@@ -727,64 +727,61 @@ function App() {
               </div>
             </div>
 
-            {/* Панель 3: Детали и Конфигурация (Правая) */}
+            {/* Панель 3: Детали Компонента (Правая) */}
             <div class="panel details-panel">
-              <Show when={selectedBundle()} fallback={<p style="color: var(--text-secondary); padding: 10px;">Выберите или создайте бандл для настройки.</p>}>
-                <div class="bundle-details-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px; margin-bottom: 15px;">
-                  <div class="bundle-details-info">
-                    <h3 style="font-size: 18px; margin: 0 0 4px 0; color: var(--cyan);">{selectedBundle().name}</h3>
-                    <p style="font-size: 12px; margin: 0; color: var(--text-secondary);">{selectedBundle().description || "Описание не задано"}</p>
-                  </div>
-                  <button class="danger" style="padding: 6px 10px; font-size: 12px;" onClick={() => handleDeleteBundle(selectedBundle().id)}>
-                    🗑
-                  </button>
-                </div>
-
-                {/* Горизонтальные табы категорий */}
-                <h4 style="font-size: 12px; text-transform: uppercase; color: var(--cyan); margin-top: 20px; letter-spacing: 0.5px;">
-                  📦 Содержимое конфигурации:
-                </h4>
-
-                <div class="bundle-tabs">
-                  <For each={[
-                    { id: "MCP", label: "🔌 MCP" },
-                    { id: "Rule", label: "📜 Правила" },
-                    { id: "Skill", label: "🧠 Навыки" },
-                    { id: "Workflow", label: "🔄 Процессы" },
-                    { id: "Hook", label: "🪝 Хуки" }
-                  ]}>
-                    {(tab) => {
-                      const count = () => selectedBundle() ? selectedBundle().components.filter(c => c.type === tab.id).length : 0;
-                      const isActive = () => selectedBundleTab() === tab.id;
-                      return (
-                        <button 
-                          class={`bundle-tab-btn ${isActive() ? 'active' : ''}`}
-                          onClick={() => setSelectedBundleTab(tab.id)}
-                        >
-                          {tab.label} ({count()})
-                        </button>
-                      )
-                    }}
-                  </For>
-                </div>
-
-                {/* Список содержимого активной вкладки */}
-                <div class="bundle-content-list" style="max-height: 200px; overflow-y: auto;">
-                  <For 
-                    each={selectedBundle().components.filter(c => c.type === selectedBundleTab())} 
-                    fallback={<p style="color: var(--text-secondary); font-size: 12px; padding: 20px 0; text-align: center;">В этой категории пока пусто.</p>}
-                  >
-                    {(item) => (
-                      <div class="bundle-content-item">
-                        <strong style="font-size: 13px; font-weight: 600;">{item.name}</strong>
-                        <button class="danger" style="padding: 4px 10px; font-size: 11px;" onClick={() => handleRemoveItemFromBundle(item.name, item.type)}>
-                          Убрать
-                        </button>
+              <Show when={selectedComponent()} fallback={<p style="color: var(--text-secondary); padding: 10px;">Выберите компонент для просмотра деталей.</p>}>
+                <div class="component-details">
+                  <h3 style="font-size: 18px; margin: 0 0 8px 0; color: var(--cyan);">⚡ {selectedComponent().Name}</h3>
+                  <p style="font-size: 13px; margin: 0 0 15px 0; color: var(--text-secondary); line-height: 1.4;">{selectedComponent().Description || "Описание отсутствует"}</p>
+                  
+                  <div style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); margin-bottom: 20px;">
+                    <div style="font-size: 11px; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 4px; letter-spacing: 0.5px;">Относительный путь:</div>
+                    <code style="font-family: var(--font-mono); font-size: 12px; color: var(--purple); word-break: break-all;">{selectedComponent().Path}</code>
+                    
+                    <Show when={selectedComponent().Details}>
+                      <div style="margin-top: 12px;">
+                        <div style="font-size: 11px; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 4px; letter-spacing: 0.5px;">Параметры запуска:</div>
+                        <code style="font-family: var(--font-mono); font-size: 12px; color: var(--yellow); word-break: break-all;">{selectedComponent().Details}</code>
                       </div>
-                    )}
-                  </For>
-                </div>
+                    </Show>
+                  </div>
 
+                  <h4 style="font-size: 12px; text-transform: uppercase; color: var(--cyan); margin: 0 0 10px 0; letter-spacing: 0.5px;">📁 Статус источника:</h4>
+                  <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.01); padding: 8px 12px; border-radius: 6px;">
+                      <span style="font-size: 13px;">Локальный репозиторий (CWD)</span>
+                      <span class={`badge ${selectedComponent().local_exists ? 'detected' : 'not-found'}`}>
+                        {selectedComponent().local_exists ? 'существует' : 'отсутствует'}
+                      </span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.01); padding: 8px 12px; border-radius: 6px;">
+                      <span style="font-size: 13px;">Глобальный каталог (~/.agents)</span>
+                      <span class={`badge ${selectedComponent().global_exists ? 'detected' : 'not-found'}`}>
+                        {selectedComponent().global_exists ? 'существует' : 'отсутствует'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <h4 style="font-size: 12px; text-transform: uppercase; color: var(--cyan); margin: 0 0 10px 0; letter-spacing: 0.5px;">🔄 Синхронизация файлов:</h4>
+                  <div style="display: flex; gap: 10px;">
+                    <button 
+                      class="as-btn"
+                      style="flex: 1; padding: 10px 14px; font-size: 12px;"
+                      disabled={!selectedComponent().global_exists}
+                      onClick={() => handleSyncSource(selectedComponent(), false)}
+                    >
+                      📥 Записать локально
+                    </button>
+                    <button 
+                      class="as-btn"
+                      style="flex: 1; padding: 10px 14px; font-size: 12px;"
+                      disabled={!selectedComponent().local_exists}
+                      onClick={() => handleSyncSource(selectedComponent(), true)}
+                    >
+                      📤 В глобальный каталог
+                    </button>
+                  </div>
+                </div>
               </Show>
             </div>
 

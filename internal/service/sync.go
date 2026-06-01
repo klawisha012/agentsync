@@ -1,4 +1,4 @@
-package main
+package service
 
 import (
 	"archive/zip"
@@ -11,11 +11,13 @@ import (
 	"strings"
 	"time"
 
+	"agentsync/internal/domain"
+
 	"github.com/hashicorp/mdns"
 )
 
 // P2PShare запускает HTTP-сервер для раздачи и анонсирует его через mDNS
-func P2PShare(repoPath string, pin string, port int) error {
+func P2PShare(repoPath string, pin string, port int, logger Logger) error {
 	// 1. Создаем легковесный HTTP-сервер
 	mux := http.NewServeMux()
 	mux.HandleFunc("/pull", func(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +72,9 @@ func P2PShare(repoPath string, pin string, port int) error {
 		})
 
 		if err != nil {
-			fmt.Printf("   [-] Ошибка сборки zip: %v\n", err)
+			if logger != nil {
+				logger.Log(fmt.Sprintf("Ошибка сборки zip: %v", err), "error")
+			}
 		}
 	})
 
@@ -84,16 +88,19 @@ func P2PShare(repoPath string, pin string, port int) error {
 	host, _ := os.Hostname()
 	serviceName := fmt.Sprintf("agentsync-%s", host)
 	
-	fmt.Printf("%s%s[+] Сервер запущен на порту %d%s\n", ColorGreen, ColorBold, actualPort, ColorReset)
-	fmt.Printf("%s%s[+] Анонсирование P2P AirDrop по mDNS под именем %s.local...%s\n", ColorBlue, ColorBold, serviceName, ColorReset)
-	fmt.Printf("%s%s[!] Одноразовый PIN-код для друга: %s%s\n\n", ColorYellow, ColorBold, pin, ColorReset)
+	if logger != nil {
+		logger.Log(fmt.Sprintf("Сервер запущен на порту %d", actualPort), "info")
+		logger.Log(fmt.Sprintf("Анонсирование P2P AirDrop по mDNS под именем %s.local...", serviceName), "info")
+		logger.Log(fmt.Sprintf("Одноразовый PIN-код для друга: %s", pin), "info")
+	}
 
 	ips, _ := localIPs()
-	fmt.Println("Доступные адреса в локальной сети:")
-	for _, ip := range ips {
-		fmt.Printf("   http://%s:%d/pull?pin=%s\n", ip, actualPort, pin)
+	if logger != nil {
+		logger.Log("Доступные адреса в локальной сети:", "info")
+		for _, ip := range ips {
+			logger.Log(fmt.Sprintf("   http://%s:%d/pull?pin=%s", ip, actualPort, pin), "info")
+		}
 	}
-	fmt.Println("\nДля остановки раздачи нажмите Ctrl+C.")
 
 	service, err := mdns.NewMDNSService(
 		serviceName,
@@ -147,8 +154,10 @@ func DiscoverServices(timeout time.Duration) ([]string, error) {
 }
 
 // P2PPull скачивает zip-архив конфигурации и разворачивает его локально
-func P2PPull(targetHost string, targetPort int, pin string, repoPath string) error {
-	fmt.Printf("%s%s[+] Подключение к P2P ноде %s:%d...%s\n", ColorBlue, ColorBold, targetHost, targetPort, ColorReset)
+func P2PPull(targetHost string, targetPort int, pin string, repoPath string, logger Logger) error {
+	if logger != nil {
+		logger.Log(fmt.Sprintf("Подключение к P2P ноде %s:%d...", targetHost, targetPort), "info")
+	}
 
 	url := fmt.Sprintf("http://%s:%d/pull?pin=%s", targetHost, targetPort, pin)
 	
@@ -178,11 +187,10 @@ func P2PPull(targetHost string, targetPort int, pin string, repoPath string) err
 		return err
 	}
 
-	// Распаковываем во временную или текущую каноническую папку
+	// Распаковываем
 	_, _ = tmpFile.Seek(0, 0)
 	zipReader, err := zip.NewReader(tmpFile, resp.ContentLength)
 	if err != nil {
-		// Если размер ContentLength неизвестен, считываем статистику файла
 		fi, statErr := tmpFile.Stat()
 		if statErr != nil {
 			return statErr
@@ -193,7 +201,9 @@ func P2PPull(targetHost string, targetPort int, pin string, repoPath string) err
 		}
 	}
 
-	fmt.Printf("%s%s[+] Распаковка канонических файлов в репозиторий %s...%s\n", ColorBlue, ColorBold, repoPath, ColorReset)
+	if logger != nil {
+		logger.Log(fmt.Sprintf("Распаковка канонических файлов в репозиторий %s...", repoPath), "info")
+	}
 
 	for _, file := range zipReader.File {
 		path := filepath.Join(repoPath, file.Name)
@@ -229,7 +239,9 @@ func P2PPull(targetHost string, targetPort int, pin string, repoPath string) err
 		}
 	}
 
-	fmt.Printf("%s✔ Успешно импортировано конфигураций по P2P AirDrop!%s\n", ColorGreen, ColorReset)
+	if logger != nil {
+		logger.Log("Успешно импортировано конфигураций по P2P AirDrop!", "info")
+	}
 	return nil
 }
 
@@ -249,4 +261,56 @@ func localIPs() ([]string, error) {
 	}
 
 	return ips, nil
+}
+
+// SyncComponentSource копирует файлы компонентов между локальным CWD и глобальным ~/.agents
+func SyncComponentSource(repoPath string, comp domain.AgentComponent, toGlobal bool) error {
+	var subDir string
+	var fileName string
+	switch comp.Type {
+	case domain.ComponentMCP:
+		subDir = "mcp"
+		fileName = comp.Name + ".yaml"
+	case domain.ComponentRule:
+		subDir = "rules"
+		fileName = comp.Name + ".md"
+	case domain.ComponentSkill:
+		subDir = "skills"
+		fileName = filepath.Join(comp.Name, "SKILL.md")
+	case domain.ComponentWorkflow:
+		subDir = "workflows"
+		fileName = comp.Name
+	case domain.ComponentHook:
+		subDir = "hooks"
+		fileName = comp.Name
+	default:
+		return fmt.Errorf("неподдерживаемый тип")
+	}
+
+	localPath := filepath.Join(repoPath, subDir, fileName)
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	globalPath := filepath.Join(home, ".agents", subDir, fileName)
+
+	var src, dst string
+	if toGlobal {
+		src = localPath
+		dst = globalPath
+	} else {
+		src = globalPath
+		dst = localPath
+	}
+
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+
+	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+		return err
+	}
+
+	return os.WriteFile(dst, data, 0644)
 }

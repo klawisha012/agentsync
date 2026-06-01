@@ -1,4 +1,4 @@
-package main
+package repository
 
 import (
 	"bufio"
@@ -8,6 +8,12 @@ import (
 	"regexp"
 	"strings"
 )
+
+// RequiredSecret представляет секрет, необходимый для работы конкретных MCP серверов
+type RequiredSecret struct {
+	Name   string   `json:"name"`
+	UsedBy []string `json:"used_by"`
+}
 
 // Паттерны для поиска утечек секретов в канонических файлах (Фаза 2: gitleaks-аудит)
 var secretLeakPatterns = map[string]*regexp.Regexp{
@@ -28,10 +34,10 @@ func LoadSecrets(repoPath string) (map[string]string, error) {
 
 	// Сначала проверяем глобальный путь ~/.agentsync/secrets.env
 	secretsPath := filepath.Join(home, ".agentsync", "secrets.env")
-	if !fileExists(secretsPath) {
+	if !repoFileExists(secretsPath) {
 		// Затем проверяем локальный secrets.env в репозитории
 		secretsPath = filepath.Join(repoPath, "secrets.env")
-		if !fileExists(secretsPath) {
+		if !repoFileExists(secretsPath) {
 			// Если нигде нет, возвращаем пустую мапу без ошибки
 			return secrets, nil
 		}
@@ -113,8 +119,8 @@ func AuditRepository(repoPath string) ([]string, error) {
 					if len(match) > 12 {
 						masked = match[:6] + "..." + match[len(match)-6:]
 					}
-					warnings = append(warnings, fmt.Sprintf("%s%s%s: Найден сырой секрет %s%s%s в файле %s%s%s%s", 
-						ColorYellow, ColorBold, name, ColorReset, ColorRed, masked, ColorReset, ColorCyan, relPath, ColorReset))
+					// Возвращаем чистые строки варнингов без ANSI цветов
+					warnings = append(warnings, fmt.Sprintf("%s: Найден сырой секрет %s в файле %s", name, masked, relPath))
 				}
 			}
 		}
@@ -131,7 +137,7 @@ func SaveSecrets(repoPath string, secrets map[string]string) error {
 	}
 
 	secretsPath := filepath.Join(home, ".agentsync", "secrets.env")
-	if !fileExists(secretsPath) {
+	if !repoFileExists(secretsPath) {
 		secretsPath = filepath.Join(repoPath, "secrets.env")
 	}
 
@@ -157,4 +163,12 @@ func SaveSecrets(repoPath string, secrets map[string]string) error {
 	}
 
 	return nil
+}
+
+func repoFileExists(path string) bool {
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
 }

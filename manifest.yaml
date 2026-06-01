@@ -4,8 +4,7 @@ active_agents:
     - claude-code
 active_bundle: '----1'
 installed_plugins:
-    claude-desktop:
-        - mem0
     claude-code:
         - mem0
-
+    claude-desktop:
+        - mem0

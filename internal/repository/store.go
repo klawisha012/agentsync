@@ -1,6 +1,7 @@
-package main
+package repository
 
 import (
+	"agentsync/internal/domain"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -32,16 +33,16 @@ func (s *Store) getSearchDirs(subDir string) []string {
 }
 
 // LoadManifest загружает глобальный manifest.yaml
-func (s *Store) LoadManifest() (Manifest, error) {
+func (s *Store) LoadManifest() (domain.Manifest, error) {
 	manifestPath := filepath.Join(s.RepoPath, "manifest.yaml")
-	var manifest Manifest
+	var manifest domain.Manifest
 
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// Возвращаем дефолтный манифест
-			return Manifest{
-				ActiveAgents: []AgentType{AgentClaudeCode, AgentClaudeDesktop, AgentAntigravity},
+			return domain.Manifest{
+				ActiveAgents: []domain.AgentType{domain.AgentClaudeCode, domain.AgentClaudeDesktop, domain.AgentAntigravity},
 			}, nil
 		}
 		return manifest, err
@@ -52,7 +53,7 @@ func (s *Store) LoadManifest() (Manifest, error) {
 }
 
 // SaveManifest сохраняет manifest.yaml
-func (s *Store) SaveManifest(manifest Manifest) error {
+func (s *Store) SaveManifest(manifest domain.Manifest) error {
 	manifestPath := filepath.Join(s.RepoPath, "manifest.yaml")
 	data, err := yaml.Marshal(&manifest)
 	if err != nil {
@@ -61,10 +62,9 @@ func (s *Store) SaveManifest(manifest Manifest) error {
 	return os.WriteFile(manifestPath, data, 0644)
 }
 
-
 // LoadMCPs загружает все канонические MCP-серверы из mcp/*.yaml
-func (s *Store) LoadMCPs() ([]MCPConfig, error) {
-	var configs []MCPConfig
+func (s *Store) LoadMCPs() ([]domain.MCPConfig, error) {
+	var configs []domain.MCPConfig
 	seen := make(map[string]bool)
 
 	dirs := s.getSearchDirs("mcp")
@@ -85,7 +85,7 @@ func (s *Store) LoadMCPs() ([]MCPConfig, error) {
 				continue
 			}
 
-			var mcp MCPConfig
+			var mcp domain.MCPConfig
 			if err := yaml.Unmarshal(data, &mcp); err != nil {
 				continue
 			}
@@ -106,8 +106,8 @@ func (s *Store) LoadMCPs() ([]MCPConfig, error) {
 }
 
 // LoadRules загружает все канонические правила из rules/*.md
-func (s *Store) LoadRules() ([]Rule, error) {
-	var rules []Rule
+func (s *Store) LoadRules() ([]domain.Rule, error) {
+	var rules []domain.Rule
 	seen := make(map[string]bool)
 
 	dirs := s.getSearchDirs("rules")
@@ -144,15 +144,15 @@ func (s *Store) LoadRules() ([]Rule, error) {
 }
 
 // parseRuleMarkdown разбирает Markdown с YAML frontmatter
-func parseRuleMarkdown(content string, fileName string) (Rule, error) {
-	var rule Rule
+func parseRuleMarkdown(content string, fileName string) (domain.Rule, error) {
+	var rule domain.Rule
 	normalized := strings.ReplaceAll(content, "\r\n", "\n")
 
 	if !strings.HasPrefix(normalized, "---\n") {
 		// Нет фронтматтера, используем имя файла как имя правила
-		rule.Header = RuleFrontmatter{
+		rule.Header = domain.RuleFrontmatter{
 			Name:    strings.TrimSuffix(fileName, ".md"),
-			Targets: []AgentType{AgentClaudeCode, AgentClaudeDesktop, AgentAntigravity},
+			Targets: []domain.AgentType{domain.AgentClaudeCode, domain.AgentClaudeDesktop, domain.AgentAntigravity},
 		}
 		rule.Content = content
 		return rule, nil
@@ -163,7 +163,7 @@ func parseRuleMarkdown(content string, fileName string) (Rule, error) {
 		return rule, fmt.Errorf("неверный формат frontmatter в файле %s", fileName)
 	}
 
-	var header RuleFrontmatter
+	var header domain.RuleFrontmatter
 	if err := yaml.Unmarshal([]byte(parts[1]), &header); err != nil {
 		return rule, fmt.Errorf("ошибка парсинга frontmatter в %s: %w", fileName, err)
 	}
@@ -178,8 +178,8 @@ func parseRuleMarkdown(content string, fileName string) (Rule, error) {
 }
 
 // LoadSkills загружает все канонические навыки из skills/*/SKILL.md или skills/*.md
-func (s *Store) LoadSkills() ([]Rule, error) {
-	var skills []Rule
+func (s *Store) LoadSkills() ([]domain.Rule, error) {
+	var skills []domain.Rule
 	seen := make(map[string]bool)
 
 	dirs := s.getSearchDirs("skills")
@@ -233,8 +233,8 @@ func (s *Store) LoadSkills() ([]Rule, error) {
 }
 
 // LoadWorkflows загружает все канонические рабочие процессы из workflows/*
-func (s *Store) LoadWorkflows() ([]Rule, error) {
-	var workflows []Rule
+func (s *Store) LoadWorkflows() ([]domain.Rule, error) {
+	var workflows []domain.Rule
 	seen := make(map[string]bool)
 
 	dirs := s.getSearchDirs("workflows")
@@ -255,11 +255,11 @@ func (s *Store) LoadWorkflows() ([]Rule, error) {
 				continue
 			}
 
-			var rule Rule
+			var rule domain.Rule
 			isYaml := strings.HasSuffix(entry.Name(), ".yaml") || strings.HasSuffix(entry.Name(), ".yml")
 			
 			if isYaml {
-				var fm RuleFrontmatter
+				var fm domain.RuleFrontmatter
 				if err := yaml.Unmarshal(data, &fm); err == nil {
 					if fm.Name == "" {
 						fm.Name = strings.TrimSuffix(strings.TrimSuffix(entry.Name(), ".yaml"), ".yml")
@@ -286,8 +286,8 @@ func (s *Store) LoadWorkflows() ([]Rule, error) {
 }
 
 // LoadHooks загружает все хуки из hooks/*
-func (s *Store) LoadHooks() ([]Rule, error) {
-	var hooks []Rule
+func (s *Store) LoadHooks() ([]domain.Rule, error) {
+	var hooks []domain.Rule
 	seen := make(map[string]bool)
 
 	dirs := s.getSearchDirs("hooks")
@@ -303,11 +303,11 @@ func (s *Store) LoadHooks() ([]Rule, error) {
 			}
 
 			if !seen[entry.Name()] {
-				rule := Rule{
-					Header: RuleFrontmatter{
+				rule := domain.Rule{
+					Header: domain.RuleFrontmatter{
 						Name:        entry.Name(),
 						Description: "Локальный триггер автоматизации (Hook)",
-						Targets:     []AgentType{AgentClaudeCode, AgentAntigravity},
+						Targets:     []domain.AgentType{domain.AgentClaudeCode, domain.AgentAntigravity},
 					},
 					Content: "Локальный хук репозитория",
 				}
@@ -337,7 +337,7 @@ func (s *Store) ResolveComponentPath(subDir string, fileName string) string {
 }
 
 // UpdateMCPTargets обновляет цели для MCP-сервера
-func (s *Store) UpdateMCPTargets(name string, targets []AgentType) error {
+func (s *Store) UpdateMCPTargets(name string, targets []domain.AgentType) error {
 	fileName := name + ".yaml"
 	path := s.ResolveComponentPath("mcp", fileName)
 	if !fileExists(path) {
@@ -351,7 +351,7 @@ func (s *Store) UpdateMCPTargets(name string, targets []AgentType) error {
 		return err
 	}
 
-	var mcp MCPConfig
+	var mcp domain.MCPConfig
 	if err := yaml.Unmarshal(data, &mcp); err != nil {
 		return err
 	}
@@ -367,7 +367,7 @@ func (s *Store) UpdateMCPTargets(name string, targets []AgentType) error {
 }
 
 // UpdateRuleTargets обновляет цели для правила
-func (s *Store) UpdateRuleTargets(name string, targets []AgentType) error {
+func (s *Store) UpdateRuleTargets(name string, targets []domain.AgentType) error {
 	path := s.ResolveComponentPath("rules", name+".md")
 
 	data, err := os.ReadFile(path)
@@ -379,7 +379,7 @@ func (s *Store) UpdateRuleTargets(name string, targets []AgentType) error {
 	normalized := strings.ReplaceAll(content, "\r\n", "\n")
 
 	if !strings.HasPrefix(normalized, "---\n") {
-		header := RuleFrontmatter{
+		header := domain.RuleFrontmatter{
 			Name:    name,
 			Targets: targets,
 		}
@@ -396,7 +396,7 @@ func (s *Store) UpdateRuleTargets(name string, targets []AgentType) error {
 		return fmt.Errorf("неверный формат frontmatter")
 	}
 
-	var header RuleFrontmatter
+	var header domain.RuleFrontmatter
 	if err := yaml.Unmarshal([]byte(parts[1]), &header); err != nil {
 		return err
 	}
@@ -413,7 +413,7 @@ func (s *Store) UpdateRuleTargets(name string, targets []AgentType) error {
 }
 
 // UpdateSkillTargets обновляет цели для навыка (Skill)
-func (s *Store) UpdateSkillTargets(name string, targets []AgentType) error {
+func (s *Store) UpdateSkillTargets(name string, targets []domain.AgentType) error {
 	path := s.ResolveComponentPath("skills", filepath.Join(name, "SKILL.md"))
 	if !fileExists(path) {
 		path = s.ResolveComponentPath("skills", name+".md")
@@ -428,7 +428,7 @@ func (s *Store) UpdateSkillTargets(name string, targets []AgentType) error {
 	normalized := strings.ReplaceAll(content, "\r\n", "\n")
 
 	if !strings.HasPrefix(normalized, "---\n") {
-		header := RuleFrontmatter{
+		header := domain.RuleFrontmatter{
 			Name:    name,
 			Targets: targets,
 		}
@@ -445,7 +445,7 @@ func (s *Store) UpdateSkillTargets(name string, targets []AgentType) error {
 		return fmt.Errorf("неверный формат frontmatter")
 	}
 
-	var header RuleFrontmatter
+	var header domain.RuleFrontmatter
 	if err := yaml.Unmarshal([]byte(parts[1]), &header); err != nil {
 		return err
 	}
@@ -462,7 +462,7 @@ func (s *Store) UpdateSkillTargets(name string, targets []AgentType) error {
 }
 
 // UpdateWorkflowTargets обновляет цели для воркфлоу
-func (s *Store) UpdateWorkflowTargets(name string, targets []AgentType) error {
+func (s *Store) UpdateWorkflowTargets(name string, targets []domain.AgentType) error {
 	path := s.ResolveComponentPath("workflows", name)
 	if !fileExists(path) {
 		if fileExists(s.ResolveComponentPath("workflows", name+".yaml")) {
@@ -481,7 +481,7 @@ func (s *Store) UpdateWorkflowTargets(name string, targets []AgentType) error {
 
 	isYaml := strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml")
 	if isYaml {
-		var header RuleFrontmatter
+		var header domain.RuleFrontmatter
 		if err := yaml.Unmarshal(data, &header); err != nil {
 			return err
 		}
@@ -496,7 +496,7 @@ func (s *Store) UpdateWorkflowTargets(name string, targets []AgentType) error {
 	content := string(data)
 	normalized := strings.ReplaceAll(content, "\r\n", "\n")
 	if !strings.HasPrefix(normalized, "---\n") {
-		header := RuleFrontmatter{
+		header := domain.RuleFrontmatter{
 			Name:    name,
 			Targets: targets,
 		}
@@ -513,7 +513,7 @@ func (s *Store) UpdateWorkflowTargets(name string, targets []AgentType) error {
 		return fmt.Errorf("неверный формат frontmatter")
 	}
 
-	var header RuleFrontmatter
+	var header domain.RuleFrontmatter
 	if err := yaml.Unmarshal([]byte(parts[1]), &header); err != nil {
 		return err
 	}
@@ -529,22 +529,8 @@ func (s *Store) UpdateWorkflowTargets(name string, targets []AgentType) error {
 	return os.WriteFile(path, []byte(newContent), 0644)
 }
 
-// BundleItem описывает один компонент внутри бандла
-type BundleItem struct {
-	Type ComponentType `yaml:"type" json:"type"`
-	Name string        `yaml:"name" json:"name"`
-}
-
-// ConfigBundle представляет бандл конфигурации
-type ConfigBundle struct {
-	ID          string       `yaml:"id" json:"id"`
-	Name        string       `yaml:"name" json:"name"`
-	Description string       `yaml:"description,omitempty" json:"description"`
-	Components  []BundleItem `yaml:"components" json:"components"`
-}
-
 // LoadBundles загружает все бандлы из папки configs/*.yaml
-func (s *Store) LoadBundles() ([]ConfigBundle, error) {
+func (s *Store) LoadBundles() ([]domain.ConfigBundle, error) {
 	configsDir := filepath.Join(s.RepoPath, "configs")
 	if err := os.MkdirAll(configsDir, 0755); err != nil {
 		return nil, err
@@ -555,7 +541,7 @@ func (s *Store) LoadBundles() ([]ConfigBundle, error) {
 		return nil, err
 	}
 
-	var bundles []ConfigBundle
+	var bundles []domain.ConfigBundle
 	for _, entry := range entries {
 		if entry.IsDir() || (!strings.HasSuffix(entry.Name(), ".yaml") && !strings.HasSuffix(entry.Name(), ".yml")) {
 			continue
@@ -567,7 +553,7 @@ func (s *Store) LoadBundles() ([]ConfigBundle, error) {
 			continue
 		}
 
-		var bundle ConfigBundle
+		var bundle domain.ConfigBundle
 		if err := yaml.Unmarshal(data, &bundle); err != nil {
 			continue
 		}
@@ -582,7 +568,7 @@ func (s *Store) LoadBundles() ([]ConfigBundle, error) {
 }
 
 // SaveBundle сохраняет бандл в configs/<id>.yaml
-func (s *Store) SaveBundle(bundle ConfigBundle) error {
+func (s *Store) SaveBundle(bundle domain.ConfigBundle) error {
 	configsDir := filepath.Join(s.RepoPath, "configs")
 	if err := os.MkdirAll(configsDir, 0755); err != nil {
 		return err
@@ -610,4 +596,10 @@ func (s *Store) DeleteBundle(id string) error {
 	return os.Remove(path)
 }
 
-
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
+}

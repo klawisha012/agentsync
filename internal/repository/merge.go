@@ -1,6 +1,7 @@
-package main
+package repository
 
 import (
+	"agentsync/internal/domain"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -11,7 +12,7 @@ import (
 var secretPlaceholderRegex = regexp.MustCompile(`\$\{secrets\.([a-zA-Z0-9_]+)\}`)
 
 // MergeJSONConfig выполняет умное слияние MCP-сервера в существующий JSON конфиг агента
-func MergeJSONConfig(existingJSON []byte, mcp MCPConfig, secrets map[string]string) ([]byte, error) {
+func MergeJSONConfig(existingJSON []byte, mcp domain.MCPConfig, secrets map[string]string) ([]byte, error) {
 	var configMap map[string]interface{}
 
 	if len(existingJSON) == 0 || strings.TrimSpace(string(existingJSON)) == "" {
@@ -48,7 +49,7 @@ func MergeJSONConfig(existingJSON []byte, mcp MCPConfig, secrets map[string]stri
 		if len(mcp.Headers) > 0 {
 			headersCopy := make(map[string]interface{})
 			for k, v := range mcp.Headers {
-				headersCopy[k] = injectSecrets(v, secrets)
+				headersCopy[k] = InjectSecrets(v, secrets)
 			}
 			serverSettings["headers"] = headersCopy
 		}
@@ -59,7 +60,7 @@ func MergeJSONConfig(existingJSON []byte, mcp MCPConfig, secrets map[string]stri
 		// Копируем аргументы
 		argsCopy := make([]interface{}, len(mcp.Args))
 		for i, arg := range mcp.Args {
-			argsCopy[i] = injectSecrets(arg, secrets)
+			argsCopy[i] = InjectSecrets(arg, secrets)
 		}
 		serverSettings["args"] = argsCopy
 
@@ -67,7 +68,7 @@ func MergeJSONConfig(existingJSON []byte, mcp MCPConfig, secrets map[string]stri
 		if len(mcp.Env) > 0 {
 			envSettings := make(map[string]interface{})
 			for k, v := range mcp.Env {
-				envSettings[k] = injectSecrets(v, secrets)
+				envSettings[k] = InjectSecrets(v, secrets)
 			}
 			serverSettings["env"] = envSettings
 		}
@@ -133,8 +134,8 @@ func MergeMarkdownConfig(existingContent string, ruleContent string) string {
 	return result.String()
 }
 
-// injectSecrets заменяет ${secrets.VAR} реальными значениями
-func injectSecrets(val string, secrets map[string]string) string {
+// InjectSecrets заменяет ${secrets.VAR} реальными значениями
+func InjectSecrets(val string, secrets map[string]string) string {
 	return secretPlaceholderRegex.ReplaceAllStringFunc(val, func(match string) string {
 		submatches := secretPlaceholderRegex.FindStringSubmatch(match)
 		if len(submatches) < 2 {

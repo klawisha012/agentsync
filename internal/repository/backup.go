@@ -1,6 +1,7 @@
-package main
+package repository
 
 import (
+	"agentsync/internal/domain"
 	"fmt"
 	"io"
 	"os"
@@ -9,9 +10,9 @@ import (
 )
 
 // CreateBackup делает резервную копию файла перед слиянием
-func CreateBackup(filePath string, agent AgentType) error {
+func CreateBackup(filePath string, agent domain.AgentType) error {
 	// Если файл не существует, бэкапить нечего
-	if !fileExists(filePath) {
+	if !backupFileExists(filePath) {
 		return nil
 	}
 
@@ -49,4 +50,12 @@ func CreateBackup(filePath string, agent AgentType) error {
 	}
 
 	return nil
+}
+
+func backupFileExists(path string) bool {
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
 }

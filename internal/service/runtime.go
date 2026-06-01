@@ -1,4 +1,4 @@
-package main
+package service
 
 import (
 	"archive/zip"
@@ -14,9 +14,10 @@ import (
 // RuntimeManager управляет изолированными рантаймами (Node.js/Python)
 type RuntimeManager struct {
 	basePath string
+	logger   Logger
 }
 
-func NewRuntimeManager() (*RuntimeManager, error) {
+func NewRuntimeManager(logger Logger) (*RuntimeManager, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
@@ -25,7 +26,13 @@ func NewRuntimeManager() (*RuntimeManager, error) {
 	if err := os.MkdirAll(base, 0755); err != nil {
 		return nil, err
 	}
-	return &RuntimeManager{basePath: base}, nil
+	return &RuntimeManager{basePath: base, logger: logger}, nil
+}
+
+func (m *RuntimeManager) log(msg string, level string) {
+	if m.logger != nil {
+		m.logger.Log(msg, level)
+	}
 }
 
 // ResolveRuntimePath возвращает путь к исполняемому файлу рантайма, при необходимости скачивая его
@@ -59,24 +66,24 @@ func (m *RuntimeManager) ensureNodeJS(version string) (string, error) {
 	nodeDir := filepath.Join(m.basePath, "node", "v"+version)
 	nodeExe := filepath.Join(nodeDir, "node.exe") // На Windows
 
-	if fileExists(nodeExe) {
+	if serviceFileExists(nodeExe) {
 		return nodeExe, nil
 	}
 
-	// Сначала проверяем, есть ли системный Node.js той же мажорной версии (оптимизация скорости)
+	// Сначала проверяем, есть ли системный Node.js той же мажорной версии (ожидаем ускорение)
 	sysNode, err := exec.LookPath("node")
 	if err == nil {
 		// Проверяем версию
 		cmd := exec.Command(sysNode, "-v")
 		output, errOut := cmd.Output()
 		if errOut == nil && strings.HasPrefix(strings.TrimSpace(string(output)), "v"+version) {
-			fmt.Printf("   ℹ Обнаружен подходящий системный Node.js (%s)\n", strings.TrimSpace(string(output)))
+			m.log(fmt.Sprintf("Обнаружен подходящий системный Node.js (%s)", strings.TrimSpace(string(output))), "info")
 			return sysNode, nil
 		}
 	}
 
 	// Если системного нет, скачиваем портативный Node.js
-	fmt.Printf("   %s[+] Скачивание портативного Node.js v%s...%s\n", ColorCyan, version, ColorReset)
+	m.log(fmt.Sprintf("Скачивание портативного Node.js v%s...", version), "info")
 	url := fmt.Sprintf("https://nodejs.org/dist/v%s.11.0/node-v%s.11.0-win-x64.zip", version, version)
 	
 	tmpZip := filepath.Join(os.TempDir(), fmt.Sprintf("node-v%s.zip", version))
@@ -85,13 +92,13 @@ func (m *RuntimeManager) ensureNodeJS(version string) (string, error) {
 	}
 	defer os.Remove(tmpZip)
 
-	fmt.Printf("   %s[+] Распаковка в изолированное окружение %s...%s\n", ColorCyan, nodeDir, ColorReset)
+	m.log(fmt.Sprintf("Распаковка в изолированное окружение %s...", nodeDir), "info")
 	if err := unzipNode(tmpZip, filepath.Dir(nodeDir), "node-v"+version+".11.0-win-x64", "v"+version); err != nil {
 		return "", fmt.Errorf("ошибка распаковки Node.js: %w", err)
 	}
 
-	if fileExists(nodeExe) {
-		fmt.Printf("   %s✔ Портативный Node.js успешно установлен!%s\n", ColorGreen, ColorReset)
+	if serviceFileExists(nodeExe) {
+		m.log("Портативный Node.js успешно установлен!", "info")
 		return nodeExe, nil
 	}
 
@@ -118,14 +125,14 @@ func (m *RuntimeManager) InstallMCPPackage(runtimeExe string, packageName string
 	}
 
 	packageCheckPath := filepath.Join(targetInstallDir, "node_modules", packageName)
-	if fileExists(filepath.Join(packageCheckPath, "package.json")) {
+	if serviceFileExists(filepath.Join(packageCheckPath, "package.json")) {
 		return packageCheckPath, nil
 	}
 
-	fmt.Printf("   %s[+] Установка npm пакета %s в изолированное окружение...%s\n", ColorCyan, packageName, ColorReset)
+	m.log(fmt.Sprintf("Установка npm пакета %s в изолированное окружение...", packageName), "info")
 
 	var cmd *exec.Cmd
-	if strings.Contains(runtimeExe, "runtime") && fileExists(npmCli) {
+	if strings.Contains(runtimeExe, "runtime") && serviceFileExists(npmCli) {
 		// Используем портативный npm
 		cmd = exec.Command(runtimeExe, npmCli, "install", "--prefix", targetInstallDir, packageName)
 	} else {
@@ -150,7 +157,7 @@ func (m *RuntimeManager) InstallMCPPackage(runtimeExe string, packageName string
 		return "", fmt.Errorf("ошибка установки npm-пакета %s: %w", packageName, err)
 	}
 
-	fmt.Printf("   %s✔ Пакет %s успешно установлен!%s\n", ColorGreen, packageName, ColorReset)
+	m.log(fmt.Sprintf("Пакет %s успешно установлен!", packageName), "info")
 	return packageCheckPath, nil
 }
 
@@ -183,7 +190,6 @@ func unzipNode(src string, dest string, expectedSubDir string, finalDirName stri
 	defer r.Close()
 
 	for _, f := range r.File {
-		// Вычисляем результирующий путь, переименовывая поддиректорию архива в finalDirName
 		relPath := f.Name
 		if strings.HasPrefix(relPath, expectedSubDir) {
 			relPath = finalDirName + relPath[len(expectedSubDir):]
@@ -218,4 +224,12 @@ func unzipNode(src string, dest string, expectedSubDir string, finalDirName stri
 		}
 	}
 	return nil
+}
+
+func serviceFileExists(path string) bool {
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
 }
