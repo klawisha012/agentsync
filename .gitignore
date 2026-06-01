@@ -10,6 +10,7 @@ agentsync.exe
 agentsync.exe~
 
 # --- Безопасность и Секреты ---
+data/secrets.env
 secrets.env
 *.env
 *.pem
@@ -31,9 +32,10 @@ frontend/dist-ssr/
 frontend/.cache/
 frontend/*.local
 
-# --- Рантаймы и Портативные пакеты ---
+# --- Рантаймы, Кэши и Портативные пакеты ---
 data/runtimes/
 data/packages/
+data/registry_cache.json
 node_modules/
 
 # --- Системные файлы и IDE ---

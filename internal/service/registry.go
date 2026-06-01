@@ -205,7 +205,7 @@ func InstallComponent(item RegistryItem) error {
 		return fmt.Errorf("неизвестный тип компонента: %s", item.Type)
 	}
 
-	targetDir := filepath.Join(cwd, subDir)
+	targetDir := filepath.Join(cwd, "data", subDir)
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		return fmt.Errorf("не удалось создать директорию %s: %v", targetDir, err)
 	}

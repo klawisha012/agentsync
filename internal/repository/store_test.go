@@ -17,22 +17,22 @@ func TestLoadAllComponents(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	// 1. Создаем MCP
-	mcpDir := filepath.Join(tmpDir, "mcp")
+	mcpDir := filepath.Join(tmpDir, "data", "mcp")
 	_ = os.MkdirAll(mcpDir, 0755)
 	_ = os.WriteFile(filepath.Join(mcpDir, "test-mcp.yaml"), []byte("name: test-mcp\ncommand: npx\nargs: []\ntargets: [claude-code]"), 0644)
 
 	// 2. Создаем Skills
-	skillsDir := filepath.Join(tmpDir, "skills", "test-skill")
+	skillsDir := filepath.Join(tmpDir, "data", "skills", "test-skill")
 	_ = os.MkdirAll(skillsDir, 0755)
 	_ = os.WriteFile(filepath.Join(skillsDir, "SKILL.md"), []byte("---\nname: test-skill\ndescription: A test skill\ntargets: [antigravity]\n---\nContent of skill"), 0644)
 
 	// 3. Создаем Workflows
-	workflowsDir := filepath.Join(tmpDir, "workflows")
+	workflowsDir := filepath.Join(tmpDir, "data", "workflows")
 	_ = os.MkdirAll(workflowsDir, 0755)
 	_ = os.WriteFile(filepath.Join(workflowsDir, "test-wf.yaml"), []byte("name: test-wf\ndescription: A test workflow\ntargets: [claude-code]"), 0644)
 
 	// 4. Создаем Hooks
-	hooksDir := filepath.Join(tmpDir, "hooks")
+	hooksDir := filepath.Join(tmpDir, "data", "hooks")
 	_ = os.MkdirAll(hooksDir, 0755)
 	_ = os.WriteFile(filepath.Join(hooksDir, "pre-commit.sh"), []byte("#!/bin/sh\necho test"), 0755)
 
@@ -74,7 +74,7 @@ func TestUpdateTargetsAndSaveSecrets(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	mcpDir := filepath.Join(tmpDir, "mcp")
+	mcpDir := filepath.Join(tmpDir, "data", "mcp")
 	_ = os.MkdirAll(mcpDir, 0755)
 	
 	mcpFile := filepath.Join(mcpDir, "test-mcp.yaml")

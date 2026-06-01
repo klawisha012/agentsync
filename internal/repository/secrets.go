@@ -36,7 +36,7 @@ func LoadSecrets(repoPath string) (map[string]string, error) {
 	secretsPath := filepath.Join(home, ".agentsync", "secrets.env")
 	if !repoFileExists(secretsPath) {
 		// Затем проверяем локальный secrets.env в репозитории
-		secretsPath = filepath.Join(repoPath, "secrets.env")
+		secretsPath = filepath.Join(repoPath, "data", "secrets.env")
 		if !repoFileExists(secretsPath) {
 			// Если нигде нет, возвращаем пустую мапу без ошибки
 			return secrets, nil
@@ -138,7 +138,7 @@ func SaveSecrets(repoPath string, secrets map[string]string) error {
 
 	secretsPath := filepath.Join(home, ".agentsync", "secrets.env")
 	if !repoFileExists(secretsPath) {
-		secretsPath = filepath.Join(repoPath, "secrets.env")
+		secretsPath = filepath.Join(repoPath, "data", "secrets.env")
 	}
 
 	// Убедимся, что директория существует

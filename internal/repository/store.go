@@ -22,7 +22,7 @@ func NewStore(repoPath string) *Store {
 
 // getSearchDirs возвращает пути для поиска компонентов (локальный репозиторий + глобальная папка ~/.agents)
 func (s *Store) getSearchDirs(subDir string) []string {
-	dirs := []string{filepath.Join(s.RepoPath, subDir)}
+	dirs := []string{filepath.Join(s.RepoPath, "data", subDir)}
 	if !s.DisableGlobal {
 		home, err := os.UserHomeDir()
 		if err == nil {
@@ -34,7 +34,7 @@ func (s *Store) getSearchDirs(subDir string) []string {
 
 // LoadManifest загружает глобальный manifest.yaml
 func (s *Store) LoadManifest() (domain.Manifest, error) {
-	manifestPath := filepath.Join(s.RepoPath, "manifest.yaml")
+	manifestPath := filepath.Join(s.RepoPath, "data", "manifest.yaml")
 	var manifest domain.Manifest
 
 	data, err := os.ReadFile(manifestPath)
@@ -54,7 +54,7 @@ func (s *Store) LoadManifest() (domain.Manifest, error) {
 
 // SaveManifest сохраняет manifest.yaml
 func (s *Store) SaveManifest(manifest domain.Manifest) error {
-	manifestPath := filepath.Join(s.RepoPath, "manifest.yaml")
+	manifestPath := filepath.Join(s.RepoPath, "data", "manifest.yaml")
 	data, err := yaml.Marshal(&manifest)
 	if err != nil {
 		return err
@@ -322,7 +322,7 @@ func (s *Store) LoadHooks() ([]domain.Rule, error) {
 
 // ResolveComponentPath находит физический путь к файлу компонента (локальный или глобальный)
 func (s *Store) ResolveComponentPath(subDir string, fileName string) string {
-	local := filepath.Join(s.RepoPath, subDir, fileName)
+	local := filepath.Join(s.RepoPath, "data", subDir, fileName)
 	if fileExists(local) {
 		return local
 	}
@@ -531,7 +531,7 @@ func (s *Store) UpdateWorkflowTargets(name string, targets []domain.AgentType) e
 
 // LoadBundles загружает все бандлы из папки configs/*.yaml
 func (s *Store) LoadBundles() ([]domain.ConfigBundle, error) {
-	configsDir := filepath.Join(s.RepoPath, "configs")
+	configsDir := filepath.Join(s.RepoPath, "data", "configs")
 	if err := os.MkdirAll(configsDir, 0755); err != nil {
 		return nil, err
 	}
@@ -569,7 +569,7 @@ func (s *Store) LoadBundles() ([]domain.ConfigBundle, error) {
 
 // SaveBundle сохраняет бандл в configs/<id>.yaml
 func (s *Store) SaveBundle(bundle domain.ConfigBundle) error {
-	configsDir := filepath.Join(s.RepoPath, "configs")
+	configsDir := filepath.Join(s.RepoPath, "data", "configs")
 	if err := os.MkdirAll(configsDir, 0755); err != nil {
 		return err
 	}
@@ -589,9 +589,9 @@ func (s *Store) SaveBundle(bundle domain.ConfigBundle) error {
 
 // DeleteBundle удаляет бандл
 func (s *Store) DeleteBundle(id string) error {
-	path := filepath.Join(s.RepoPath, "configs", id+".yaml")
+	path := filepath.Join(s.RepoPath, "data", "configs", id+".yaml")
 	if !fileExists(path) {
-		path = filepath.Join(s.RepoPath, "configs", id+".yml")
+		path = filepath.Join(s.RepoPath, "data", "configs", id+".yml")
 	}
 	return os.Remove(path)
 }

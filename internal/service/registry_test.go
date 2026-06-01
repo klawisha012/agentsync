@@ -38,7 +38,7 @@ func TestInstallComponent(t *testing.T) {
 		t.Fatalf("failed to install rule: %v", err)
 	}
 
-	ruleFile := filepath.Join("rules", "test-rule-install.md")
+	ruleFile := filepath.Join("data", "rules", "test-rule-install.md")
 	if _, err := os.Stat(ruleFile); os.IsNotExist(err) {
 		t.Errorf("expected installed rule file to exist at %s, but it doesn't", ruleFile)
 	}
@@ -55,7 +55,7 @@ func TestInstallComponent(t *testing.T) {
 		t.Fatalf("failed to install skill: %v", err)
 	}
 
-	skillFile := filepath.Join("skills", "test-skill-install", "SKILL.md")
+	skillFile := filepath.Join("data", "skills", "test-skill-install", "SKILL.md")
 	if _, err := os.Stat(skillFile); os.IsNotExist(err) {
 		t.Errorf("expected installed skill file to exist at %s, but it doesn't", skillFile)
 	}

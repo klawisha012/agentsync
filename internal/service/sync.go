@@ -52,7 +52,7 @@ func P2PShare(repoPath string, pin string, port int, logger Logger) error {
 			}
 
 			// Исключаем secrets.env, бэкапы, Git-папку и сам бинарник
-			if relPath == "secrets.env" || strings.HasPrefix(relPath, "backups") || strings.HasPrefix(relPath, ".git") || strings.HasSuffix(relPath, ".exe") {
+			if relPath == filepath.Join("data", "secrets.env") || strings.HasPrefix(relPath, "backups") || strings.HasPrefix(relPath, ".git") || strings.HasSuffix(relPath, ".exe") {
 				return nil
 			}
 
@@ -287,7 +287,7 @@ func SyncComponentSource(repoPath string, comp domain.AgentComponent, toGlobal b
 		return fmt.Errorf("неподдерживаемый тип")
 	}
 
-	localPath := filepath.Join(repoPath, subDir, fileName)
+	localPath := filepath.Join(repoPath, "data", subDir, fileName)
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
