@@ -161,7 +161,10 @@ func P2PPull(targetHost string, targetPort int, pin string, repoPath string, log
 
 	url := fmt.Sprintf("http://%s:%d/pull?pin=%s", targetHost, targetPort, pin)
 	
-	resp, err := http.Get(url)
+	client := &http.Client{
+		Timeout: 15 * time.Second,
+	}
+	resp, err := client.Get(url)
 	if err != nil {
 		return fmt.Errorf("ошибка подключения: %w", err)
 	}

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 )
 
+var _ AgentAdapter = (*ClaudeCodeAdapter)(nil)
+
 type ClaudeCodeAdapter struct {
 	homeDir string
 }

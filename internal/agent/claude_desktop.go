@@ -11,6 +11,8 @@ import (
 	"strings"
 )
 
+var _ AgentAdapter = (*ClaudeDesktopAdapter)(nil)
+
 type ClaudeDesktopAdapter struct {
 	homeDir string
 	appData string

@@ -267,7 +267,7 @@ func (s *DeployService) Deploy(activeBundleId string) error {
 
 // SmartImportMCPs импортирует существующие локальные MCP-серверы из конфигов агентов в репозиторий
 func (s *DeployService) SmartImportMCPs() error {
-	mcpDir := filepath.Join(s.repoPath, "mcp")
+	mcpDir := filepath.Join(s.repoPath, "data", "mcp")
 	if err := os.MkdirAll(mcpDir, 0755); err != nil {
 		return err
 	}

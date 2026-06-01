@@ -16,8 +16,23 @@ type Store struct {
 	DisableGlobal bool
 }
 
-func NewStore(repoPath string) *Store {
-	return &Store{RepoPath: repoPath}
+// StoreOption определяет функциональную опцию для Store
+type StoreOption func(*Store)
+
+// WithDisableGlobal отключает поиск в глобальной папке ~/.agents
+func WithDisableGlobal(disable bool) StoreOption {
+	return func(s *Store) {
+		s.DisableGlobal = disable
+	}
+}
+
+// NewStore создает новый экземпляр Store с заданными опциями
+func NewStore(repoPath string, opts ...StoreOption) *Store {
+	s := &Store{RepoPath: repoPath}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // getSearchDirs возвращает пути для поиска компонентов (локальный репозиторий + глобальная папка ~/.agents)

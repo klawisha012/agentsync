@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 )
 
+var _ AgentAdapter = (*AntigravityAdapter)(nil)
+
 type AntigravityAdapter struct {
 	homeDir string
 }

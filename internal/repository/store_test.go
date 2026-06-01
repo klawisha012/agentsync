@@ -36,8 +36,7 @@ func TestLoadAllComponents(t *testing.T) {
 	_ = os.MkdirAll(hooksDir, 0755)
 	_ = os.WriteFile(filepath.Join(hooksDir, "pre-commit.sh"), []byte("#!/bin/sh\necho test"), 0755)
 
-	store := repository.NewStore(tmpDir)
-	store.DisableGlobal = true
+	store := repository.NewStore(tmpDir, repository.WithDisableGlobal(true))
 
 	// Проверяем LoadSkills
 	skills, err := store.LoadSkills()
@@ -80,8 +79,7 @@ func TestUpdateTargetsAndSaveSecrets(t *testing.T) {
 	mcpFile := filepath.Join(mcpDir, "test-mcp.yaml")
 	_ = os.WriteFile(mcpFile, []byte("name: test-mcp\ncommand: npx\nargs: []\ntargets: [claude-code]"), 0644)
 
-	store := repository.NewStore(tmpDir)
-	store.DisableGlobal = true
+	store := repository.NewStore(tmpDir, repository.WithDisableGlobal(true))
 	err = store.UpdateMCPTargets("test-mcp", []domain.AgentType{domain.AgentClaudeDesktop, domain.AgentAntigravity})
 	if err != nil {
 		t.Fatalf("failed to update mcp targets: %v", err)
