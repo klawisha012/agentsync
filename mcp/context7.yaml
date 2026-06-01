@@ -1,0 +1,12 @@
+name: context7
+description: Импортировано из локальной конфигурации antigravity
+command: npx
+args:
+    - -y
+    - '@upstash/context7-mcp'
+    - --api-key
+    - ${secrets.CONTEXT7_API_KEY}
+targets:
+    - antigravity
+    - claude-code
+    - claude-desktop

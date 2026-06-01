@@ -1,0 +1,11 @@
+active_agents:
+    - claude-desktop
+    - antigravity
+    - claude-code
+active_bundle: '----1'
+installed_plugins:
+    claude-desktop:
+        - mem0
+    claude-code:
+        - mem0
+

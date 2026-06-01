@@ -1,0 +1,10 @@
+name: sqlite
+description: MCP сервер sqlite, импортированный из реестра Smithery
+command: npx
+args:
+    - -y
+    - '@smithery-mcp/server-sqlite'
+targets:
+    - claude-code
+    - claude-desktop
+    - antigravity

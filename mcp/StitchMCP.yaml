@@ -1,0 +1,13 @@
+name: StitchMCP
+description: Импортировано из локальной конфигурации antigravity
+command: npx
+args:
+    - -y
+    - mcp-remote
+    - https://stitch.googleapis.com/mcp
+    - --header
+    - 'X-Goog-Api-Key: ${secrets.STITCH_API_KEY}'
+targets:
+    - antigravity
+    - claude-code
+    - claude-desktop

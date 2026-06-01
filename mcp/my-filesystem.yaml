@@ -1,0 +1,9 @@
+name: my-filesystem
+description: Импортировано из локальной конфигурации antigravity
+command: npx
+args:
+    - -y
+    - '@modelcontextprotocol/server-filesystem'
+    - C:/Sync/Programming/projects/waf/
+targets:
+    - antigravity

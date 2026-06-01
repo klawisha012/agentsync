@@ -1,0 +1,28 @@
+id: '----1'
+name: тест1
+description: Без описания
+components:
+    - type: MCP
+      name: context7
+    - type: MCP
+      name: github
+    - type: MCP
+      name: graphify
+    - type: MCP
+      name: mem0
+    - type: Rule
+      name: graphify
+    - type: Skill
+      name: github-best-architecture
+    - type: Skill
+      name: improve-codebase-architecture
+    - type: Skill
+      name: skill-creator
+    - type: Skill
+      name: find-skills
+    - type: Skill
+      name: find-dead-code
+    - type: Workflow
+      name: graphify
+    - type: MCP
+      name: StitchMCP

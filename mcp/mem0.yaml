@@ -1,0 +1,9 @@
+name: mem0
+description: Импортировано из локальной конфигурации antigravity
+server_url: https://mcp.mem0.ai/mcp
+headers:
+    Authorization: Token ${secrets.MEM0_TOKEN}
+targets:
+    - antigravity
+    - claude-code
+    - claude-desktop

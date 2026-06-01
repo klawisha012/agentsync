@@ -1,0 +1,11 @@
+name: github
+description: Импортировано из локальной конфигурации claude-code
+command: C:\Users\zward\.agentsync\runtime\node\v20\node.exe
+args:
+    - C:\Users\zward\.agentsync\runtime\node\v20\node_modules\@modelcontextprotocol\server-github\dist\index.js
+env:
+    GITHUB_PERSONAL_ACCESS_TOKEN: ${secrets.GITHUB_TOKEN}
+targets:
+    - claude-code
+    - claude-desktop
+    - antigravity

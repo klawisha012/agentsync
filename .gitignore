@@ -1,0 +1,47 @@
+# --- Специфичные для Go файлы и бинарники ---
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+agentsync
+agentsync.exe
+agentsync.exe~
+
+# --- Безопасность и Секреты ---
+secrets.env
+*.env
+*.pem
+*.key
+
+# --- Инструменты ИИ и базы знаний (AI & Agents) ---
+.superpowers/
+graphify-out/
+docs/*
+!docs/superpowers/
+docs/superpowers/*
+!docs/superpowers/specs/
+!docs/superpowers/plans/
+
+# --- Фронтенд (SolidJS/Vite) ---
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/.cache/
+frontend/*.local
+
+# --- Рантаймы и Портативные пакеты ---
+data/runtimes/
+data/packages/
+node_modules/
+
+# --- Системные файлы и IDE ---
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db

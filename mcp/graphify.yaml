@@ -1,0 +1,16 @@
+name: graphify
+description: Импортировано из локальной конфигурации antigravity
+command: C:/Users/zward/AppData/Local/Programs/Python/Python313/Scripts/uv.exe
+args:
+    - run
+    - --with
+    - graphifyy
+    - --with
+    - mcp
+    - -m
+    - graphify.serve
+    - C:/Sync/Programming/projects/waf/graphify-out/graph.json
+targets:
+    - antigravity
+    - claude-code
+    - claude-desktop
