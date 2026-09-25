@@ -148,6 +148,7 @@ func (s *store) create(email, password, name string) (accountView, string, strin
 		return accountView{}, "", "", http.StatusInternalServerError, "Не удалось создать аккаунт."
 	}
 	if err := s.insertSession(ctx, id, item); err != nil {
+		_, _ = s.db.ExecContext(ctx, `DELETE FROM accounts WHERE id = $1`, item.id)
 		return accountView{}, "", "", http.StatusInternalServerError, "Не удалось создать аккаунт."
 	}
 	s.byEmail[item.emailKey] = item
@@ -183,10 +184,10 @@ func (s *store) open(email, password string) (accountView, string, int, string) 
 	return item.view(), id, http.StatusOK, ""
 }
 
-func (s *store) close(id string) {
+func (s *store) close(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_ = s.deleteSession(context.Background(), id)
+	return s.deleteSession(context.Background(), id)
 }
 
 func (s *store) session(id string) (accountView, bool) {
@@ -284,8 +285,10 @@ func (a *app) createSession(c echo.Context) error {
 }
 
 func (a *app) deleteSession(c echo.Context) error {
-	if cookie, err := c.Cookie(sessionCookie); err == nil {
-		a.accounts.close(cookie.Value)
+	if cookie, err := c.Cookie(sessionCookie); err == nil && cookie.Value != "" {
+		if err := a.accounts.close(cookie.Value); err != nil {
+			return writeExplanation(c, http.StatusInternalServerError, "Не удалось выйти.")
+		}
 	}
 	setSessionCookie(c, "", true)
 	return c.NoContent(http.StatusNoContent)

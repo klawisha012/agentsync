@@ -49,17 +49,21 @@ func (s *store) confirmEmail(token string) (int, string) {
 		}
 		return http.StatusBadRequest, letterStale
 	}
+	prevVerified, prevToken, prevExpires := item.verified, item.confirmToken, item.confirmExpires
 	item.verified = true
 	item.confirmToken = ""
 	item.confirmExpires = time.Time{}
 	used := time.Now()
-	s.spentConfirms[token] = used
 	if err := s.saveAccount(context.Background(), item); err != nil {
+		item.verified, item.confirmToken, item.confirmExpires = prevVerified, prevToken, prevExpires
 		return http.StatusInternalServerError, "Не удалось подтвердить почту."
 	}
 	if err := s.saveSpent(context.Background(), token, used); err != nil {
+		item.verified, item.confirmToken, item.confirmExpires = prevVerified, prevToken, prevExpires
+		_ = s.saveAccount(context.Background(), item)
 		return http.StatusInternalServerError, "Не удалось подтвердить почту."
 	}
+	s.spentConfirms[token] = used
 	return http.StatusOK, ""
 }
 
@@ -80,9 +84,11 @@ func (s *store) requestReset(email string) (string, int, string) {
 	if item == nil {
 		return "", http.StatusOK, ready
 	}
+	prevToken, prevExpires := item.resetToken, item.resetExpires
 	item.resetToken = token
 	item.resetExpires = time.Now().Add(letterTTL)
 	if err := s.saveAccount(context.Background(), item); err != nil {
+		item.resetToken, item.resetExpires = prevToken, prevExpires
 		return "", http.StatusInternalServerError, "Не удалось подготовить письмо."
 	}
 	return "/recover/" + token, http.StatusOK, ready
@@ -108,10 +114,12 @@ func (s *store) resetPassword(token, password string) (int, string) {
 		}
 		return http.StatusBadRequest, letterStale
 	}
+	prevHash, prevToken, prevExpires := append([]byte(nil), item.password...), item.resetToken, item.resetExpires
 	item.password = hash
 	item.resetToken = ""
 	item.resetExpires = time.Time{}
 	if err := s.saveAccount(context.Background(), item); err != nil {
+		item.password, item.resetToken, item.resetExpires = prevHash, prevToken, prevExpires
 		return http.StatusInternalServerError, "Не удалось сменить пароль."
 	}
 	return http.StatusOK, ""

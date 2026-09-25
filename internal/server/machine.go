@@ -62,8 +62,9 @@ func (s *store) confirmMachine(sessionID, id, host, listener string) (machineVie
 		chainID = freshChain
 		item.chains[id] = chainID
 	}
+	var prevToken string
 	if prev := s.machines[id]; prev != nil {
-		delete(s.byAgentToken, prev.token)
+		prevToken = prev.token
 	}
 	bound := &machine{
 		id:       id,
@@ -74,6 +75,9 @@ func (s *store) confirmMachine(sessionID, id, host, listener string) (machineVie
 	}
 	if err := s.saveMachine(context.Background(), bound); err != nil {
 		return machineView{}, http.StatusInternalServerError, "Не удалось подтвердить машину."
+	}
+	if prevToken != "" {
+		delete(s.byAgentToken, prevToken)
 	}
 	s.machines[id] = bound
 	s.byAgentToken[token] = bound

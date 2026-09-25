@@ -289,10 +289,12 @@ func (s *store) insertSession(ctx context.Context, id string, item *account) err
 }
 
 func (s *store) deleteSession(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE id = $1`, id)
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE id = $1`, id); err != nil {
+		return err
+	}
 	delete(s.sessions, id)
 	delete(s.sessionExpiry, id)
-	return err
+	return nil
 }
 
 func (s *store) saveSpent(ctx context.Context, token string, used time.Time) error {
