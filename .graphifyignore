@@ -1,0 +1,51 @@
+# >>> auto-graphify safe block >>>
+# Managed by /usr/local/bin/sync-projects-graphify-init.
+# Keeps automatic Graphify initialization safe and code-first.
+graphify-out/
+.hermes/skills/graphify/
+node_modules/
+vendor/
+dist/
+build/
+.next/
+.nuxt/
+.cache/
+.venv/
+venv/
+__pycache__/
+# No Graphify LLM backend key was present when this project was auto-initialized.
+# Exclude docs/media so headless indexing does not fail. Remove these lines
+# and rerun Graphify manually if you want docs/PDF/images in the graph.
+*.md
+*.mdx
+*.qmd
+*.txt
+*.rst
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+*.mp4
+*.mov
+*.mp3
+*.wav
+*.docx
+*.xlsx
+# <<< auto-graphify safe block <<<
+
+# graphify 0.9 sends these to the LLM, not the AST pass.
+# docker-compose.yml was the one file that made headless extract demand an API key.
+# Kept outside the managed block above so a rewrite of that block does not drop them.
+*.yml
+*.yaml
+*.html
+*.skill
+*.svg
+*.webm
+*.mkv
+*.avi
+*.m4v
+*.m4a
+*.ogg
