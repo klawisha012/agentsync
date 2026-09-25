@@ -55,10 +55,19 @@ func TestPushKeepsPortableFiles(t *testing.T) {
 		t.Fatalf("empty %d %s", empty.Code, empty.Body.String())
 	}
 
+	bare := postAuth(t, e, "/agent/push", "", pushBody("Grok", false, pushFile{"rules/ok.md", "hello"}), author)
+	if bare.Code == http.StatusCreated || !strings.Contains(bare.Body.String(), "аккаунт") {
+		t.Fatalf("push without the agent %d %s", bare.Code, bare.Body.String())
+	}
 	secret := "sk-live-SUPERSECRETVALUE"
 	leaked := postAuth(t, e, "/agent/push", token, pushBody("Grok", false, pushFile{"rules/key.md", "token=" + secret}), author)
 	if leaked.Code == http.StatusCreated || !strings.Contains(leaked.Body.String(), "rules/key.md") || strings.Contains(leaked.Body.String(), secret) {
 		t.Fatalf("secret %d %s", leaked.Code, leaked.Body.String())
+	}
+	jsonSecret := "JSONSECRETVALUE99"
+	leakedJSON := postAuth(t, e, "/agent/push", token, pushBody("Grok", false, pushFile{"rules/key.json", `{"token":"` + jsonSecret + `"}`}), author)
+	if leakedJSON.Code == http.StatusCreated || !strings.Contains(leakedJSON.Body.String(), "rules/key.json") || strings.Contains(leakedJSON.Body.String(), jsonSecret) {
+		t.Fatalf("json secret %d %s", leakedJSON.Code, leakedJSON.Body.String())
 	}
 
 	first := postAuth(t, e, "/agent/push", token, pushBody("Grok", false,
@@ -69,14 +78,18 @@ func TestPushKeepsPortableFiles(t *testing.T) {
 		pushFile{"skills/note.md", "see /Users/alex/notes"},
 		pushFile{"mcp/local.json", `{"args":["/Users/alex/mcp.js"]}`},
 		pushFile{"mcp/shared.json", `{"command":"npx","args":["docs"]}`},
+		pushFile{"hooks.json", "bash scripts/ok.sh"},
+		pushFile{"hooks/unix.json", "bash /bin/run.sh"},
+		pushFile{"bin/run.sh", "echo unix"},
+		pushFile{"mcp/env.json", `{"env":{"GITHUB_TOKEN":"ghp_abcdefghijklmnopqrst"}}`},
 	), author)
 	if first.Code != http.StatusCreated {
 		t.Fatalf("push %d %s", first.Code, first.Body.String())
 	}
-	if strings.Contains(first.Body.String(), "credentials.json") || strings.Contains(first.Body.String(), "hooks/machine.json") || strings.Contains(first.Body.String(), "scripts/run.sh") || strings.Contains(first.Body.String(), "mcp/local.json") {
+	if strings.Contains(first.Body.String(), "credentials.json") || strings.Contains(first.Body.String(), "hooks/machine.json") || strings.Contains(first.Body.String(), "scripts/run.sh") || strings.Contains(first.Body.String(), "mcp/local.json") || strings.Contains(first.Body.String(), "hooks/unix.json") || strings.Contains(first.Body.String(), "bin/run.sh") || strings.Contains(first.Body.String(), "mcp/env.json") || strings.Contains(first.Body.String(), "ghp_abcdefghijklmnopqrst") {
 		t.Fatalf("publication kept a private file %s", first.Body.String())
 	}
-	if !strings.Contains(first.Body.String(), "rules/ok.md") || !strings.Contains(first.Body.String(), "skills/note.md") || !strings.Contains(first.Body.String(), "mcp/shared.json") {
+	if !strings.Contains(first.Body.String(), "rules/ok.md") || !strings.Contains(first.Body.String(), "skills/note.md") || !strings.Contains(first.Body.String(), "mcp/shared.json") || !strings.Contains(first.Body.String(), "hooks.json") {
 		t.Fatalf("publication lost a portable file %s", first.Body.String())
 	}
 	if !strings.Contains(first.Body.String(), `"version":1`) {

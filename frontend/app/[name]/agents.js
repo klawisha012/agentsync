@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { api } from "../api";
 import { probeAgent } from "../agent";
 
 const colors = {
@@ -13,17 +12,27 @@ const colors = {
 
 export default function AgentBoard({ name, page, owner, onChange, onExplain }) {
   const [copied, setCopied] = useState("");
+  const [notes, setNotes] = useState({});
   const agents = page.agents || [];
 
+  function note(agentName, text) {
+    setNotes((current) => ({ ...current, [agentName]: text }));
+  }
+
   async function updateAgent(agentName) {
-    onExplain("");
+    note(agentName, "");
     if (owner && page.verified === false) {
-      onExplain("Подтвердите почту, чтобы загрузить или снять публикацию.");
+      note(agentName, "Подтвердите почту, чтобы загрузить или снять публикацию.");
       return;
     }
     const probe = await probeAgent();
     if (!probe.ok) {
-      onExplain("Локальный агент не отвечает.");
+      note(agentName, "Локальный агент не отвечает.");
+      return;
+    }
+    const same = !probe.account || probe.account.localeCompare(name, "ru", { sensitivity: "accent" }) === 0;
+    if (!same) {
+      note(agentName, "Аккаунт браузера и\u00a0аккаунт машины различаются.");
       return;
     }
     let exported;
@@ -34,26 +43,38 @@ export default function AgentBoard({ name, page, owner, onChange, onExplain }) {
         body: JSON.stringify({ agent: agentName }),
       });
       if (!res.ok) {
-        onExplain("Локальный агент не отвечает.");
+        note(agentName, "Локальный агент не отвечает.");
         return;
       }
       exported = await res.json();
     } catch {
-      onExplain("Локальный агент не отвечает.");
+      note(agentName, "Локальный агент не отвечает.");
       return;
     }
-    const pushed = await api("/agent/push", {
+    if (!exported.token) {
+      note(agentName, "Аккаунт браузера и\u00a0аккаунт машины различаются.");
+      return;
+    }
+    const pushed = await fetch("/backend/agent/push", {
       method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${exported.token}`,
+      },
       body: JSON.stringify({
         agent: agentName,
         missing: Boolean(exported.missing),
         files: exported.files || [],
       }),
     });
+    const text = await pushed.text();
+    const body = text ? JSON.parse(text) : null;
     if (!pushed.ok) {
-      onExplain(pushed.body?.explanation || "Не удалось загрузить ИИ-агента.");
+      note(agentName, body?.explanation || "Не удалось загрузить ИИ-агента.");
       return;
     }
+    note(agentName, "");
     await onChange();
   }
 
@@ -85,6 +106,7 @@ export default function AgentBoard({ name, page, owner, onChange, onExplain }) {
                 ? "Нет публикаций"
                 : `${agent.files}\u00a0файлов · ${publishedLabel(agent.publishedAt)}`}
             </p>
+            {notes[agent.name] ? <p className="explanation">{notes[agent.name]}</p> : null}
             <div className="agent-actions">
               {agent.version != null && !owner ? (
                 <button type="button">Применить v{agent.version}</button>

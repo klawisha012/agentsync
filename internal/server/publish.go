@@ -34,8 +34,8 @@ type publicationView struct {
 }
 
 var (
-	absolutePath = regexp.MustCompile(`(?i)(?:[a-z]:[\\/][^\s"']+|/(?:users|home|opt|var|tmp|etc|private)/[^\s"']+)`)
-	secretValue  = regexp.MustCompile(`(?i)(?:api[_-]?key|secret|token|password|authorization)\s*[:=]\s*["']?[A-Za-z0-9_+\-/]{12,}`)
+	absolutePath = regexp.MustCompile(`(?i)(?:^|[\s"'=])(?:[a-z]:[\\/][^\s"']+|/(?:[a-z0-9._-]+/)*[a-z0-9._-]+)`)
+	secretValue  = regexp.MustCompile(`(?i)"?(?:api[_-]?key|secret|token|password|authorization)"?\s*[:=]\s*"?[A-Za-z0-9_+\-/]{8,}`)
 	knownSecret  = regexp.MustCompile(`(?:sk-[A-Za-z0-9]{10,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)`)
 )
 
@@ -93,16 +93,11 @@ func (s *store) push(sessionID, agentToken, agent string, missing bool, files []
 }
 
 func (s *store) machineMatches(viewer *account, agentToken string) bool {
-	if agentToken != "" {
-		bound := s.byAgentToken[agentToken]
-		return bound != nil && bound.account == viewer
+	if agentToken == "" {
+		return false
 	}
-	for _, bound := range s.machines {
-		if bound.account == viewer {
-			return true
-		}
-	}
-	return false
+	bound := s.byAgentToken[agentToken]
+	return bound != nil && bound.account == viewer
 }
 
 func (s *store) publication(id string) (publicationView, bool) {
@@ -140,7 +135,8 @@ func classify(files []storedFile) ([]storedFile, string) {
 		}
 		hooks[file.Path] = struct{}{}
 		for _, match := range absolutePath.FindAllString(file.Body, -1) {
-			scripts[strings.ToLower(filepath.Base(filepath.ToSlash(match)))] = struct{}{}
+			cleaned := strings.Trim(match, " \t\"'=")
+			scripts[strings.ToLower(filepath.Base(filepath.ToSlash(cleaned)))] = struct{}{}
 		}
 	}
 	kept := make([]storedFile, 0)
@@ -191,6 +187,9 @@ func portablePath(path string) bool {
 	clean := filepath.ToSlash(path)
 	if clean == ".." || strings.HasPrefix(clean, "../") {
 		return false
+	}
+	if isHook(path) || isMCP(path) {
+		return true
 	}
 	base := strings.ToLower(filepath.Base(clean))
 	switch base {
