@@ -22,8 +22,20 @@ func main() {
 	if origin == "" {
 		origin = "http://localhost:3000"
 	}
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		log.Fatal("DATABASE_URL is required")
+	}
+	db, err := server.Open(context.Background(), dsn)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
 
-	e := server.New(origin)
+	e, err := server.New(origin, db)
+	if err != nil {
+		log.Fatal(err)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 

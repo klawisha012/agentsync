@@ -11,7 +11,7 @@ import (
 )
 
 func TestHealth(t *testing.T) {
-	e := New("http://localhost:3000")
+	e := newServer(t)
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
 	e.ServeHTTP(rec, req)
@@ -29,7 +29,7 @@ func TestHealth(t *testing.T) {
 }
 
 func TestRegisterThenSessionShowsName(t *testing.T) {
-	e := New("http://localhost:3000")
+	e := newServer(t)
 	rec := postJSON(t, e, "/accounts", map[string]string{
 		"email":    "a@example.com",
 		"password": "secret",
@@ -99,7 +99,7 @@ func TestRegisterRejectsName(t *testing.T) {
 		{name: "other alphabet stays distinct", account: "Аlice", wantCode: http.StatusCreated},
 		{name: "not a site page", account: "session", wantCode: http.StatusCreated},
 	}
-	e := New("http://localhost:3000")
+	e := newServer(t)
 	first := postJSON(t, e, "/accounts", map[string]string{
 		"email": "first@example.com", "password": "secret", "name": "Alice",
 	}, nil)
@@ -122,7 +122,7 @@ func TestRegisterRejectsName(t *testing.T) {
 }
 
 func TestLoginRejectsWrongPassword(t *testing.T) {
-	e := New("http://localhost:3000")
+	e := newServer(t)
 	created := postJSON(t, e, "/accounts", map[string]string{
 		"email": "a@example.com", "password": "secret", "name": "harbor",
 	}, nil)

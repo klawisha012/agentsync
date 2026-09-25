@@ -1,0 +1,4 @@
+DROP TABLE IF EXISTS publications;
+DROP TABLE IF EXISTS machines;
+DROP TABLE IF EXISTS page_likes;
+DROP TABLE IF EXISTS page_views;

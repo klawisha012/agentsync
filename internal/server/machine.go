@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -49,7 +50,7 @@ func (s *store) confirmMachine(sessionID, id, host, listener string) (machineVie
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	item := s.sessions[sessionID]
+	item := s.accountBySession(sessionID)
 	if item == nil {
 		return machineView{}, http.StatusUnauthorized, "Войдите в аккаунт."
 	}
@@ -71,6 +72,9 @@ func (s *store) confirmMachine(sessionID, id, host, listener string) (machineVie
 		account:  item,
 		token:    token,
 	}
+	if err := s.saveMachine(context.Background(), bound); err != nil {
+		return machineView{}, http.StatusInternalServerError, "Не удалось подтвердить машину."
+	}
 	s.machines[id] = bound
 	s.byAgentToken[token] = bound
 	return machineView{
@@ -86,13 +90,16 @@ func (s *store) confirmMachine(sessionID, id, host, listener string) (machineVie
 func (s *store) releaseMachine(sessionID, id string) (int, string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	item := s.sessions[sessionID]
+	item := s.accountBySession(sessionID)
 	if item == nil {
 		return http.StatusUnauthorized, "Войдите в аккаунт."
 	}
 	bound := s.machines[id]
 	if bound == nil || bound.account != item {
 		return http.StatusNotFound, "Эта машина не подтверждена в аккаунте."
+	}
+	if err := s.deleteMachine(context.Background(), id); err != nil {
+		return http.StatusInternalServerError, "Не удалось снять подтверждение."
 	}
 	delete(s.byAgentToken, bound.token)
 	delete(s.machines, id)

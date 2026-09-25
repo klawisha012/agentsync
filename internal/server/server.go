@@ -1,6 +1,8 @@
 package server
 
 import (
+	"context"
+	"database/sql"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -11,8 +13,12 @@ type app struct {
 	accounts *store
 }
 
-func New(webOrigin string) *echo.Echo {
-	a := &app{accounts: newStore()}
+func New(webOrigin string, db *sql.DB) (*echo.Echo, error) {
+	accounts, err := newStore(context.Background(), db)
+	if err != nil {
+		return nil, err
+	}
+	a := &app{accounts: accounts}
 	e := echo.New()
 	e.HideBanner = true
 	e.Use(middleware.Recover())
@@ -42,7 +48,7 @@ func New(webOrigin string) *echo.Echo {
 	e.POST("/session", a.createSession)
 	e.GET("/session", a.currentSession)
 	e.DELETE("/session", a.deleteSession)
-	return e
+	return e, nil
 }
 
 func health(c echo.Context) error {

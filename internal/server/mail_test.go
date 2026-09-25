@@ -9,7 +9,7 @@ import (
 )
 
 func TestEmailConfirmBlocksUploadAndResetPassword(t *testing.T) {
-	e := New("http://localhost:3000")
+	e := newServer(t)
 	const (
 		email    = "alex@studio.io"
 		password = "secret"

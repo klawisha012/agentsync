@@ -10,7 +10,7 @@ import (
 )
 
 func TestPushKeepsPortableFiles(t *testing.T) {
-	e := New("http://localhost:3000")
+	e := newServer(t)
 	created := postJSON(t, e, "/accounts", map[string]string{
 		"email": "author@example.com", "password": "secret", "name": "Author",
 	}, nil)

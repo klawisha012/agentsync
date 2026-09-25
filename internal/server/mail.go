@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"time"
@@ -43,12 +44,22 @@ func (s *store) confirmEmail(token string) (int, string) {
 	if item == nil || !time.Now().Before(item.confirmExpires) {
 		if item != nil {
 			item.confirmToken = ""
+			item.confirmExpires = time.Time{}
+			_ = s.saveAccount(context.Background(), item)
 		}
 		return http.StatusBadRequest, letterStale
 	}
 	item.verified = true
 	item.confirmToken = ""
-	s.spentConfirms[token] = time.Now()
+	item.confirmExpires = time.Time{}
+	used := time.Now()
+	s.spentConfirms[token] = used
+	if err := s.saveAccount(context.Background(), item); err != nil {
+		return http.StatusInternalServerError, "Не удалось подтвердить почту."
+	}
+	if err := s.saveSpent(context.Background(), token, used); err != nil {
+		return http.StatusInternalServerError, "Не удалось подтвердить почту."
+	}
 	return http.StatusOK, ""
 }
 
@@ -71,6 +82,9 @@ func (s *store) requestReset(email string) (string, int, string) {
 	}
 	item.resetToken = token
 	item.resetExpires = time.Now().Add(letterTTL)
+	if err := s.saveAccount(context.Background(), item); err != nil {
+		return "", http.StatusInternalServerError, "Не удалось подготовить письмо."
+	}
 	return "/recover/" + token, http.StatusOK, ready
 }
 
@@ -96,13 +110,17 @@ func (s *store) resetPassword(token, password string) (int, string) {
 	}
 	item.password = hash
 	item.resetToken = ""
+	item.resetExpires = time.Time{}
+	if err := s.saveAccount(context.Background(), item); err != nil {
+		return http.StatusInternalServerError, "Не удалось сменить пароль."
+	}
 	return http.StatusOK, ""
 }
 
 func (s *store) sessionVerified(id string) (bool, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	item := s.sessions[id]
+	item := s.accountBySession(id)
 	if item == nil {
 		return false, false
 	}
@@ -116,7 +134,7 @@ func (s *store) page(name, sessionID, visitorID string) (any, int, string) {
 	if item == nil {
 		return nil, http.StatusNotFound, "Страница не найдена."
 	}
-	viewer := s.sessions[sessionID]
+	viewer := s.accountBySession(sessionID)
 	s.recordView(item, viewer, visitorID)
 	public := publicPage{
 		Name:     item.name,

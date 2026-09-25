@@ -30,7 +30,7 @@ func TestTopWeekFollowsTheLikesLeader(t *testing.T) {
 }
 
 func TestAccountListSearchAndSort(t *testing.T) {
-	e := New("http://localhost:3000")
+	e := newServer(t)
 	for _, name := range []string{"Nova", "harbor"} {
 		rec := postJSON(t, e, "/accounts", map[string]string{
 			"email": name + "@example.com", "password": "secret", "name": name,

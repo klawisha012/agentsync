@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -14,7 +15,7 @@ func (s *store) bindVisitor(sessionID, visitorID string) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	viewer := s.sessions[sessionID]
+	viewer := s.accountBySession(sessionID)
 	if viewer == nil {
 		return
 	}
@@ -25,11 +26,13 @@ func (s *store) bindVisitor(sessionID, visitorID string) {
 			continue
 		}
 		delete(page.viewers, from)
+		_ = s.dropView(context.Background(), page, from)
 		if _, ok := page.viewers[to]; !ok {
 			if page.viewers == nil {
 				page.viewers = map[string]struct{}{}
 			}
 			page.viewers[to] = struct{}{}
+			_ = s.putView(context.Background(), page, to)
 		}
 		page.views = len(page.viewers)
 	}
@@ -42,25 +45,31 @@ func (s *store) recordView(page, viewer *account, visitorID string) {
 	if page.viewers == nil {
 		page.viewers = map[string]struct{}{}
 	}
+	ctx := context.Background()
 	if viewer != nil {
 		if visitorID != "" {
 			delete(page.viewers, "v:"+visitorID)
+			_ = s.dropView(ctx, page, "v:"+visitorID)
 		}
-		page.viewers["a:"+viewer.nameKey] = struct{}{}
+		key := "a:" + viewer.nameKey
+		page.viewers[key] = struct{}{}
+		_ = s.putView(ctx, page, key)
 		page.views = len(page.viewers)
 		return
 	}
 	if visitorID == "" {
 		return
 	}
-	page.viewers["v:"+visitorID] = struct{}{}
+	key := "v:" + visitorID
+	page.viewers[key] = struct{}{}
+	_ = s.putView(ctx, page, key)
 	page.views = len(page.viewers)
 }
 
 func (s *store) toggleLike(name, sessionID string) (int, bool, int, string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	viewer := s.sessions[sessionID]
+	viewer := s.accountBySession(sessionID)
 	if viewer == nil {
 		return 0, false, http.StatusUnauthorized, "Войдите в аккаунт, чтобы поставить лайк."
 	}
@@ -75,10 +84,17 @@ func (s *store) toggleLike(name, sessionID string) (int, bool, int, string) {
 		page.likedBy = map[string]struct{}{}
 	}
 	_, on := page.likedBy[viewer.nameKey]
+	ctx := context.Background()
 	if on {
 		delete(page.likedBy, viewer.nameKey)
+		if err := s.dropLike(ctx, page, viewer); err != nil {
+			return 0, false, http.StatusInternalServerError, "Не удалось снять лайк."
+		}
 	} else {
 		page.likedBy[viewer.nameKey] = struct{}{}
+		if err := s.putLike(ctx, page, viewer); err != nil {
+			return 0, false, http.StatusInternalServerError, "Не удалось поставить лайк."
+		}
 	}
 	page.likes = len(page.likedBy)
 	return page.likes, !on, http.StatusOK, ""

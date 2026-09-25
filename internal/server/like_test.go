@@ -9,7 +9,7 @@ import (
 )
 
 func TestOneViewAndLike(t *testing.T) {
-	e := New("http://localhost:3000")
+	e := newServer(t)
 	alice := mustAccount(t, e, "alice@example.com", "secret", "Alice")
 	bob := mustAccount(t, e, "bob@example.com", "secret", "Bob")
 

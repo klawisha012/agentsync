@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS spent_confirms;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS accounts;

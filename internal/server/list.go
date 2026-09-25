@@ -86,7 +86,7 @@ func (a account) card() accountCard {
 func (s *store) list(query, sortKey, sessionID string) []accountCard {
 	foldedQuery := foldKey.String(strings.TrimSpace(query))
 	s.mu.Lock()
-	viewer := s.sessions[sessionID]
+	viewer := s.accountBySession(sessionID)
 	all := make([]accountCard, 0, len(s.byName))
 	for _, item := range s.byName {
 		card := item.card()

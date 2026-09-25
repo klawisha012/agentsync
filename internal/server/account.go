@@ -1,7 +1,9 @@
 package server
 
 import (
+	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"net/http"
 	"strings"
@@ -25,6 +27,7 @@ var (
 )
 
 type account struct {
+	id             string
 	email          string
 	emailKey       string
 	name           string
@@ -56,23 +59,34 @@ type explanationBody struct {
 
 type store struct {
 	mu            sync.Mutex
+	db            *sql.DB
 	byEmail       map[string]*account
 	byName        map[string]*account
 	sessions      map[string]*account
+	sessionExpiry map[string]time.Time
 	machines      map[string]*machine
 	byAgentToken  map[string]*machine
 	spentConfirms map[string]time.Time
 }
 
-func newStore() *store {
-	return &store{
+func newStore(ctx context.Context, db *sql.DB) (*store, error) {
+	s := &store{
+		db:            db,
 		byEmail:       map[string]*account{},
 		byName:        map[string]*account{},
 		sessions:      map[string]*account{},
+		sessionExpiry: map[string]time.Time{},
 		machines:      map[string]*machine{},
 		byAgentToken:  map[string]*machine{},
 		spentConfirms: map[string]time.Time{},
 	}
+	if err := s.migrate(); err != nil {
+		return nil, err
+	}
+	if err := s.load(ctx); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 func (s *store) create(email, password, name string) (accountView, string, string, int, string) {
@@ -91,7 +105,12 @@ func (s *store) create(email, password, name string) (accountView, string, strin
 	if err != nil {
 		return accountView{}, "", "", http.StatusInternalServerError, "Не удалось создать аккаунт."
 	}
+	accountID, err := newID()
+	if err != nil {
+		return accountView{}, "", "", http.StatusInternalServerError, "Не удалось создать аккаунт."
+	}
 	item := &account{
+		id:           accountID,
 		email:        email,
 		emailKey:     foldKey.String(email),
 		name:         name,
@@ -121,9 +140,18 @@ func (s *store) create(email, password, name string) (accountView, string, strin
 	if _, taken := s.byName[item.nameKey]; taken {
 		return accountView{}, "", "", http.StatusConflict, "Это имя уже занято."
 	}
+	ctx := context.Background()
+	if err := s.insertAccount(ctx, item); err != nil {
+		if msg, ok := uniqueMessage(err); ok {
+			return accountView{}, "", "", http.StatusConflict, msg
+		}
+		return accountView{}, "", "", http.StatusInternalServerError, "Не удалось создать аккаунт."
+	}
+	if err := s.insertSession(ctx, id, item); err != nil {
+		return accountView{}, "", "", http.StatusInternalServerError, "Не удалось создать аккаунт."
+	}
 	s.byEmail[item.emailKey] = item
 	s.byName[item.nameKey] = item
-	s.sessions[id] = item
 	return item.view(), id, "/confirm/" + letterToken, http.StatusCreated, ""
 }
 
@@ -148,22 +176,23 @@ func (s *store) open(email, password string) (accountView, string, int, string) 
 		return accountView{}, "", http.StatusInternalServerError, "Не удалось войти."
 	}
 	s.mu.Lock()
-	s.sessions[id] = item
-	view := item.view()
-	s.mu.Unlock()
-	return view, id, http.StatusOK, ""
+	defer s.mu.Unlock()
+	if err := s.insertSession(context.Background(), id, item); err != nil {
+		return accountView{}, "", http.StatusInternalServerError, "Не удалось войти."
+	}
+	return item.view(), id, http.StatusOK, ""
 }
 
 func (s *store) close(id string) {
 	s.mu.Lock()
-	delete(s.sessions, id)
-	s.mu.Unlock()
+	defer s.mu.Unlock()
+	_ = s.deleteSession(context.Background(), id)
 }
 
 func (s *store) session(id string) (accountView, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	item := s.sessions[id]
+	item := s.accountBySession(id)
 	if item == nil {
 		return accountView{}, false
 	}
@@ -353,7 +382,7 @@ func writeExplanation(c echo.Context, code int, text string) error {
 }
 
 func setSessionCookie(c echo.Context, id string, clear bool) {
-	maxAge := 14 * 24 * 60 * 60
+	maxAge := int(sessionTTL.Seconds())
 	if clear {
 		maxAge = -1
 		id = ""

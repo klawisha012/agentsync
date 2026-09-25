@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"path/filepath"
@@ -46,7 +47,7 @@ func (s *store) push(sessionID, agentToken, agent string, missing bool, files []
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	viewer := s.sessions[sessionID]
+	viewer := s.accountBySession(sessionID)
 	if viewer == nil {
 		return publicationView{}, http.StatusUnauthorized, "Войдите в аккаунт."
 	}
@@ -85,6 +86,9 @@ func (s *store) push(sessionID, agentToken, agent string, missing bool, files []
 		files:   kept,
 		packed:  packed,
 		created: created,
+	}
+	if err := s.insertPublication(context.Background(), viewer, item); err != nil {
+		return publicationView{}, http.StatusInternalServerError, "Не удалось сохранить публикацию."
 	}
 	viewer.publications = append(viewer.publications, item)
 	stamp := created
@@ -251,6 +255,23 @@ func packFiles(files []storedFile) ([]byte, error) {
 	}
 	defer encoder.Close()
 	return encoder.EncodeAll(raw, nil), nil
+}
+
+func unpackFiles(packed []byte) ([]storedFile, error) {
+	decoder, err := zstd.NewReader(nil)
+	if err != nil {
+		return nil, err
+	}
+	defer decoder.Close()
+	raw, err := decoder.DecodeAll(packed, nil)
+	if err != nil {
+		return nil, err
+	}
+	var files []storedFile
+	if err := json.Unmarshal(raw, &files); err != nil {
+		return nil, err
+	}
+	return files, nil
 }
 
 func (a *app) pushAgent(c echo.Context) error {
