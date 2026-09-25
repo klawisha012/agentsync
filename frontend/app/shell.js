@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "./api";
+import { listenerLabel, useAgentProbe } from "./agent";
 
 const links = [
   { href: "/", label: "Главная" },
@@ -15,6 +16,20 @@ export default function Shell({ children }) {
   const path = usePathname();
   const router = useRouter();
   const [session, setSession] = useState(undefined);
+  const [agent] = useAgentProbe();
+  const agentOnline = Boolean(
+    agent.ok &&
+      session &&
+      agent.account &&
+      agent.account.localeCompare(session.name, "ru", { sensitivity: "accent" }) === 0,
+  );
+  const agentOther = Boolean(agent.ok && session && agent.account && !agentOnline);
+  let agentLabel = "локальный агент не отвечает";
+  if (agentOnline) {
+    agentLabel = `${listenerLabel} · онлайн`;
+  } else if (agentOther) {
+    agentLabel = "локальный агент в\u00a0другом аккаунте";
+  }
 
   useEffect(() => {
     let gone = false;
@@ -53,9 +68,9 @@ export default function Shell({ children }) {
           ))}
         </nav>
         <div className="top-gap">
-          <span className="agent-pill">
+          <span className={agentOnline ? "agent-pill online" : "agent-pill"}>
             <i />
-            локальный агент не отвечает
+            {agentLabel}
           </span>
           {session ? (
             <Link className="who" href={`/${session.name}`}>

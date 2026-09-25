@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 
 	"github.com/labstack/echo/v4"
@@ -24,13 +25,20 @@ var (
 )
 
 type account struct {
-	email    string
-	emailKey string
-	name     string
-	nameKey  string
-	password []byte
-	views    int
-	likes    int
+	email          string
+	emailKey       string
+	name           string
+	nameKey        string
+	password       []byte
+	views          int
+	likes          int
+	verified       bool
+	publishedAt    *time.Time
+	confirmToken   string
+	confirmExpires time.Time
+	resetToken     string
+	resetExpires   time.Time
+	chains         map[string]string
 }
 
 type accountView struct {
@@ -44,35 +52,41 @@ type explanationBody struct {
 }
 
 type store struct {
-	mu       sync.Mutex
-	byEmail  map[string]*account
-	byName   map[string]*account
-	sessions map[string]*account
+	mu            sync.Mutex
+	byEmail       map[string]*account
+	byName        map[string]*account
+	sessions      map[string]*account
+	machines      map[string]*machine
+	agents        map[string]*machine
+	spentConfirms map[string]time.Time
 }
 
 func newStore() *store {
 	return &store{
-		byEmail:  map[string]*account{},
-		byName:   map[string]*account{},
-		sessions: map[string]*account{},
+		byEmail:       map[string]*account{},
+		byName:        map[string]*account{},
+		sessions:      map[string]*account{},
+		machines:      map[string]*machine{},
+		agents:        map[string]*machine{},
+		spentConfirms: map[string]time.Time{},
 	}
 }
 
-func (s *store) create(email, password, name string) (accountView, string, int, string) {
+func (s *store) create(email, password, name string) (accountView, string, string, int, string) {
 	email = strings.TrimSpace(email)
 	name = strings.TrimSpace(name)
 	if email == "" || password == "" || name == "" {
-		return accountView{}, "", http.StatusBadRequest, "Введите почту, пароль и имя."
+		return accountView{}, "", "", http.StatusBadRequest, "Введите почту, пароль и имя."
 	}
 	if !validEmail(email) {
-		return accountView{}, "", http.StatusBadRequest, "Введите почту в виде name@example.com."
+		return accountView{}, "", "", http.StatusBadRequest, "Введите почту в виде name@example.com."
 	}
 	if msg, code := checkName(name); msg != "" {
-		return accountView{}, "", code, msg
+		return accountView{}, "", "", code, msg
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return accountView{}, "", http.StatusInternalServerError, "Не удалось создать аккаунт."
+		return accountView{}, "", "", http.StatusInternalServerError, "Не удалось создать аккаунт."
 	}
 	item := &account{
 		email:    email,
@@ -80,24 +94,31 @@ func (s *store) create(email, password, name string) (accountView, string, int, 
 		name:     name,
 		nameKey:  foldKey.String(name),
 		password: hash,
+		chains:   map[string]string{},
 	}
 	id, err := newSessionID()
 	if err != nil {
-		return accountView{}, "", http.StatusInternalServerError, "Не удалось создать аккаунт."
+		return accountView{}, "", "", http.StatusInternalServerError, "Не удалось создать аккаунт."
 	}
+	letterToken, err := newSessionID()
+	if err != nil {
+		return accountView{}, "", "", http.StatusInternalServerError, "Не удалось создать аккаунт."
+	}
+	item.confirmToken = letterToken
+	item.confirmExpires = time.Now().Add(letterTTL)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, taken := s.byEmail[item.emailKey]; taken {
-		return accountView{}, "", http.StatusConflict, "Аккаунт с этой почтой уже есть."
+		return accountView{}, "", "", http.StatusConflict, "Аккаунт с этой почтой уже есть."
 	}
 	if _, taken := s.byName[item.nameKey]; taken {
-		return accountView{}, "", http.StatusConflict, "Это имя уже занято."
+		return accountView{}, "", "", http.StatusConflict, "Это имя уже занято."
 	}
 	s.byEmail[item.emailKey] = item
 	s.byName[item.nameKey] = item
 	s.sessions[id] = item
-	return item.view(), id, http.StatusCreated, ""
+	return item.view(), id, "/confirm/" + letterToken, http.StatusCreated, ""
 }
 
 func (s *store) open(email, password string) (accountView, string, int, string) {
@@ -137,16 +158,6 @@ func (s *store) session(id string) (accountView, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	item := s.sessions[id]
-	if item == nil {
-		return accountView{}, false
-	}
-	return item.view(), true
-}
-
-func (s *store) public(name string) (accountView, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	item := s.byName[foldKey.String(name)]
 	if item == nil {
 		return accountView{}, false
 	}
@@ -203,12 +214,16 @@ func (a *app) createAccount(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return writeExplanation(c, http.StatusBadRequest, "Введите почту, пароль и имя.")
 	}
-	view, id, code, msg := a.accounts.create(req.Email, req.Password, req.Name)
+	view, id, letter, code, msg := a.accounts.create(req.Email, req.Password, req.Name)
 	if msg != "" {
 		return writeExplanation(c, code, msg)
 	}
 	setSessionCookie(c, id, false)
-	return c.JSON(code, view)
+	// Почтового сервера нет: путь в ответе и есть письмо.
+	return c.JSON(code, struct {
+		accountView
+		LetterPath string `json:"letterPath,omitempty"`
+	}{view, letter})
 }
 
 func (a *app) createSession(c echo.Context) error {
@@ -248,11 +263,80 @@ func (a *app) currentSession(c echo.Context) error {
 }
 
 func (a *app) publicAccount(c echo.Context) error {
-	view, ok := a.accounts.public(c.Param("name"))
-	if !ok {
-		return writeExplanation(c, http.StatusNotFound, "Страница не найдена.")
+	sessionID := ""
+	if cookie, err := c.Cookie(sessionCookie); err == nil {
+		sessionID = cookie.Value
 	}
-	return c.JSON(http.StatusOK, view)
+	view, code, msg := a.accounts.page(c.Param("name"), sessionID)
+	if msg != "" {
+		return writeExplanation(c, code, msg)
+	}
+	return c.JSON(code, view)
+}
+
+func (a *app) confirmEmail(c echo.Context) error {
+	var req struct {
+		Token string `json:"token"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return writeExplanation(c, http.StatusBadRequest, letterStale)
+	}
+	code, msg := a.accounts.confirmEmail(req.Token)
+	if msg != "" {
+		return writeExplanation(c, code, msg)
+	}
+	return c.JSON(code, map[string]bool{"verified": true})
+}
+
+func (a *app) requestRecovery(c echo.Context) error {
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return writeExplanation(c, http.StatusBadRequest, "Введите почту в виде name@example.com.")
+	}
+	letter, code, msg := a.accounts.requestReset(req.Email)
+	if code != http.StatusOK {
+		return writeExplanation(c, code, msg)
+	}
+	body := map[string]string{"explanation": msg}
+	if letter != "" {
+		body["letterPath"] = letter
+	}
+	return c.JSON(code, body)
+}
+
+func (a *app) resetPassword(c echo.Context) error {
+	var req struct {
+		Token    string `json:"token"`
+		Password string `json:"password"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return writeExplanation(c, http.StatusBadRequest, letterStale)
+	}
+	code, msg := a.accounts.resetPassword(req.Token, req.Password)
+	if msg != "" {
+		return writeExplanation(c, code, msg)
+	}
+	return c.JSON(code, map[string]bool{"reset": true})
+}
+
+func (a *app) publicationGate(c echo.Context) error {
+	cookie, err := c.Cookie(sessionCookie)
+	if err != nil || cookie.Value == "" {
+		return writeExplanation(c, http.StatusUnauthorized, "Войдите в аккаунт.")
+	}
+	verified, ok := a.accounts.sessionVerified(cookie.Value)
+	if !ok {
+		return writeExplanation(c, http.StatusUnauthorized, "Войдите в аккаунт.")
+	}
+	if !verified {
+		return writeExplanation(c, http.StatusForbidden, mailClosed)
+	}
+	if c.Request().Method == http.MethodDelete {
+		return writeExplanation(c, http.StatusNotFound, "Публикация не найдена.")
+	}
+	return writeExplanation(c, http.StatusBadRequest, "Нет переносимой настройки.")
 }
 
 func writeExplanation(c echo.Context, code int, text string) error {
