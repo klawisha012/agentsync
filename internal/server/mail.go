@@ -36,7 +36,7 @@ func (s *store) confirmEmail(token string) (int, string) {
 	if spent, ok := s.spentConfirms[token]; ok && time.Now().Before(spent.Add(letterTTL)) {
 		return http.StatusOK, ""
 	}
-	item := s.accountByConfirm(token)
+	item := s.accountByField(token, func(item *account) string { return item.confirmToken })
 	if item == nil || !time.Now().Before(item.confirmExpires) {
 		if item != nil {
 			item.confirmToken = ""
@@ -55,7 +55,7 @@ func (s *store) requestReset(email string) (string, int, string) {
 	if email == "" || !validEmail(email) {
 		return "", http.StatusBadRequest, "Введите почту в виде name@example.com."
 	}
-	token, err := newSessionID()
+	token, err := newID()
 	if err != nil {
 		return "", http.StatusInternalServerError, "Не удалось подготовить письмо."
 	}
@@ -84,7 +84,7 @@ func (s *store) resetPassword(token, password string) (int, string) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	item := s.accountByReset(token)
+	item := s.accountByField(token, func(item *account) string { return item.resetToken })
 	if item == nil || !time.Now().Before(item.resetExpires) {
 		if item != nil {
 			item.resetToken = ""
@@ -134,18 +134,9 @@ func (s *store) page(name, sessionID string) (any, int, string) {
 	return owner, http.StatusOK, ""
 }
 
-func (s *store) accountByConfirm(token string) *account {
+func (s *store) accountByField(token string, field func(*account) string) *account {
 	for _, item := range s.byEmail {
-		if item.confirmToken == token {
-			return item
-		}
-	}
-	return nil
-}
-
-func (s *store) accountByReset(token string) *account {
-	for _, item := range s.byEmail {
-		if item.resetToken == token {
+		if field(item) == token {
 			return item
 		}
 	}

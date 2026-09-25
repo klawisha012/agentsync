@@ -57,7 +57,7 @@ type store struct {
 	byName        map[string]*account
 	sessions      map[string]*account
 	machines      map[string]*machine
-	agents        map[string]*machine
+	byAgentToken  map[string]*machine
 	spentConfirms map[string]time.Time
 }
 
@@ -67,7 +67,7 @@ func newStore() *store {
 		byName:        map[string]*account{},
 		sessions:      map[string]*account{},
 		machines:      map[string]*machine{},
-		agents:        map[string]*machine{},
+		byAgentToken:  map[string]*machine{},
 		spentConfirms: map[string]time.Time{},
 	}
 }
@@ -96,11 +96,11 @@ func (s *store) create(email, password, name string) (accountView, string, strin
 		password: hash,
 		chains:   map[string]string{},
 	}
-	id, err := newSessionID()
+	id, err := newID()
 	if err != nil {
 		return accountView{}, "", "", http.StatusInternalServerError, "Не удалось создать аккаунт."
 	}
-	letterToken, err := newSessionID()
+	letterToken, err := newID()
 	if err != nil {
 		return accountView{}, "", "", http.StatusInternalServerError, "Не удалось создать аккаунт."
 	}
@@ -137,7 +137,7 @@ func (s *store) open(email, password string) (accountView, string, int, string) 
 	if item == nil || bcrypt.CompareHashAndPassword(hash, []byte(password)) != nil {
 		return accountView{}, "", http.StatusUnauthorized, "Неверная почта или пароль."
 	}
-	id, err := newSessionID()
+	id, err := newID()
 	if err != nil {
 		return accountView{}, "", http.StatusInternalServerError, "Не удалось войти."
 	}
@@ -197,7 +197,7 @@ func validEmail(email string) bool {
 	return strings.Contains(domain, ".")
 }
 
-func newSessionID() (string, error) {
+func newID() (string, error) {
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
 		return "", err
@@ -333,10 +333,7 @@ func (a *app) publicationGate(c echo.Context) error {
 	if !verified {
 		return writeExplanation(c, http.StatusForbidden, mailClosed)
 	}
-	if c.Request().Method == http.MethodDelete {
-		return writeExplanation(c, http.StatusNotFound, "Публикация не найдена.")
-	}
-	return writeExplanation(c, http.StatusBadRequest, "Нет переносимой настройки.")
+	return writeExplanation(c, http.StatusNotImplemented, "Сервер ещё не принимает загрузку и снятие ИИ-агента.")
 }
 
 func writeExplanation(c echo.Context, code int, text string) error {

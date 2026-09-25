@@ -38,11 +38,11 @@ func (s *store) confirmMachine(sessionID, id, host, listener string) (machineVie
 	if id == "" || host == "" {
 		return machineView{}, http.StatusBadRequest, "Укажите компьютер."
 	}
-	token, err := newSessionID()
+	token, err := newID()
 	if err != nil {
 		return machineView{}, http.StatusInternalServerError, "Не удалось подтвердить машину."
 	}
-	freshChain, err := newSessionID()
+	freshChain, err := newID()
 	if err != nil {
 		return machineView{}, http.StatusInternalServerError, "Не удалось подтвердить машину."
 	}
@@ -62,7 +62,7 @@ func (s *store) confirmMachine(sessionID, id, host, listener string) (machineVie
 		item.chains[id] = chainID
 	}
 	if prev := s.machines[id]; prev != nil {
-		delete(s.agents, prev.token)
+		delete(s.byAgentToken, prev.token)
 	}
 	bound := &machine{
 		id:       id,
@@ -72,7 +72,7 @@ func (s *store) confirmMachine(sessionID, id, host, listener string) (machineVie
 		token:    token,
 	}
 	s.machines[id] = bound
-	s.agents[token] = bound
+	s.byAgentToken[token] = bound
 	return machineView{
 		ID:         id,
 		Host:       host,
@@ -94,7 +94,7 @@ func (s *store) releaseMachine(sessionID, id string) (int, string) {
 	if bound == nil || bound.account != item {
 		return http.StatusNotFound, "Эта машина не подтверждена в аккаунте."
 	}
-	delete(s.agents, bound.token)
+	delete(s.byAgentToken, bound.token)
 	delete(s.machines, id)
 	return http.StatusNoContent, ""
 }
@@ -102,7 +102,7 @@ func (s *store) releaseMachine(sessionID, id string) (int, string) {
 func (s *store) agentSession(token string) (machineView, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	bound := s.agents[token]
+	bound := s.byAgentToken[token]
 	if bound == nil || bound.account == nil {
 		return machineView{}, false
 	}

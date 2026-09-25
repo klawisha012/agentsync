@@ -8,7 +8,7 @@ import { dropAgent, handToken, listenerLabel, probeAgent } from "../agent";
 export default function AccountView({ name }) {
   const [state, setState] = useState(null);
   const [explanation, setExplanation] = useState("");
-  const [ask, setAsk] = useState(null);
+  const [releaseID, setReleaseID] = useState(null);
 
   async function load() {
     const res = await api(`/accounts/${encodeURIComponent(name)}`);
@@ -61,7 +61,7 @@ export default function AccountView({ name }) {
       return;
     }
     await dropAgent();
-    setAsk(null);
+    setReleaseID(null);
     await load();
   }
 
@@ -117,8 +117,9 @@ export default function AccountView({ name }) {
                   <strong>{item.host}</strong>
                   <span className="live">Подтверждена</span>
                   <p className="hint">Идентификатор машины: {item.id}</p>
+                  <p className="hint">Цепочка этого компьютера на месте.</p>
                 </div>
-                <button className="ghost" type="button" onClick={() => setAsk(item.id)}>
+                <button className="ghost" type="button" onClick={() => setReleaseID(item.id)}>
                   Снять подтверждение машины
                 </button>
               </div>
@@ -127,14 +128,14 @@ export default function AccountView({ name }) {
         </div>
       ) : null}
       {explanation ? <p className="explanation">{explanation}</p> : null}
-      {ask ? (
+      {releaseID ? (
         <div className="dialog-back">
           <div className="dialog" role="dialog" aria-labelledby="unpair-title">
             <h2 id="unpair-title">Снять подтверждение машины?</h2>
             <p>Локальный агент выйдет из{"\u00a0"}аккаунта. Цепочка на диске останется.</p>
             <div className="dialog-actions">
-              <button className="solid" type="button" onClick={() => release(ask)}>Снять подтверждение</button>
-              <button className="ghost" type="button" onClick={() => setAsk(null)}>Отмена</button>
+              <button className="solid" type="button" onClick={() => release(releaseID)}>Снять подтверждение</button>
+              <button className="ghost" type="button" onClick={() => setReleaseID(null)}>Отмена</button>
             </div>
           </div>
         </div>

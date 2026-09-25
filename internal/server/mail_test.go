@@ -57,11 +57,11 @@ func TestEmailConfirmBlocksUploadAndResetPassword(t *testing.T) {
 	}
 
 	open := postJSON(t, e, "/publications", map[string]string{}, cookie)
-	if strings.Contains(open.Body.String(), "почт") {
-		t.Fatalf("confirmed mail still blocks upload: %s", open.Body.String())
+	if open.Code != http.StatusNotImplemented || strings.Contains(open.Body.String(), "почт") {
+		t.Fatalf("confirmed mail still blocks upload: %d %s", open.Code, open.Body.String())
 	}
-	if open.Code == http.StatusCreated || open.Code == http.StatusOK {
-		t.Fatalf("upload created a publication: %d %s", open.Code, open.Body.String())
+	if strings.Contains(open.Body.String(), "переносимой") {
+		t.Fatalf("upload pretended to inspect a portable setup: %s", open.Body.String())
 	}
 
 	guest := getJSON(t, e, "/accounts/"+name, nil)
