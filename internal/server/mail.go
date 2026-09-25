@@ -14,10 +14,13 @@ const mailClosed = "Подтвердите почту, чтобы загрузи
 const letterStale = "Ссылка из письма недействительна или устарела."
 
 type publicPage struct {
-	Name     string `json:"name"`
-	Views    int    `json:"views"`
-	Likes    int    `json:"likes"`
-	Verified bool   `json:"verified"`
+	Name     string      `json:"name"`
+	Views    int         `json:"views"`
+	Likes    int         `json:"likes"`
+	Verified bool        `json:"verified"`
+	Liked    bool        `json:"liked"`
+	CanLike  bool        `json:"canLike"`
+	Agents   []agentSlot `json:"agents"`
 }
 
 type ownerPage struct {
@@ -106,20 +109,26 @@ func (s *store) sessionVerified(id string) (bool, bool) {
 	return item.verified, true
 }
 
-func (s *store) page(name, sessionID string) (any, int, string) {
+func (s *store) page(name, sessionID, visitorID string) (any, int, string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	item := s.byName[foldKey.String(name)]
 	if item == nil {
 		return nil, http.StatusNotFound, "Страница не найдена."
 	}
+	viewer := s.sessions[sessionID]
+	s.recordView(item, viewer, visitorID)
 	public := publicPage{
 		Name:     item.name,
 		Views:    item.views,
 		Likes:    item.likes,
 		Verified: item.verified,
+		Agents:   item.agentSlots(),
 	}
-	viewer := s.sessions[sessionID]
+	if viewer != nil && viewer != item {
+		_, public.Liked = item.likedBy[viewer.nameKey]
+		public.CanLike = true
+	}
 	if viewer == nil || viewer != item {
 		return public, http.StatusOK, ""
 	}

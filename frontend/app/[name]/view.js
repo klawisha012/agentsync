@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { dropAgent, handToken, listenerLabel, probeAgent } from "../agent";
+import AgentBoard from "./agents";
 
 export default function AccountView({ name }) {
   const [state, setState] = useState(null);
@@ -27,6 +28,19 @@ export default function AccountView({ name }) {
       gone = true;
     };
   }, [name]);
+
+  async function like() {
+    const res = await api(`/accounts/${encodeURIComponent(name)}/like`, {
+      method: "POST",
+      body: "{}",
+    });
+    if (!res.ok) {
+      setExplanation(res.body?.explanation || "Не удалось поставить лайк.");
+      return;
+    }
+    setExplanation("");
+    await load();
+  }
 
   async function confirmMachine() {
     setExplanation("");
@@ -100,7 +114,12 @@ export default function AccountView({ name }) {
         </div>
         <div>
           <b>{page.likes}</b>
-          <span>лайки</span>
+          <span>{owner ? "ваш профиль" : "лайки"}</span>
+          {page.canLike ? (
+            <button className="ghost" type="button" aria-pressed={Boolean(page.liked)} onClick={like}>
+              {page.liked ? "Снять лайк" : "Лайк"}
+            </button>
+          ) : null}
         </div>
       </div>
       {owner ? (
@@ -127,6 +146,13 @@ export default function AccountView({ name }) {
           )}
         </div>
       ) : null}
+      <AgentBoard
+        name={name}
+        page={page}
+        owner={owner}
+        onChange={load}
+        onExplain={setExplanation}
+      />
       {explanation ? <p className="explanation">{explanation}</p> : null}
       {releaseID ? (
         <div className="dialog-back">

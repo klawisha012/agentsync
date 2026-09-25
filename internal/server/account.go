@@ -39,6 +39,9 @@ type account struct {
 	resetToken     string
 	resetExpires   time.Time
 	chains         map[string]string
+	viewers        map[string]struct{}
+	likedBy        map[string]struct{}
+	publications   []*publication
 }
 
 type accountView struct {
@@ -89,12 +92,15 @@ func (s *store) create(email, password, name string) (accountView, string, strin
 		return accountView{}, "", "", http.StatusInternalServerError, "Не удалось создать аккаунт."
 	}
 	item := &account{
-		email:    email,
-		emailKey: foldKey.String(email),
-		name:     name,
-		nameKey:  foldKey.String(name),
-		password: hash,
-		chains:   map[string]string{},
+		email:        email,
+		emailKey:     foldKey.String(email),
+		name:         name,
+		nameKey:      foldKey.String(name),
+		password:     hash,
+		chains:       map[string]string{},
+		viewers:      map[string]struct{}{},
+		likedBy:      map[string]struct{}{},
+		publications: []*publication{},
 	}
 	id, err := newID()
 	if err != nil {
@@ -219,6 +225,9 @@ func (a *app) createAccount(c echo.Context) error {
 		return writeExplanation(c, code, msg)
 	}
 	setSessionCookie(c, id, false)
+	if cookie, err := c.Cookie(visitorCookie); err == nil {
+		a.accounts.bindVisitor(id, cookie.Value)
+	}
 	// Почтового сервера нет: путь в ответе и есть письмо.
 	return c.JSON(code, struct {
 		accountView
@@ -239,6 +248,9 @@ func (a *app) createSession(c echo.Context) error {
 		return writeExplanation(c, code, msg)
 	}
 	setSessionCookie(c, id, false)
+	if cookie, err := c.Cookie(visitorCookie); err == nil {
+		a.accounts.bindVisitor(id, cookie.Value)
+	}
 	return c.JSON(code, view)
 }
 
@@ -267,7 +279,7 @@ func (a *app) publicAccount(c echo.Context) error {
 	if cookie, err := c.Cookie(sessionCookie); err == nil {
 		sessionID = cookie.Value
 	}
-	view, code, msg := a.accounts.page(c.Param("name"), sessionID)
+	view, code, msg := a.accounts.page(c.Param("name"), sessionID, ensureVisitor(c))
 	if msg != "" {
 		return writeExplanation(c, code, msg)
 	}

@@ -20,7 +20,7 @@ func New(webOrigin string) *echo.Echo {
 		e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
 			AllowOrigins:     []string{webOrigin},
 			AllowMethods:     []string{http.MethodGet, http.MethodPost, http.MethodDelete, http.MethodOptions},
-			AllowHeaders:     []string{echo.HeaderContentType},
+			AllowHeaders:     []string{echo.HeaderContentType, echo.HeaderAuthorization},
 			AllowCredentials: true,
 		}))
 	}
@@ -28,11 +28,14 @@ func New(webOrigin string) *echo.Echo {
 	e.POST("/accounts", a.createAccount)
 	e.GET("/accounts", a.listAccounts)
 	e.GET("/accounts/:name", a.publicAccount)
+	e.POST("/accounts/:name/like", a.toggleLike)
 	e.POST("/email/confirm", a.confirmEmail)
 	e.POST("/recovery", a.requestRecovery)
 	e.POST("/recovery/password", a.resetPassword)
 	e.POST("/publications", a.publicationGate)
+	e.GET("/publications/:id", a.showPublication)
 	e.DELETE("/publications/:id", a.publicationGate)
+	e.POST("/agent/push", a.pushAgent)
 	e.POST("/machine", a.confirmMachine)
 	e.DELETE("/machine/:id", a.releaseMachine)
 	e.GET("/agent/session", a.agentSession)

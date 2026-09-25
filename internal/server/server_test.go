@@ -55,7 +55,7 @@ func TestRegisterThenSessionShowsName(t *testing.T) {
 		t.Fatalf("public status %d", public.Code)
 	}
 	page := decodeAccount(t, public.Body)
-	if page.Name != "Alice" || page.Views != 0 || page.Likes != 0 {
+	if page.Name != "Alice" || page.Views != 1 || page.Likes != 0 {
 		t.Fatalf("page %#v", page)
 	}
 	if strings.Contains(public.Body.String(), "email") || strings.Contains(public.Body.String(), "a@example.com") {

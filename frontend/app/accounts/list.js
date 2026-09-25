@@ -30,7 +30,12 @@ export default function AccountList() {
   const [accounts, setAccounts] = useState(null);
   const [explanation, setExplanation] = useState("");
   const [pingNote, setPingNote] = useState("");
+  const [session, setSession] = useState(null);
   const [agent, refreshAgent] = useAgentProbe();
+
+  useEffect(() => {
+    api("/session").then((res) => setSession(res.ok ? res.body : null));
+  }, []);
 
   useEffect(() => {
     let gone = false;
@@ -55,6 +60,20 @@ export default function AccountList() {
       gone = true;
     };
   }, [query, sort]);
+
+  async function likeAccount(name) {
+    const res = await api(`/accounts/${encodeURIComponent(name)}/like`, {
+      method: "POST",
+      body: "{}",
+    });
+    if (!res.ok) {
+      setExplanation(res.body?.explanation || "Не удалось поставить лайк.");
+      return;
+    }
+    setAccounts((current) => (current || []).map((account) => (
+      account.name === name ? { ...account, likes: res.body.likes, liked: res.body.liked } : account
+    )));
+  }
 
   async function ping() {
     const next = await refreshAgent();
@@ -119,7 +138,7 @@ export default function AccountList() {
             </p>
           ) : null}
           {found.map((account) => (
-            <AccountCard key={account.name} account={account} />
+            <AccountCard key={account.name} account={account} session={session} onLike={likeAccount} />
           ))}
         </div>
         <aside className="side">
@@ -184,7 +203,7 @@ export default function AccountList() {
   );
 }
 
-function AccountCard({ account }) {
+function AccountCard({ account, session, onLike }) {
   const agents = account.agents || [];
   const published = agents.filter((agent) => agent.version != null).length;
   return (
@@ -207,18 +226,38 @@ function AccountCard({ account }) {
       </div>
       <div className="card-stats">
         <span><b>{account.views}</b> просмотры</span>
-        <span><b>{account.likes}</b> лайки</span>
+        <LikeMark account={account} session={session} onLike={onLike} />
       </div>
       <ul className="slots">
         {agents.map((agent) => (
           <li key={agent.name}>
             <i style={{ background: colorOf(agent.name) }} />
             <span>{agent.name}</span>
-            <em>{agent.version == null ? "Нет публикаций" : `v${agent.version}`}</em>
+            {agent.version == null ? (
+              <em>Нет публикаций</em>
+            ) : (
+              <button type="button">Применить v{agent.version}</button>
+            )}
           </li>
         ))}
       </ul>
     </article>
+  );
+}
+
+function LikeMark({ account, session, onLike }) {
+  const mine = session && session.name === account.name;
+  if (!session || mine) {
+    return (
+      <span>
+        <b>{account.likes}</b> {mine ? "ваш профиль" : "лайки"}
+      </span>
+    );
+  }
+  return (
+    <button type="button" aria-pressed={Boolean(account.liked)} onClick={() => onLike(account.name)}>
+      <b>{account.likes}</b> {account.liked ? "Снять лайк" : "Лайк"}
+    </button>
   );
 }
 

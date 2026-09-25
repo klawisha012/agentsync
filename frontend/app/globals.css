@@ -794,6 +794,55 @@ input:focus {
   stroke-width: 3;
 }
 
+.agent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 0.75rem;
+}
+
+.agent-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.agent-actions,
+.commands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  margin-top: 0.8rem;
+}
+
+.agent-actions button,
+.agent-actions a,
+.commands button {
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--text);
+  border-radius: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+}
+
+.agent-actions .solid {
+  width: auto;
+  margin-top: 0;
+}
+
+.commands {
+  flex-direction: column;
+  align-items: stretch;
+  margin-top: 1.2rem;
+}
+
+.commands h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
 .profile {
   flex-direction: column;
   align-items: stretch;

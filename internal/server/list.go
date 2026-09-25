@@ -12,8 +12,11 @@ import (
 var exampleAgents = []string{"Grok", "Agents", "Claude"}
 
 type agentSlot struct {
-	Name    string `json:"name"`
-	Version *int   `json:"version"`
+	Name          string     `json:"name"`
+	Version       *int       `json:"version"`
+	Files         int        `json:"files,omitempty"`
+	PublishedAt   *time.Time `json:"publishedAt,omitempty"`
+	PublicationID string     `json:"publicationId,omitempty"`
 }
 
 type accountCard struct {
@@ -21,34 +24,76 @@ type accountCard struct {
 	Views       int         `json:"views"`
 	Likes       int         `json:"likes"`
 	Verified    bool        `json:"verified"`
+	Liked       bool        `json:"liked"`
 	PublishedAt *time.Time  `json:"publishedAt"`
 	Fresh       bool        `json:"fresh"`
 	TopWeek     bool        `json:"topWeek"`
 	Agents      []agentSlot `json:"agents"`
 }
 
-func (a account) card() accountCard {
-	slots := make([]agentSlot, 0, len(exampleAgents))
-	for _, name := range exampleAgents {
-		slots = append(slots, agentSlot{Name: name})
+func (a account) agentSlots() []agentSlot {
+	latest := map[string]*publication{}
+	for _, pub := range a.publications {
+		prev := latest[pub.agent]
+		if prev == nil || pub.version > prev.version {
+			latest[pub.agent] = pub
+		}
 	}
+	slots := make([]agentSlot, 0, len(exampleAgents)+len(latest))
+	seen := map[string]bool{}
+	for _, name := range exampleAgents {
+		seen[name] = true
+		slots = append(slots, slotFor(name, latest[name]))
+	}
+	extra := make([]string, 0)
+	for name := range latest {
+		if !seen[name] {
+			extra = append(extra, name)
+		}
+	}
+	slices.Sort(extra)
+	for _, name := range extra {
+		slots = append(slots, slotFor(name, latest[name]))
+	}
+	return slots
+}
+
+func slotFor(name string, pub *publication) agentSlot {
+	slot := agentSlot{Name: name}
+	if pub == nil {
+		return slot
+	}
+	version := pub.version
+	created := pub.created
+	slot.Version = &version
+	slot.Files = len(pub.files)
+	slot.PublishedAt = &created
+	slot.PublicationID = pub.id
+	return slot
+}
+
+func (a account) card() accountCard {
 	return accountCard{
 		Name:     a.name,
 		Views:    a.views,
 		Likes:    a.likes,
 		Verified: a.verified,
 		Fresh:    a.publishedAt == nil,
-		Agents:   slots,
+		Agents:   a.agentSlots(),
 	}
 }
 
-func (s *store) list(query, sortKey string) []accountCard {
+func (s *store) list(query, sortKey, sessionID string) []accountCard {
 	foldedQuery := foldKey.String(strings.TrimSpace(query))
 	s.mu.Lock()
+	viewer := s.sessions[sessionID]
 	all := make([]accountCard, 0, len(s.byName))
 	for _, item := range s.byName {
 		card := item.card()
 		card.PublishedAt = item.publishedAt
+		if viewer != nil {
+			_, card.Liked = item.likedBy[viewer.nameKey]
+		}
 		all = append(all, card)
 	}
 	s.mu.Unlock()
@@ -135,6 +180,6 @@ func likesAhead(a, b accountCard) bool {
 
 func (a *app) listAccounts(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]any{
-		"accounts": a.accounts.list(c.QueryParam("q"), c.QueryParam("sort")),
+		"accounts": a.accounts.list(c.QueryParam("q"), c.QueryParam("sort"), sessionID(c)),
 	})
 }
