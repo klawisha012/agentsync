@@ -19,8 +19,7 @@ var (
 	foldKey  = cases.Fold()
 	reserved = map[string]struct{}{
 		"login": {}, "recover": {}, "accounts": {}, "catalog": {},
-		"api": {}, "health": {}, "backend": {}, "install": {},
-		"session": {}, "account": {},
+		"health": {}, "backend": {},
 	}
 )
 

@@ -58,22 +58,22 @@ export default function Shell({ children }) {
             локальный агент не отвечает
           </span>
           {session ? (
-            <>
-              <Link href={`/${session.name}`}>{session.name}</Link>
-              <button className="ghost" type="button" onClick={logout}>
-                Выйти
-              </button>
-            </>
+            <Link className="who" href={`/${session.name}`}>
+              {session.name}
+            </Link>
           ) : (
-            <>
-              <Link className="ghost" href="/login">
-                Войти
-              </Link>
-              <Link className="solid" href="/login?tab=register">
-                Создать аккаунт
-              </Link>
-            </>
+            <Link className="ghost" href="/login">
+              Войти
+            </Link>
           )}
+          <Link className="solid" href="/login?tab=register">
+            Создать аккаунт
+          </Link>
+          {session ? (
+            <button className="ghost" type="button" onClick={logout}>
+              Выйти
+            </button>
+          ) : null}
         </div>
       </header>
       <main className="main">{children}</main>

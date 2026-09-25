@@ -97,6 +97,7 @@ func TestRegisterRejectsName(t *testing.T) {
 		{name: "site page", account: "login", wantCode: http.StatusConflict},
 		{name: "same letters different case", account: "alice", wantCode: http.StatusConflict},
 		{name: "other alphabet stays distinct", account: "Аlice", wantCode: http.StatusCreated},
+		{name: "not a site page", account: "session", wantCode: http.StatusCreated},
 	}
 	e := New("http://localhost:3000")
 	first := postJSON(t, e, "/accounts", map[string]string{

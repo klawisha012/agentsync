@@ -297,10 +297,16 @@ input:focus {
   font-size: 0.75rem;
 }
 
+.who,
 .account-name {
   margin: 0;
+  font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 2rem;
   letter-spacing: -0.03em;
+}
+
+.who {
+  font-size: 0.875rem;
 }
 
 @media (max-width: 720px) {
