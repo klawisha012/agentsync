@@ -17,18 +17,18 @@ export default function Shell({ children }) {
   const router = useRouter();
   const [session, setSession] = useState(undefined);
   const [agent] = useAgentProbe();
-  const agentOnline = Boolean(
+  const sameAccount = Boolean(
     agent.ok &&
       session &&
       agent.account &&
       agent.account.localeCompare(session.name, "ru", { sensitivity: "accent" }) === 0,
   );
-  const agentOther = Boolean(agent.ok && session && agent.account && !agentOnline);
+  const otherAccount = Boolean(agent.ok && session && agent.account && !sameAccount);
   let agentLabel = "локальный агент не отвечает";
-  if (agentOnline) {
-    agentLabel = `${listenerLabel} · онлайн`;
-  } else if (agentOther) {
-    agentLabel = "локальный агент в\u00a0другом аккаунте";
+  if (agent.ok) {
+    const host = agent.host ? ` · ${agent.host}` : "";
+    const state = sameAccount ? " · онлайн" : otherAccount ? " · другой аккаунт" : "";
+    agentLabel = `${listenerLabel}${host} · ${agent.ms}\u00a0мс${state}`;
   }
 
   useEffect(() => {
@@ -68,7 +68,7 @@ export default function Shell({ children }) {
           ))}
         </nav>
         <div className="top-gap">
-          <span className={agentOnline ? "agent-pill online" : "agent-pill"}>
+          <span className={sameAccount ? "agent-pill online" : "agent-pill"}>
             <i />
             {agentLabel}
           </span>

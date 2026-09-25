@@ -4,7 +4,30 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+	"time"
 )
+
+func TestTopWeekFollowsTheLikesLeader(t *testing.T) {
+	now := time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)
+	recent := now.Add(-24 * time.Hour)
+	old := now.Add(-8 * 24 * time.Hour)
+	cards := []accountCard{
+		{Name: "leader", Likes: 10, PublishedAt: &old},
+		{Name: "recent", Likes: 3, PublishedAt: &recent},
+		{Name: "plain", Likes: 1},
+	}
+	markTopWeek(cards, now)
+	for _, card := range cards {
+		if card.TopWeek {
+			t.Fatalf("old leader should leave no badge, got %s", card.Name)
+		}
+	}
+	cards[0].PublishedAt = &recent
+	markTopWeek(cards, now)
+	if !cards[0].TopWeek || cards[1].TopWeek || cards[2].TopWeek {
+		t.Fatalf("badge %+v", cards)
+	}
+}
 
 func TestAccountListSearchAndSort(t *testing.T) {
 	e := New("http://localhost:3000")

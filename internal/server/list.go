@@ -45,18 +45,22 @@ func (a account) card() accountCard {
 func (s *store) list(query, sortKey string) []accountCard {
 	foldedQuery := foldKey.String(strings.TrimSpace(query))
 	s.mu.Lock()
-	cards := make([]accountCard, 0, len(s.byName))
+	all := make([]accountCard, 0, len(s.byName))
 	for _, item := range s.byName {
-		if foldedQuery != "" && !strings.Contains(item.nameKey, foldedQuery) {
-			continue
-		}
 		card := item.card()
 		card.PublishedAt = item.publishedAt
-		cards = append(cards, card)
+		all = append(all, card)
 	}
 	s.mu.Unlock()
+	markTopWeek(all, time.Now())
+	cards := make([]accountCard, 0, len(all))
+	for _, card := range all {
+		if foldedQuery != "" && !strings.Contains(foldKey.String(card.Name), foldedQuery) {
+			continue
+		}
+		cards = append(cards, card)
+	}
 	sortCards(cards, sortKey)
-	markTopWeek(cards, time.Now())
 	return cards
 }
 
@@ -105,17 +109,18 @@ func cmpDesc(a, b int) int {
 func markTopWeek(cards []accountCard, now time.Time) {
 	best := -1
 	for i := range cards {
-		at := cards[i].PublishedAt
-		if at == nil || now.Sub(*at) > 7*24*time.Hour {
-			continue
-		}
 		if best == -1 || likesAhead(cards[i], cards[best]) {
 			best = i
 		}
 	}
-	if best >= 0 {
-		cards[best].TopWeek = true
+	if best < 0 {
+		return
 	}
+	at := cards[best].PublishedAt
+	if at == nil || now.Sub(*at) > 7*24*time.Hour || now.Before(*at) {
+		return
+	}
+	cards[best].TopWeek = true
 }
 
 func likesAhead(a, b accountCard) bool {
