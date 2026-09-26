@@ -27,11 +27,26 @@ type storedFile struct {
 	Body string `json:"body"`
 }
 
+type excludedNote struct {
+	Path  string `json:"path"`
+	Label string `json:"label"`
+}
+
+var previewExcluded = []excludedNote{
+	{Path: "~/…/.credentials", Label: "учётные данные"},
+	{Path: "~/…/sessions.db", Label: "диалоги"},
+	{Path: "~/…/cache/*", Label: "кэш"},
+	{Path: "machine-mcp.json", Label: "машинный MCP"},
+	{Path: "hooks/….sh", Label: "машинный хук"},
+}
+
 type publicationView struct {
-	ID      string       `json:"id"`
-	Agent   string       `json:"agent"`
-	Version int          `json:"version"`
-	Files   []storedFile `json:"files"`
+	ID       string         `json:"id"`
+	Agent    string         `json:"agent"`
+	Version  int            `json:"version"`
+	Author   string         `json:"author,omitempty"`
+	Files    []storedFile   `json:"files"`
+	Excluded []excludedNote `json:"excluded"`
 }
 
 var (
@@ -93,7 +108,7 @@ func (s *store) push(sessionID, agentToken, agent string, missing bool, files []
 	viewer.publications = append(viewer.publications, item)
 	stamp := created
 	viewer.publishedAt = &stamp
-	return item.view(), http.StatusCreated, ""
+	return item.view(viewer.name), http.StatusCreated, ""
 }
 
 func (s *store) machineMatches(viewer *account, agentToken string) bool {
@@ -110,17 +125,21 @@ func (s *store) publication(id string) (publicationView, bool) {
 	for _, page := range s.byName {
 		for _, item := range page.publications {
 			if item.id == id {
-				return item.view(), true
+				return item.view(page.name), true
 			}
 		}
 	}
 	return publicationView{}, false
 }
 
-func (p publication) view() publicationView {
+func (p publication) view(author string) publicationView {
 	files := make([]storedFile, len(p.files))
 	copy(files, p.files)
-	return publicationView{ID: p.id, Agent: p.agent, Version: p.version, Files: files}
+	excluded := append([]excludedNote(nil), previewExcluded...)
+	return publicationView{
+		ID: p.id, Agent: p.agent, Version: p.version, Author: author,
+		Files: files, Excluded: excluded,
+	}
 }
 
 func classify(files []storedFile) ([]storedFile, string) {
