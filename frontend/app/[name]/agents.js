@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { probeAgent } from "../agent";
+import { api } from "../api";
+import { probeAgent, useAgentProbe } from "../agent";
 
 const colors = {
   Grok: "var(--grok)",
@@ -12,6 +13,7 @@ const colors = {
 
 export default function AgentBoard({ name, page, owner, onChange, onExplain }) {
   const [copied, setCopied] = useState("");
+  const [agentProbe] = useAgentProbe();
   const [notes, setNotes] = useState({});
   const agents = page.agents || [];
 
@@ -78,6 +80,24 @@ export default function AgentBoard({ name, page, owner, onChange, onExplain }) {
     await onChange();
   }
 
+  async function withdraw(agent) {
+    if (!agent.publicationId) {
+      note(agent.name, "Публикация не найдена.");
+      return;
+    }
+    if (page.verified === false) {
+      note(agent.name, "Подтвердите почту, чтобы загрузить или снять публикацию.");
+      return;
+    }
+    const res = await api(`/publications/${agent.publicationId}/withdraw`, { method: "POST", body: "{}" });
+    if (!res.ok) {
+      note(agent.name, res.body?.explanation || "Не удалось снять публикацию.");
+      return;
+    }
+    note(agent.name, "");
+    await onChange();
+  }
+
   async function copyCommand(agentName) {
     try {
       await navigator.clipboard.writeText(`agentsync push ${agentName}`);
@@ -108,7 +128,7 @@ export default function AgentBoard({ name, page, owner, onChange, onExplain }) {
             </p>
             {notes[agent.name] ? <p className="explanation">{notes[agent.name]}</p> : null}
             <div className="agent-actions">
-              {agent.version != null && !owner ? (
+              {agent.version != null && !owner && agentProbe.ok ? (
                 <button type="button">Применить v{agent.version}</button>
               ) : null}
               {owner ? (
@@ -117,8 +137,9 @@ export default function AgentBoard({ name, page, owner, onChange, onExplain }) {
                   {agent.publicationId ? (
                     <Link href={`/publications/${agent.publicationId}`}>Осмотр</Link>
                   ) : null}
-                  <button type="button">Снимки</button>
-                  <button type="button">Снять публикацию</button>
+                  <button type="button" onClick={() => note(agent.name, agentProbe.ok ? "Цепочка на этом компьютере." : "Локальный агент не отвечает.")}>Снимки</button>
+                  <button type="button" onClick={() => withdraw(agent)}>Снять публикацию</button>
+                  <button type="button" onClick={() => note(agent.name, agentProbe.ok ? `agentsync revert ${agent.name}` : "Локальный агент не отвечает.")}>Откатить</button>
                 </>
               ) : null}
             </div>
@@ -127,7 +148,7 @@ export default function AgentBoard({ name, page, owner, onChange, onExplain }) {
       </div>
       {owner ? (
         <div className="commands">
-          <h2>Команды загрузки</h2>
+          <h2>Публикация и обновление конфигураций через терминал</h2>
           {agents.map((agent) => (
             <div className="terminal-line" key={agent.name}>
               <code>agentsync push {agent.name}</code>

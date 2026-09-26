@@ -17,9 +17,10 @@ type publication struct {
 	id      string
 	agent   string
 	version int
-	files   []storedFile
-	packed  []byte
-	created time.Time
+	files     []storedFile
+	packed    []byte
+	created   time.Time
+	withdrawn bool
 }
 
 type storedFile struct {
@@ -124,7 +125,7 @@ func (s *store) publication(id string) (publicationView, bool) {
 	defer s.mu.Unlock()
 	for _, page := range s.byName {
 		for _, item := range page.publications {
-			if item.id == id {
+			if item.id == id && !item.withdrawn {
 				return item.view(page.name), true
 			}
 		}

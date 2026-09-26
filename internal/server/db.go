@@ -194,7 +194,7 @@ func (s *store) loadMachines(ctx context.Context, byID map[string]*account) erro
 
 func (s *store) loadPublications(ctx context.Context, byID map[string]*account) error {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, account_id, agent, version, packed, created_at FROM publications`)
+		SELECT id, account_id, agent, version, packed, created_at, withdrawn FROM publications`)
 	if err != nil {
 		return err
 	}
@@ -202,7 +202,7 @@ func (s *store) loadPublications(ctx context.Context, byID map[string]*account) 
 	for rows.Next() {
 		var accountID string
 		item := &publication{}
-		if err := rows.Scan(&item.id, &accountID, &item.agent, &item.version, &item.packed, &item.created); err != nil {
+		if err := rows.Scan(&item.id, &accountID, &item.agent, &item.version, &item.packed, &item.created, &item.withdrawn); err != nil {
 			return err
 		}
 		files, err := unpackFiles(item.packed)
@@ -378,9 +378,9 @@ func (s *store) deleteMachine(ctx context.Context, id string) error {
 
 func (s *store) insertPublication(ctx context.Context, owner *account, item *publication) error {
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO publications (id, account_id, agent, version, packed, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6)`,
-		item.id, owner.id, item.agent, item.version, item.packed, item.created)
+		INSERT INTO publications (id, account_id, agent, version, packed, created_at, withdrawn)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		item.id, owner.id, item.agent, item.version, item.packed, item.created, item.withdrawn)
 	return err
 }
 

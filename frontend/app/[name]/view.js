@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import { dropAgent, handToken, listenerLabel, probeAgent } from "../agent";
@@ -10,6 +11,11 @@ export default function AccountView({ name }) {
   const [state, setState] = useState(null);
   const [explanation, setExplanation] = useState("");
   const [releaseID, setReleaseID] = useState(null);
+  const [editing, setEditing] = useState(false);
+  const [nextName, setNextName] = useState("");
+  const [removing, setRemoving] = useState(false);
+  const [password, setPassword] = useState("");
+  const router = useRouter();
 
   async function load() {
     const res = await api(`/accounts/${encodeURIComponent(name)}`);
@@ -28,6 +34,27 @@ export default function AccountView({ name }) {
       gone = true;
     };
   }, [name]);
+
+  async function saveName(event) {
+    event.preventDefault();
+    const res = await api("/account/name", { method: "POST", body: JSON.stringify({ name: nextName }) });
+    if (!res.ok) {
+      setExplanation(res.body?.explanation || "Не удалось сменить имя.");
+      return;
+    }
+    setEditing(false);
+    router.push(`/${res.body.name}`);
+  }
+
+  async function deleteAccount(event) {
+    event.preventDefault();
+    const res = await api("/account/delete", { method: "POST", body: JSON.stringify({ password }) });
+    if (!res.ok) {
+      setExplanation(res.body?.explanation || "Не удалось удалить аккаунт.");
+      return;
+    }
+    router.push("/accounts");
+  }
 
   async function like() {
     const res = await api(`/accounts/${encodeURIComponent(name)}/like`, {
@@ -94,6 +121,8 @@ export default function AccountView({ name }) {
     <section className="profile">
       <div className="card-title">
         <h1 className="account-name">{page.name}</h1>
+        {owner ? <button className="ghost" type="button" onClick={() => { setNextName(page.name); setEditing(true); }}>Изменить</button> : null}
+        {owner ? <button className="ghost" type="button" onClick={() => setRemoving(true)}>Удалить аккаунт</button> : null}
         {page.verified ? <em className="badge ok">верифицирован</em> : null}
       </div>
       {owner ? (
@@ -154,6 +183,30 @@ export default function AccountView({ name }) {
         onExplain={setExplanation}
       />
       {explanation ? <p className="explanation">{explanation}</p> : null}
+      {editing ? (
+        <form onSubmit={saveName}>
+          <label htmlFor="next-name">Имя</label>
+          <input id="next-name" value={nextName} onChange={(event) => setNextName(event.target.value)} />
+          <div className="dialog-actions">
+            <button className="solid" type="submit">Сохранить</button>
+            <button className="ghost" type="button" onClick={() => setEditing(false)}>Отмена</button>
+          </div>
+        </form>
+      ) : null}
+      {removing ? (
+        <div className="dialog-back">
+          <form className="dialog" onSubmit={deleteAccount}>
+            <h2>Удалить аккаунт?</h2>
+            <p>Публикации будут сняты, имя освободится. Цепочки на дисках останутся.</p>
+            <label htmlFor="delete-password">Пароль</label>
+            <input id="delete-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+            <div className="dialog-actions">
+              <button className="solid" type="submit">Удалить навсегда</button>
+              <button className="ghost" type="button" onClick={() => setRemoving(false)}>Отмена</button>
+            </div>
+          </form>
+        </div>
+      ) : null}
       {releaseID ? (
         <div className="dialog-back">
           <div className="dialog" role="dialog" aria-labelledby="unpair-title">

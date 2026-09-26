@@ -34,6 +34,9 @@ type accountCard struct {
 func (a account) agentSlots() []agentSlot {
 	latest := map[string]*publication{}
 	for _, pub := range a.publications {
+		if pub.withdrawn {
+			continue
+		}
 		prev := latest[pub.agent]
 		if prev == nil || pub.version > prev.version {
 			latest[pub.agent] = pub

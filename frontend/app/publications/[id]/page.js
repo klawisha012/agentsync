@@ -50,7 +50,7 @@ export default function PublicationPage() {
   const page = state.body;
   const files = page.files || [];
   const current = files.find((file) => file.path === selected) || files[0];
-  const command = commandText(tab, origin, page.id);
+  const command = `${commandText(origin, page.author, page.agent)}\nagentsync revert ${page.agent}`;
 
   async function copy(text, key) {
     try {
@@ -155,12 +155,8 @@ export default function PublicationPage() {
   );
 }
 
-function commandText(tab, origin, id) {
-  const url = `${origin}/publications/${id}`;
-  if (tab === "ps") {
-    return `irm ${url} | agentsync`;
-  }
-  return `curl -fsSL ${url} | agentsync`;
+function commandText(origin, author, agent) {
+  return `curl -sSL ${origin}/api/apply/${author}/${agent} | agentsync`;
 }
 
 function byteLabel(text) {

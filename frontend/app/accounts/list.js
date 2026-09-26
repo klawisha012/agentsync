@@ -138,7 +138,7 @@ export default function AccountList() {
             </p>
           ) : null}
           {found.map((account) => (
-            <AccountCard key={account.name} account={account} session={session} onLike={likeAccount} />
+            <AccountCard key={account.name} account={account} session={session} onLike={likeAccount} agentOnline={agent.ok} />
           ))}
         </div>
         <aside className="side">
@@ -203,7 +203,7 @@ export default function AccountList() {
   );
 }
 
-function AccountCard({ account, session, onLike }) {
+function AccountCard({ account, session, onLike, agentOnline }) {
   const agents = account.agents || [];
   const published = agents.filter((agent) => agent.version != null).length;
   return (
@@ -233,7 +233,7 @@ function AccountCard({ account, session, onLike }) {
           <li key={agent.name}>
             <i style={{ background: colorOf(agent.name) }} />
             <span>{agent.name}</span>
-            {agent.version == null ? (
+            {agent.version == null || !agentOnline ? (
               <em>Нет публикаций</em>
             ) : (
               <button type="button">Применить v{agent.version}</button>
