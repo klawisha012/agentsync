@@ -109,7 +109,7 @@ export default function Home() {
           </video>
         </div>
         <p className="lede hero-lede">
-          Однократный перенос переносимой настройки ИИ-агента без риска утечки учётных данных и{"\u00a0"}машинного MCP.
+          Однократный перенос переносимой конфигурации ИИ-агента без риска утечки учётных данных и{"\u00a0"}машинных зависимостей MCP.
         </p>
         <div className="terminal">
           <div className="terminal-tabs" role="tablist">

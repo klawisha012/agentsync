@@ -191,16 +191,17 @@ func receiverDirs(root, place string, targets []string) ([]string, error) {
 }
 
 type backedFile struct {
-	path    string
-	existed bool
-	prior   []byte
+	path        string
+	existed     bool
+	prior       []byte
+	createdDirs []string
 }
 
 func writeInstalled(dir string, files []File) ([]backedFile, error) {
 	written := make([]backedFile, 0, len(files))
 	for _, file := range files {
 		target := filepath.Join(dir, filepath.FromSlash(file.Path))
-		prior := backedFile{path: target}
+		prior := backedFile{path: target, createdDirs: missingDirs(filepath.Dir(target))}
 		raw, err := os.ReadFile(target)
 		if err == nil {
 			prior.existed = true
@@ -208,10 +209,10 @@ func writeInstalled(dir string, files []File) ([]backedFile, error) {
 		} else if !errors.Is(err, os.ErrNotExist) {
 			return written, err
 		}
+		written = append(written, prior)
 		if err := writeFile(dir, file); err != nil {
 			return written, err
 		}
-		written = append(written, prior)
 	}
 	return written, nil
 }
@@ -233,8 +234,32 @@ func restoreFiles(files []backedFile) error {
 		if err := os.Remove(file.path); err != nil && !errors.Is(err, os.ErrNotExist) {
 			errs = append(errs, err)
 		}
+		for _, dir := range file.createdDirs {
+			if err := os.Remove(dir); err != nil && !errors.Is(err, os.ErrNotExist) {
+				break
+			}
+		}
 	}
 	return errors.Join(errs...)
+}
+
+func missingDirs(start string) []string {
+	var missing []string
+	dir := filepath.Clean(start)
+	for {
+		if _, err := os.Stat(dir); err == nil {
+			break
+		} else if !errors.Is(err, os.ErrNotExist) {
+			break
+		}
+		missing = append(missing, dir)
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return missing
 }
 
 func skillFolders(all []File) []skillFolder {

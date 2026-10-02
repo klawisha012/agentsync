@@ -324,6 +324,16 @@ func TestCopySkillsHonorsEnvironmentAndRestores(t *testing.T) {
 	if body := mustRead(t, extra); body != "mine" {
 		t.Fatal("rollback touched an extra file")
 	}
+	fresh := CopySkills(t.Context(), srv.URL, root, "zwarder", "", "", SkillCopy{
+		Author: "zwarder", Source: "Grok", Version: 4, Place: "global",
+		Skills: []string{"child"}, Targets: []string{"jazz", "windsurf"},
+	})
+	if fresh == nil {
+		t.Fatal("expected the fresh receiver to roll back")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".jazz")); !os.IsNotExist(err) {
+		t.Fatal("rollback left the new directory")
+	}
 }
 
 func TestCopySkillsRefusesDuplicateFolderNames(t *testing.T) {

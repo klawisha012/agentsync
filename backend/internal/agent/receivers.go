@@ -3,7 +3,6 @@ package agent
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 )
@@ -106,12 +105,6 @@ func openClawDir(root string) string {
 func configHome(root string) string {
 	if value := strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME")); value != "" {
 		return value
-	}
-	if runtime.GOOS == "windows" {
-		if value := strings.TrimSpace(os.Getenv("APPDATA")); value != "" {
-			return value
-		}
-		return filepath.Join(root, "AppData", "Roaming")
 	}
 	return filepath.Join(root, ".config")
 }

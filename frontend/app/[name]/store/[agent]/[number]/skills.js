@@ -75,7 +75,7 @@ export default function SkillCommand({ author, agent, version, skills, picked })
             <button type="button" onClick={copyCommand}>{copied ? "Скопировано" : "Скопировать"}</button>
           </div>
         ) : clashes.length === 0 ? (
-          <p className="hint">{chosen.length === 0 ? "Отметьте навыки в\u00A0списке файлов" : "Отметьте приёмника"}</p>
+          <p className="hint">{chosen.length === 0 ? "Отметьте навыки в\u00A0списке файлов" : "Отметьте приёмник"}</p>
         ) : null}
       </div>
       {clashes.length > 0 ? <p className="explanation">{clashText(clashes)}</p> : null}
