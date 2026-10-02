@@ -2,3 +2,10 @@
 *.exe
 frontend/node_modules/
 frontend/.next/
+.grok/
+.env
+.env.*
+.agentsync/
+credentials.json
+auth.json
+session.json
