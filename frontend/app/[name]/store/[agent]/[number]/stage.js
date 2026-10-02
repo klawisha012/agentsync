@@ -5,7 +5,7 @@ import { fileDownloadName, isMarkdown, skillBundle, skillZip } from "./pack";
 import MarkdownView from "./preview";
 import styles from "./stage.module.css";
 
-export default function CodeStage({ files, current, onSelect, children }) {
+export default function CodeStage({ files, current, onSelect }) {
   const [mode, setMode] = useState("preview");
   const [copied, setCopied] = useState(false);
   const [note, setNote] = useState("");
@@ -84,7 +84,6 @@ export default function CodeStage({ files, current, onSelect, children }) {
         ) : null}
       </div>
       {note ? <p className="explanation">{note}</p> : null}
-      {children}
       {current ? (
         showPreview ? (
           <MarkdownView text={current.body || ""} files={files} currentPath={current.path} onSelect={onSelect} styles={styles} />

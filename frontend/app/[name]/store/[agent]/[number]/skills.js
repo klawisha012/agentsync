@@ -123,11 +123,19 @@ function skillCommand(author, source, version, skills, home) {
   if (skills.length === 0 || !home) {
     return "";
   }
-  const parts = ["agentsync", "skills", shellArg(author), shellArg(source), "--version", String(version)];
+  const parts = [
+    "agentsync",
+    "skills",
+    shellArg(author),
+    shellArg(source),
+    "--version",
+    String(version),
+    "--into",
+    shellArg(home),
+  ];
   for (const skill of skills) {
-    parts.push("--skill", shellArg(skill.path));
+    parts.push(shellArg(skill.label || skill.path));
   }
-  parts.push("--into", shellArg(home));
   return parts.join(" ");
 }
 

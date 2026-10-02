@@ -120,6 +120,15 @@ export default function VersionPage() {
             </Link>
           ))}
         </div>
+        <SkillCommand
+          author={name}
+          agent={agent}
+          version={shot.version}
+          skills={skills}
+          picked={picked}
+          target={target}
+          onTarget={setTarget}
+        />
       </div>
       <div className="preview-grid">
         <div className="manifest">
@@ -154,17 +163,7 @@ export default function VersionPage() {
           </div>
           <p className="hint">{stamp(shot.created)} · манифест v{shot.version}</p>
         </div>
-        <CodeStage files={files} current={current} onSelect={setSelected}>
-          <SkillCommand
-            author={name}
-            agent={agent}
-            version={shot.version}
-            skills={skills}
-            picked={picked}
-            target={target}
-            onTarget={setTarget}
-          />
-        </CodeStage>
+        <CodeStage files={files} current={current} onSelect={setSelected} />
       </div>
     </article>
   );
