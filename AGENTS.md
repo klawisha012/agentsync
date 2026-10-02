@@ -11,3 +11,7 @@ Five canonical roles, label strings equal to the role names. See `docs/agents/tr
 ### Domain docs
 
 Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+### Design
+
+Before visual UI work, read `docs/DESIGN.md`. Take colors, type, spacing, and component roles from it. Take fields, copy, states, and behavior from this repo.
