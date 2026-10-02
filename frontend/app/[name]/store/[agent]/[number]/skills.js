@@ -27,7 +27,7 @@ export default function SkillCommand({ author, agent, version, skills, picked, t
   }
 
   if (skills.length === 0) {
-    return <p className="hint">{"В\u00A0этой версии нет навыков"}</p>;
+    return <p className="hint skill-empty">{"В\u00A0этой версии нет навыков"}</p>;
   }
 
   return (

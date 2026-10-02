@@ -102,33 +102,35 @@ export default function VersionPage() {
   return (
     <article className="preview">
       <div className="preview-top">
-        <nav className="crumbs" aria-label="Путь">
-          <Link href={`/${name}`}>{name}</Link>
-          <span>/</span>
-          <Link href={`/${name}/store/${encodeURIComponent(agent)}`}>версии</Link>
-          <span>/</span>
-          <b>v{shot.version}</b>
-        </nav>
-        <div className="version-switch" role="tablist" aria-label="Версии">
-          {ordered.map((item) => (
-            <Link
-              key={item.version}
-              href={`/${name}/store/${encodeURIComponent(agent)}/${item.version}`}
-              aria-current={item.version === shot.version ? "page" : undefined}
-            >
-              v{item.version}
-            </Link>
-          ))}
+        <div className="crumbs">
+          <nav aria-label="Путь">
+            <Link href={`/${name}`}>{name}</Link>
+            <span>/</span>
+            <Link href={`/${name}/store/${encodeURIComponent(agent)}`}>версии</Link>
+            <span>/</span>
+            <b>v{shot.version}</b>
+          </nav>
+          <div className="version-switch" role="tablist" aria-label="Версии">
+            {ordered.map((item) => (
+              <Link
+                key={item.version}
+                href={`/${name}/store/${encodeURIComponent(agent)}/${item.version}`}
+                aria-current={item.version === shot.version ? "page" : undefined}
+              >
+                v{item.version}
+              </Link>
+            ))}
+          </div>
+          <SkillCommand
+            author={name}
+            agent={agent}
+            version={shot.version}
+            skills={skills}
+            picked={picked}
+            target={target}
+            onTarget={setTarget}
+          />
         </div>
-        <SkillCommand
-          author={name}
-          agent={agent}
-          version={shot.version}
-          skills={skills}
-          picked={picked}
-          target={target}
-          onTarget={setTarget}
-        />
       </div>
       <div className="preview-grid">
         <div className="manifest">
