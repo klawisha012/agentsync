@@ -12,6 +12,7 @@ type skillCall struct {
 	version int
 	skills  []string
 	targets []string
+	place   string
 }
 
 func parseSkillArgs(args []string) (skillCall, error) {
@@ -43,6 +44,11 @@ func parseSkillArgs(args []string) (skillCall, error) {
 			}
 			call.skills = append(call.skills, value)
 			i = next
+		case arg == "--global" || arg == "--project":
+			if call.place != "" {
+				return skillCall{}, fmt.Errorf("Укажите одно место: глобальный каталог или проект.")
+			}
+			call.place = strings.TrimPrefix(arg, "--")
 		case arg == "--into" || strings.HasPrefix(arg, "--into="):
 			value, next, err := flagValue(args, i, "--into")
 			if err != nil {
@@ -65,6 +71,9 @@ func parseSkillArgs(args []string) (skillCall, error) {
 	}
 	if !seenVersion {
 		return skillCall{}, fmt.Errorf("Назовите номер версии.")
+	}
+	if call.place == "" {
+		return skillCall{}, fmt.Errorf("Выберите глобальный каталог или проект.")
 	}
 	call.author = positional[0]
 	call.source = positional[1]

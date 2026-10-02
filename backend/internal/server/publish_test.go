@@ -131,7 +131,7 @@ type pushFile struct {
 	Body string `json:"body"`
 }
 
-func TestLowerAgentNameFillsExampleSlot(t *testing.T) {
+func TestPublishedNameStaysAsWritten(t *testing.T) {
 	e := newServer(t)
 	created := postJSON(t, e, "/accounts", map[string]string{
 		"email": "fold@example.com", "password": "secret", "name": "Folder",
@@ -158,19 +158,7 @@ func TestLowerAgentNameFillsExampleSlot(t *testing.T) {
 	if err := json.Unmarshal(page.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	var grok, extra int
-	for _, agent := range body.Agents {
-		if agent.Name == "Grok" {
-			grok++
-			if agent.Version == nil || *agent.Version != 1 || agent.Files != 1 {
-				t.Fatalf("Grok slot %+v", agent)
-			}
-		}
-		if strings.EqualFold(agent.Name, "grok") && agent.Name != "Grok" {
-			extra++
-		}
-	}
-	if grok != 1 || extra != 0 {
+	if len(body.Agents) != 1 || body.Agents[0].Name != "grok" || body.Agents[0].Version == nil || *body.Agents[0].Version != 1 || body.Agents[0].Files != 1 {
 		t.Fatalf("agents %+v", body.Agents)
 	}
 }

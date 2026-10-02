@@ -7,7 +7,7 @@ import { api } from "../../../../api";
 import FileTree from "../../../../file-tree";
 import { buildManifest, ruTokens, skillTokenTotal } from "../../../../publications/[id]/manifest";
 import CodeStage from "./stage";
-import SkillCommand, { defaultHome, listSkillChoices, skillParentPaths } from "./skills";
+import SkillCommand, { listSkillChoices, skillParentPaths } from "./skills";
 
 export default function VersionPage() {
   const params = useParams();
@@ -18,7 +18,6 @@ export default function VersionPage() {
   const [selected, setSelected] = useState("");
   const [open, setOpen] = useState(() => new Set());
   const [picked, setPicked] = useState(() => new Set());
-  const [target, setTarget] = useState("");
   const allRef = useRef(null);
 
   useEffect(() => {
@@ -27,7 +26,6 @@ export default function VersionPage() {
     setSelected("");
     setOpen(new Set());
     setPicked(new Set());
-    setTarget(defaultHome(agent));
     api(`/accounts/${encodeURIComponent(name)}/versions/${encodeURIComponent(agent)}/${encodeURIComponent(number)}`).then((res) => {
       if (!gone) {
         setState(res);
@@ -109,8 +107,6 @@ export default function VersionPage() {
             version={shot.version}
             skills={skills}
             picked={picked}
-            target={target}
-            onTarget={setTarget}
           />
         </div>
       </div>

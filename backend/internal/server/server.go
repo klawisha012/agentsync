@@ -35,6 +35,7 @@ func New(webOrigin string, db *sql.DB) (*echo.Echo, error) {
 		}))
 	}
 	e.GET("/health", health)
+	e.GET("/receivers", listReceivers)
 	e.POST("/accounts", a.createAccount)
 	e.GET("/accounts", a.listAccounts)
 	e.GET("/accounts/:name", a.publicAccount)

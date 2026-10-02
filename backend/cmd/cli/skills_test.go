@@ -12,30 +12,33 @@ func TestParseSkillArgs(t *testing.T) {
 		version int
 		skills  string
 		targets string
+		place   string
 		err     string
 	}{
 		{
 			name:    "flags",
-			args:    []string{"Author", "Grok", "--version", "4", "--skill", "ru-text", "--into", "Claude"},
+			args:    []string{"Author", "Grok", "--version", "4", "--global", "--skill", "ru-text", "--into", "cursor"},
 			version: 4,
 			skills:  "ru-text",
-			targets: "Claude",
+			targets: "cursor",
+			place:   "global",
 		},
 		{
 			name:    "equals form",
-			args:    []string{"--skill=graphify", "Author", "Grok", "--into=Grok", "--version=2", "--skill", "ru-text"},
+			args:    []string{"--project", "--skill=graphify", "Author", "Grok", "--into=windsurf", "--version=2", "--skill", "ru-text"},
 			version: 2,
 			skills:  "graphify,ru-text",
-			targets: "Grok",
+			targets: "windsurf",
+			place:   "project",
 		},
 		{
 			name: "missing version",
-			args: []string{"Author", "Grok", "--skill", "ru-text", "--into", "Grok"},
+			args: []string{"Author", "Grok", "--global", "--skill", "ru-text", "--into", "cursor"},
 			err:  "номер версии",
 		},
 		{
 			name: "bad version",
-			args: []string{"Author", "Grok", "--version", "0", "--skill", "ru-text", "--into", "Grok"},
+			args: []string{"Author", "Grok", "--version", "0", "--global", "--skill", "ru-text", "--into", "cursor"},
 			err:  "номер версии",
 		},
 		{
@@ -44,18 +47,30 @@ func TestParseSkillArgs(t *testing.T) {
 			err:  "--fast",
 		},
 		{
+			name: "missing place",
+			args: []string{"Author", "Grok", "--version", "4", "--into", "cursor", "ru-text"},
+			err:  "глобальный каталог или проект",
+		},
+		{
+			name: "both places",
+			args: []string{"Author", "Grok", "--version", "4", "--global", "--project", "--into", "cursor", "ru-text"},
+			err:  "одно место",
+		},
+		{
 			name:    "skill list",
-			args:    []string{"Author", "Grok", "--version", "4", "--into", "Grok", "--into", "Claude", "ru-text", "graphify"},
+			args:    []string{"Author", "Grok", "--version", "4", "--global", "--into", "cursor", "--into", "windsurf", "ru-text", "graphify"},
 			version: 4,
 			skills:  "ru-text,graphify",
-			targets: "Grok,Claude",
+			targets: "cursor,windsurf",
+			place:   "global",
 		},
 		{
 			name:    "skill before flags",
-			args:    []string{"Author", "Grok", "ru-text", "--version", "1", "--skill", "graphify", "--into", "Grok"},
+			args:    []string{"Author", "Grok", "ru-text", "--version", "1", "--project", "--skill", "graphify", "--into", "cursor"},
 			version: 1,
 			skills:  "ru-text,graphify",
-			targets: "Grok",
+			targets: "cursor",
+			place:   "project",
 		},
 	}
 	for _, tt := range tests {
@@ -70,7 +85,7 @@ func TestParseSkillArgs(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got.author != "Author" || got.source != "Grok" || got.version != tt.version {
+			if got.author != "Author" || got.source != "Grok" || got.version != tt.version || got.place != tt.place {
 				t.Fatalf("call %+v", got)
 			}
 			if strings.Join(got.skills, ",") != tt.skills || strings.Join(got.targets, ",") != tt.targets {

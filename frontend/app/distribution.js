@@ -1,32 +1,29 @@
 "use client";
 
-export const agentExamples = [
-  { name: "Grok", color: "var(--grok)" },
-  { name: "Agents", color: "var(--agents)" },
-  { name: "Claude", color: "var(--claude)" },
-];
+const palette = ["var(--grok)", "var(--agents)", "var(--claude)", "#e4e4e7", "var(--muted)"];
 
 export function distribution(accounts) {
-  const rows = agentExamples.map((item) => ({ ...item, count: 0, pct: 0 }));
+  const counts = new Map();
   let total = 0;
-  for (const account of accounts) {
+  for (const account of accounts || []) {
     for (const agent of account.agents || []) {
       if (agent.version == null) {
         continue;
       }
       total += 1;
-      const row = rows.find((item) => item.name === agent.name);
-      if (row) {
-        row.count += 1;
-      }
+      counts.set(agent.name, (counts.get(agent.name) || 0) + 1);
     }
   }
-  if (total > 0) {
-    for (const row of rows) {
-      row.pct = Math.round((row.count / total) * 100);
-    }
-  }
-  return { total, rows };
+  const rows = [...counts.entries()].map(([name, count]) => ({
+    name,
+    count,
+    pct: total > 0 ? Math.round((count / total) * 100) : 0,
+  }));
+  rows.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "ru", { sensitivity: "base" }));
+  return {
+    total,
+    rows: rows.map((row, index) => ({ ...row, color: palette[index % palette.length] })),
+  };
 }
 
 export function publicationWord(n) {

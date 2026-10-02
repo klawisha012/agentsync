@@ -145,6 +145,7 @@ func (item spec) execute(args []string, stdout io.Writer) error {
 			Version: call.version,
 			Skills:  call.skills,
 			Targets: call.targets,
+			Place:   call.place,
 		})
 	case "apply":
 		return agent.Apply(

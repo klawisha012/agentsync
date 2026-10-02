@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import Avatar from "../avatar";
-import { agentExamples } from "../distribution";
+
 
 const sorts = [
   { id: "likes", label: "По лайкам" },
@@ -74,15 +74,6 @@ export default function AccountList() {
         </div>
         <div className="search-note">
           <p className="hint"><span className="ok-mark" aria-hidden="true">✓</span> Поиск без учёта регистра. Содержимое локальных файлов не индексируется.</p>
-          <div className="examples" aria-label="Примеры ИИ-агентов">
-            <span>Поддерживаемые агенты:</span>
-            {agentExamples.map((item) => (
-              <span key={item.name}>
-                <i style={{ background: item.color }} />
-                {item.name}
-              </span>
-            ))}
-          </div>
         </div>
       </div>
 
@@ -145,11 +136,9 @@ function metaLine(account, agents, published) {
     return "В агентах нет опубликованных настроек";
   }
   const when = account.publishedAt ? `Обновлено: ${ago(account.publishedAt)}` : "Обновлено";
-  const active = published === agents.length && agents.length === 3
-    ? "Все 3 агента активны"
-    : published === 1
-      ? `1 активный агент (${agents.find((agent) => agent.version != null).name})`
-      : ruCount(published, "активный агент", "активных агента", "активных агентов");
+  const active = published === 1
+    ? `1 активный агент (${agents.find((agent) => agent.version != null).name})`
+    : ruCount(published, "активный агент", "активных агента", "активных агентов");
   return `${when} · ${active}`;
 }
 

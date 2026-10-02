@@ -85,20 +85,19 @@ func commands() []spec {
 		},
 		{
 			name:    "skills",
-			summary: "Кладёт выбранные навыки публикации в\u00a0домашние папки ИИ-агентов",
-			usage:   "agentsync skills <автор> <ии-агент> --version <номер> --into <ии-агент> <навык>…",
+			summary: "Кладёт выбранные навыки публикации в\u00a0каталоги приёмников",
+			usage:   "agentsync skills <автор> <ии-агент> --version <номер> --global|--project --into <приёмник>… <навык>…",
 			about: "Команда берёт названную версию и\u00a0копирует только названные навыки.\n" +
 				"Навык\u00a0— папка с\u00a0SKILL.md. Имя можно дать коротко или путём, например skills/ru-text.\n" +
 				"Навыки пишутся списком в\u00a0конце команды, каждый своим аргументом.\n" +
 				"Флаг --skill тоже принимает один навык и\u00a0может повторяться.\n" +
-				"--into повторяется для каждой домашней папки.\n" +
-				"Остальные файлы не меняются. Перед записью переносимая настройка уходит в\u00a0снимок.\n" +
-				"Откат одной папки: agentsync revert <ии-агент>.\n" +
-				"Своя публикация требует сессии этого аккаунта. Пароль в\u00a0команду не входит.",
+				"Ровно один из флагов --global и\u00a0--project называет место. --into повторяется для каждого приёмника.\n" +
+				"Папка навыка ложится прямо в\u00a0каталог навыков приёмника. Остальные навыки не меняются.\n" +
+				"Хранилище команда не пополняет. Своя публикация требует сессии этого аккаунта. Пароль в\u00a0команду не входит.",
 			envs: []envLine{root, server, token, cookie, account},
 			examples: []string{
-				"agentsync skills Author Grok --version 4 --into Grok ru-text",
-				"agentsync skills Author Grok --version 4 --into Grok --into Claude ru-text graphify",
+				"agentsync skills Author Grok --version 4 --global --into cursor ru-text",
+				"agentsync skills Author Grok --version 4 --project --into cursor --into windsurf ru-text graphify",
 			},
 			minArgs: 2,
 			missing: "Назовите автора и\u00a0ИИ-агента.",
@@ -164,7 +163,7 @@ func rootHelp() string {
 		"agentsync push Grok",
 		"agentsync store Grok 2",
 		"agentsync apply Author Grok",
-		"agentsync skills Author Grok --version 4 --into Claude ru-text",
+		"agentsync skills Author Grok --version 4 --global --into cursor ru-text",
 		"agentsync help apply",
 	}))
 	b.WriteString("\nЧтобы открыть справку по команде, запустите agentsync help <команда>.\n")

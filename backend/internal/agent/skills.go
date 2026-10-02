@@ -11,20 +11,25 @@ import (
 	"strings"
 )
 
-// SkillCopy names a publication version and the skill folders to place into other homes.
+// SkillCopy names a publication version and the skill folders to place into receivers.
 type SkillCopy struct {
 	Author  string
 	Source  string
 	Version int
 	Skills  []string
 	Targets []string
+	Place   string
 }
 
 // CopySkills reads one publication version and adds the named skill folders
-// to each target home. Other files in those homes stay in place.
+// to each receiver's skills directory. Other skills stay in place. The store is not written.
 func CopySkills(ctx context.Context, server, root, account, token, cookie string, copy SkillCopy) error {
 	if copy.Version < 1 {
 		return errors.New("Назовите номер версии.")
+	}
+	place, err := onePlace(copy.Place)
+	if err != nil {
+		return err
 	}
 	skills := compactNames(copy.Skills)
 	if len(skills) == 0 {
@@ -32,30 +37,35 @@ func CopySkills(ctx context.Context, server, root, account, token, cookie string
 	}
 	targets := compactNames(copy.Targets)
 	if len(targets) == 0 {
-		return errors.New("Назовите ИИ-агента, куда положить навыки.")
+		return errors.New("Назовите приёмника, куда положить навыки.")
+	}
+	dirs, err := receiverDirs(root, place, targets)
+	if err != nil {
+		return err
 	}
 	payload, err := fetchPublication(ctx, server, copy.Author, copy.Source, token, cookie, copy.Version)
 	if err != nil {
 		return err
 	}
-	files, err := chosenSkillFiles(payload.Files, skills)
+	folders, err := chosenSkillFolders(payload.Files, skills)
 	if err != nil {
 		return err
 	}
-	owner := strings.TrimSpace(account)
-	if owner == "" {
-		owner = payload.Author
+	folders, err = uniqueSkillBases(folders)
+	if err != nil {
+		return err
 	}
-	placed := make([]skillPlace, 0, len(targets))
-	for _, target := range targets {
-		place, err := placeSkills(root, owner, target, files)
+	installed := relocateSkills(folders)
+	var written []backedFile
+	for _, dir := range dirs {
+		next, err := writeInstalled(dir, installed)
+		written = append(written, next...)
 		if err != nil {
-			if undoErr := rollbackPlaces(placed); undoErr != nil {
+			if undoErr := restoreFiles(written); undoErr != nil {
 				return errors.Join(err, undoErr)
 			}
 			return err
 		}
-		placed = append(placed, place)
 	}
 	return nil
 }
@@ -65,10 +75,10 @@ type skillFolder struct {
 	files []File
 }
 
-func chosenSkillFiles(all []File, wanted []string) ([]File, error) {
+func chosenSkillFolders(all []File, wanted []string) ([]skillFolder, error) {
 	folders := skillFolders(all)
-	chosen := map[string]File{}
 	seen := map[string]struct{}{}
+	out := make([]skillFolder, 0, len(wanted))
 	for _, name := range wanted {
 		hits, err := matchFolders(folders, name)
 		if err != nil {
@@ -79,22 +89,152 @@ func chosenSkillFiles(all []File, wanted []string) ([]File, error) {
 				continue
 			}
 			seen[folder.path] = struct{}{}
-			for _, file := range folder.files {
-				chosen[file.Path] = file
-			}
+			out = append(out, folder)
 		}
 	}
-	if len(chosen) == 0 {
+	if len(out) == 0 {
 		return nil, errors.New("В выбранных навыках нет файлов.")
 	}
-	out := make([]File, 0, len(chosen))
-	for _, file := range chosen {
-		out = append(out, file)
+	return out, nil
+}
+
+func uniqueSkillBases(folders []skillFolder) ([]skillFolder, error) {
+	grouped := map[string][]string{}
+	order := make([]string, 0)
+	for _, folder := range folders {
+		base := path.Base(folder.path)
+		if _, ok := grouped[base]; !ok {
+			order = append(order, base)
+		}
+		grouped[base] = append(grouped[base], folder.path)
+	}
+	var clashes []string
+	for _, base := range order {
+		paths := grouped[base]
+		if len(paths) < 2 {
+			continue
+		}
+		quoted := make([]string, len(paths))
+		for i, item := range paths {
+			quoted[i] = "«" + item + "»"
+		}
+		clashes = append(clashes, strings.Join(quoted, " и "))
+	}
+	if len(clashes) > 0 {
+		return nil, fmt.Errorf("Навыки %s называются одинаково. Оставьте один.", strings.Join(clashes, ", "))
+	}
+	return folders, nil
+}
+
+func relocateSkills(folders []skillFolder) []File {
+	out := make([]File, 0)
+	for _, folder := range folders {
+		base := path.Base(folder.path)
+		for _, file := range folder.files {
+			rel := base
+			if file.Path != folder.path {
+				rel = base + "/" + strings.TrimPrefix(file.Path, folder.path+"/")
+			}
+			out = append(out, File{Path: rel, Body: file.Body})
+		}
 	}
 	slices.SortFunc(out, func(a, b File) int {
 		return strings.Compare(a.Path, b.Path)
 	})
+	return out
+}
+
+func onePlace(value string) (string, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "global":
+		return "global", nil
+	case "project":
+		return "project", nil
+	default:
+		return "", errors.New("Выберите глобальный каталог или проект.")
+	}
+}
+
+func receiverDirs(root, place string, targets []string) ([]string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(targets))
+	for _, target := range targets {
+		receiver, ok := FindReceiver(target)
+		if !ok {
+			return nil, fmt.Errorf("Приёмник «%s» не найден.", target)
+		}
+		var dir string
+		var have bool
+		if place == "project" {
+			dir, have = receiver.ProjectDir(cwd)
+		} else {
+			dir, have = receiver.GlobalDir(root)
+		}
+		if !have {
+			if place == "project" {
+				return nil, fmt.Errorf("У приёмника «%s» нет каталога проекта.", receiver.Display)
+			}
+			return nil, fmt.Errorf("У приёмника «%s» нет глобального каталога.", receiver.Display)
+		}
+		key := filepath.Clean(dir)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, dir)
+	}
 	return out, nil
+}
+
+type backedFile struct {
+	path    string
+	existed bool
+	prior   []byte
+}
+
+func writeInstalled(dir string, files []File) ([]backedFile, error) {
+	written := make([]backedFile, 0, len(files))
+	for _, file := range files {
+		target := filepath.Join(dir, filepath.FromSlash(file.Path))
+		prior := backedFile{path: target}
+		raw, err := os.ReadFile(target)
+		if err == nil {
+			prior.existed = true
+			prior.prior = raw
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return written, err
+		}
+		if err := writeFile(dir, file); err != nil {
+			return written, err
+		}
+		written = append(written, prior)
+	}
+	return written, nil
+}
+
+func restoreFiles(files []backedFile) error {
+	var errs []error
+	for i := len(files) - 1; i >= 0; i-- {
+		file := files[i]
+		if file.existed {
+			if err := os.MkdirAll(filepath.Dir(file.path), 0o755); err != nil {
+				errs = append(errs, err)
+				continue
+			}
+			if err := os.WriteFile(file.path, file.prior, 0o644); err != nil {
+				errs = append(errs, err)
+			}
+			continue
+		}
+		if err := os.Remove(file.path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func skillFolders(all []File) []skillFolder {
@@ -199,98 +339,4 @@ func compactNames(values []string) []string {
 		out = append(out, value)
 	}
 	return out
-}
-
-type skillPlace struct {
-	home    string
-	snap    string
-	written []string
-	prior   map[string]string
-	had     map[string]bool
-}
-
-func placeSkills(root, account, agentName string, next []File) (skillPlace, error) {
-	home := skillHome(root, agentName)
-	current, err := readTree(home)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return skillPlace{}, err
-	}
-	want := map[string]struct{}{}
-	for _, file := range next {
-		want[file.Path] = struct{}{}
-	}
-	portable := make([]File, 0)
-	prior := map[string]string{}
-	had := map[string]bool{}
-	for _, file := range current {
-		rel := filepath.ToSlash(file.Path)
-		if _, ok := want[rel]; ok {
-			prior[rel] = file.Body
-			had[rel] = true
-		}
-		if isPortable(file.Path, file.Body) {
-			portable = append(portable, file)
-		}
-	}
-	snap, err := writeSnapshot(root, account, agentName, portable)
-	if err != nil {
-		return skillPlace{}, err
-	}
-	place := skillPlace{home: home, snap: snap, prior: prior, had: had}
-	for _, file := range next {
-		if err := writeFile(home, file); err != nil {
-			if undoErr := place.rollback(); undoErr != nil {
-				return skillPlace{}, errors.Join(err, undoErr)
-			}
-			return skillPlace{}, err
-		}
-		place.written = append(place.written, file.Path)
-	}
-	return place, nil
-}
-
-func (place skillPlace) rollback() error {
-	var errs []error
-	for _, rel := range place.written {
-		if place.had[rel] {
-			if err := writeFile(place.home, File{Path: rel, Body: place.prior[rel]}); err != nil {
-				errs = append(errs, err)
-			}
-			continue
-		}
-		err := os.Remove(filepath.Join(place.home, filepath.FromSlash(rel)))
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			errs = append(errs, err)
-		}
-	}
-	if place.snap != "" {
-		if err := os.RemoveAll(place.snap); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	return errors.Join(errs...)
-}
-
-func rollbackPlaces(places []skillPlace) error {
-	var errs []error
-	for i := len(places) - 1; i >= 0; i-- {
-		if err := places[i].rollback(); err != nil {
-			errs = append(errs, err)
-		}
-	}
-	return errors.Join(errs...)
-}
-
-func skillHome(root, name string) string {
-	name = strings.TrimSpace(name)
-	home := agentHome(root, name)
-	literal := filepath.Join(root, name)
-	if home != literal {
-		return home
-	}
-	info, err := os.Stat(literal)
-	if err == nil && info.IsDir() {
-		return literal
-	}
-	return filepath.Join(root, "."+strings.ToLower(name))
 }

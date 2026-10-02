@@ -3152,6 +3152,54 @@ input:focus-visible {
   margin: 0.35rem 0 0;
 }
 
+.place-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.place-switch button,
+.skill-command input {
+  margin: 0;
+  padding: 0.35rem 0.55rem;
+  background: #000;
+  color: #e4e4e7;
+  border: 1px solid #27272a;
+  border-radius: 0.55rem;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.82rem;
+}
+
+.place-switch button[aria-pressed="true"] {
+  border-color: #fff;
+}
+
+.skill-command input {
+  width: 14rem;
+  flex: 1 1 10rem;
+}
+
+.receiver-list {
+  width: 100%;
+  max-height: 12rem;
+  margin: 0;
+  padding: 0.35rem 0.55rem;
+  overflow: auto;
+  list-style: none;
+  border: 1px solid #27272a;
+  border-radius: 0.55rem;
+  background: #000;
+}
+
+.receiver-list label {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  padding: 0.2rem 0;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.82rem;
+}
+
 
 
 .term-bar {

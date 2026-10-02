@@ -6,10 +6,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/klawisha012/agentsync/internal/agent"
 	"github.com/labstack/echo/v4"
 )
 
-var exampleAgents = []string{"Grok", "Agents", "Claude"}
+func listReceivers(c echo.Context) error {
+	return c.JSON(http.StatusOK, map[string]any{"receivers": agent.ReceiverViews()})
+}
 
 type agentSlot struct {
 	Name          string     `json:"name"`
@@ -51,25 +54,13 @@ func (a account) agentSlots() []agentSlot {
 			latest[key] = pub
 		}
 	}
-	slots := make([]agentSlot, 0, len(exampleAgents)+len(latest))
-	seen := map[string]bool{}
-	for _, name := range exampleAgents {
-		key := foldKey.String(name)
-		seen[key] = true
-		slots = append(slots, slotFor(name, latest[key]))
-	}
-	extra := make([]*publication, 0)
-	for key, pub := range latest {
-		if !seen[key] {
-			extra = append(extra, pub)
-		}
-	}
-	slices.SortFunc(extra, func(a, b *publication) int {
-		return strings.Compare(foldKey.String(a.agent), foldKey.String(b.agent))
-	})
-	for _, pub := range extra {
+	slots := make([]agentSlot, 0, len(latest))
+	for _, pub := range latest {
 		slots = append(slots, slotFor(pub.agent, pub))
 	}
+	slices.SortFunc(slots, func(a, b agentSlot) int {
+		return strings.Compare(foldKey.String(a.Name), foldKey.String(b.Name))
+	})
 	return slots
 }
 

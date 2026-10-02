@@ -109,7 +109,7 @@ export default function Home() {
           </video>
         </div>
         <p className="lede hero-lede">
-          Однократный перенос переносимой конфигурации агентов <strong>Grok</strong>, <strong>Agents</strong> и{"\u00a0"}<strong>Claude</strong> без риска утечки учётных данных и{"\u00a0"}машинных зависимостей MCP.
+          Однократный перенос переносимой настройки ИИ-агента без риска утечки учётных данных и{"\u00a0"}машинного MCP.
         </p>
         <div className="terminal">
           <div className="terminal-tabs" role="tablist">
@@ -177,7 +177,7 @@ export default function Home() {
           <div className="kicker">Каталог синхронизации</div>
           <h2>Готовые публикации от авторов сообщества</h2>
           <p className="hint">
-            Манифесты для Grok, Agents и{"\u00a0"}Claude. Применение разовое: поздняя публикация сама на компьютер не приезжает.
+            Манифесты ИИ-агентов. Применение разовое: поздняя публикация сама на компьютер не приезжает.
           </p>
         </div>
         <Link className="solid" href="/accounts">

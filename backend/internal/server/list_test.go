@@ -120,6 +120,71 @@ func decodeCards(t *testing.T, raw []byte) []listCard {
 	return body.Accounts
 }
 
+func TestAccountListsOnlyPublishedAgents(t *testing.T) {
+	e := newServer(t)
+	owner := mustAccount(t, e, "owner@example.com", "secret", "Owner")
+	bare := getJSON(t, e, "/accounts/Owner", nil)
+	if bare.Code != http.StatusOK {
+		t.Fatalf("page %d %s", bare.Code, bare.Body.String())
+	}
+	if names := agentNames(t, bare.Body.Bytes()); len(names) != 0 {
+		t.Fatalf("empty page listed %v", names)
+	}
+
+	pushed := postAuth(t, e, "/agent/push", "", pushBody("Grok", false, pushFile{"rules/ok.md", "one"}), owner)
+	if pushed.Code != http.StatusCreated {
+		t.Fatalf("push %d %s", pushed.Code, pushed.Body.String())
+	}
+	page := getJSON(t, e, "/accounts/Owner", nil)
+	if names := agentNames(t, page.Body.Bytes()); len(names) != 1 || names[0] != "Grok" {
+		t.Fatalf("published page %v %s", names, page.Body.String())
+	}
+	cards := decodeCards(t, getJSON(t, e, "/accounts", nil).Body.Bytes())
+	var ownerCard listCard
+	for _, card := range cards {
+		if card.Name == "Owner" {
+			ownerCard = card
+		}
+	}
+	if names := agentNamesOf(ownerCard); len(names) != 1 || names[0] != "Grok" {
+		t.Fatalf("list card %+v", ownerCard.Agents)
+	}
+
+	withdrawn := postJSON(t, e, "/publications/"+publicationID(t, pushed.Body.Bytes())+"/withdraw", map[string]string{}, owner)
+	if withdrawn.Code != http.StatusOK {
+		t.Fatalf("withdraw %d %s", withdrawn.Code, withdrawn.Body.String())
+	}
+	after := getJSON(t, e, "/accounts/Owner", nil)
+	if names := agentNames(t, after.Body.Bytes()); len(names) != 0 {
+		t.Fatalf("withdrawn page listed %v", names)
+	}
+}
+
+func agentNames(t *testing.T, raw []byte) []string {
+	t.Helper()
+	var body struct {
+		Agents []struct {
+			Name string `json:"name"`
+		} `json:"agents"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil {
+		t.Fatal(err)
+	}
+	names := make([]string, 0, len(body.Agents))
+	for _, agent := range body.Agents {
+		names = append(names, agent.Name)
+	}
+	return names
+}
+
+func agentNamesOf(card listCard) []string {
+	names := make([]string, 0, len(card.Agents))
+	for _, agent := range card.Agents {
+		names = append(names, agent.Name)
+	}
+	return names
+}
+
 func sameNames(got, want []string) bool {
 	if len(got) != len(want) {
 		return false

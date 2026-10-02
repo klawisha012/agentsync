@@ -51,6 +51,7 @@ type toolArgs struct {
 	Version int      `json:"version"`
 	Skills  []string `json:"skills"`
 	Into    []string `json:"into"`
+	Place   string   `json:"place"`
 }
 
 func Run(ctx context.Context, in io.Reader, out io.Writer, env Env) error {
@@ -128,7 +129,7 @@ func toolList() []map[string]any {
 		tool("store", "Читает снимок ИИ-агента из\u00a0хранилища.", objectSchema([]string{"agent"})),
 		tool("revert", "Возвращает последний снимок на\u00a0этой машине.", agentSchema),
 		tool("apply", "Применяет публикацию автора к\u00a0ИИ-агенту.", objectSchema([]string{"author", "agent"})),
-		tool("skills", "Кладёт выбранные навыки публикации в\u00a0домашние папки ИИ-агентов.", skillsSchema()),
+		tool("skills", "Кладёт выбранные навыки публикации в\u00a0каталоги приёмников.", skillsSchema()),
 	}
 }
 
@@ -155,8 +156,9 @@ func skillsSchema() map[string]any {
 				"type":  "array",
 				"items": map[string]any{"type": "string"},
 			},
+			"place": map[string]any{"type": "string", "enum": []string{"global", "project"}},
 		},
-		"required": []string{"author", "agent", "version", "skills", "into"},
+		"required": []string{"author", "agent", "version", "skills", "into", "place"},
 	}
 }
 
@@ -246,6 +248,7 @@ func runTool(ctx context.Context, name string, args toolArgs, env Env) (string, 
 			Version: args.Version,
 			Skills:  args.Skills,
 			Targets: args.Into,
+			Place:   args.Place,
 		})
 		return done(err)
 	case "apply":
