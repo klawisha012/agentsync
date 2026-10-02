@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { api } from "../api";
@@ -18,7 +19,7 @@ export default function LoginCard() {
     event.preventDefault();
     if (tab === "register") {
       if (!email.trim() || !password || !name.trim()) {
-        setExplanation("Введите почту, пароль и имя.");
+        setExplanation("Введите почту, пароль и\u00a0имя.");
         return;
       }
       const res = await api("/accounts", {
@@ -34,7 +35,7 @@ export default function LoginCard() {
       return;
     }
     if (!email.trim() || !password) {
-      setExplanation("Введите почту и пароль.");
+      setExplanation("Введите почту и\u00a0пароль.");
       return;
     }
     const res = await api("/session", {
@@ -52,8 +53,11 @@ export default function LoginCard() {
   return (
     <div className="login-wrap">
       <form className="card" onSubmit={submit}>
-        <h1>AgentSync</h1>
-        <p className="lede">Вход в страницу аккаунта</p>
+        <div className="auth-mark" aria-hidden="true">AS</div>
+        <div className="auth-title">
+          <h1>AgentSync</h1>
+        </div>
+        <p className="lede">Безопасный перенос конфигураций AI-агентов</p>
         <div className="tabs" role="tablist">
           <button type="button" role="tab" aria-selected={tab === "login"} onClick={() => { setTab("login"); setExplanation(""); }}>
             Вход
@@ -64,16 +68,19 @@ export default function LoginCard() {
         </div>
         {tab === "register" ? (
           <>
-            <label htmlFor="name">Публичное имя</label>
-            <input id="name" value={name} autoComplete="username" onChange={(event) => setName(event.target.value)} />
-            <p className="hint">3–32 знака: буквы любого алфавита, цифры и дефис не по краям. Alice и alice — одно имя.</p>
+            <div className="row">
+              <label htmlFor="name">Публичное имя страницы</label>
+              <span className="hint">3–32 знака</span>
+            </div>
+            <input id="name" value={name} autoComplete="username" placeholder="alex-dev" onChange={(event) => setName(event.target.value)} />
+            <p className="hint">Буквы любого алфавита, цифры и{"\u00a0"}дефис не по краям. Alice и{"\u00a0"}alice{"\u00a0"}— одно имя.</p>
           </>
         ) : null}
         <label htmlFor="email">Рабочая почта</label>
-        <input id="email" type="email" autoComplete="email" value={email} placeholder="name@example.com" onChange={(event) => setEmail(event.target.value)} />
+        <input id="email" type="email" autoComplete="email" value={email} placeholder="alex@domain.dev" onChange={(event) => setEmail(event.target.value)} />
         <div className="row">
           <label htmlFor="password">Пароль</label>
-          <a href="/recover">Восстановление пароля по почте</a>
+          {tab === "login" ? <a href="/recover">Восстановление пароля по почте</a> : null}
         </div>
         <div className="pass">
           <input
@@ -81,6 +88,7 @@ export default function LoginCard() {
             type={show ? "text" : "password"}
             autoComplete={tab === "register" ? "new-password" : "current-password"}
             value={password}
+            placeholder="••••••••"
             onChange={(event) => setPassword(event.target.value)}
           />
           <button type="button" onClick={() => setShow((value) => !value)}>
@@ -89,8 +97,9 @@ export default function LoginCard() {
         </div>
         {explanation ? <p className="explanation">{explanation}</p> : null}
         <button className="solid" type="submit">
-          {tab === "register" ? "Создать аккаунт" : "Войти в аккаунт"}
+          {tab === "register" ? "Зарегистрироваться" : "Войти в\u00a0аккаунт"}
         </button>
+        <Link className="back-link" href="/">Вернуться на главную</Link>
       </form>
     </div>
   );

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "../../api";
-import { useAgentProbe } from "../../agent";
+import FileTree from "../../file-tree";
+import { buildManifest, ruTokens, skillTokenTotal } from "./manifest";
 
 const commandTabs = [
   { id: "mac", label: "macOS" },
@@ -16,24 +17,19 @@ export default function PublicationPage() {
   const params = useParams();
   const [state, setState] = useState(null);
   const [selected, setSelected] = useState("");
+  const [open, setOpen] = useState(() => new Set());
   const [tab, setTab] = useState("mac");
   const [copied, setCopied] = useState("");
-  const [origin, setOrigin] = useState("");
-  const [agent] = useAgentProbe();
-
-  useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
 
   useEffect(() => {
     let gone = false;
+    setSelected("");
+    setOpen(new Set());
     api(`/publications/${encodeURIComponent(params.id)}`).then((res) => {
       if (gone) {
         return;
       }
       setState(res);
-      const first = res.body?.files?.[0]?.path || "";
-      setSelected(first);
     });
     return () => {
       gone = true;
@@ -49,8 +45,10 @@ export default function PublicationPage() {
 
   const page = state.body;
   const files = page.files || [];
-  const current = files.find((file) => file.path === selected) || files[0];
-  const command = `${commandText(origin, page.author, page.agent)}\nagentsync revert ${page.agent}`;
+  const current = files.find((file) => file.path === selected)
+    || (selected === "" ? files.find((file) => !String(file.path).includes("/")) : null)
+    || null;
+  const command = `${commandText(page.author, page.agent)}\nagentsync revert ${page.agent}`;
 
   async function copy(text, key) {
     try {
@@ -61,44 +59,56 @@ export default function PublicationPage() {
     }
   }
 
+  const tree = buildManifest(files);
+
+  function toggleFolder(path) {
+    setOpen((current) => {
+      const next = new Set(current);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  }
+
   return (
     <article className="preview">
-      <nav className="crumbs" aria-label="Путь">
-        <Link href="/catalog">каталог</Link>
-        <span>/</span>
-        <Link href={`/${page.author}`}>@{page.author}</Link>
-        <span>/</span>
-        <span>{page.agent} (~/…/{page.agent})</span>
-        <span>/</span>
-        <b>v{page.version}</b>
-        <em className="badge">immutable</em>
-      </nav>
+      <div className="preview-top">
+        <nav className="crumbs" aria-label="Путь">
+          <Link href="/catalog">каталог</Link>
+          <span>/</span>
+          <Link href={`/${page.author}`}>@{page.author}</Link>
+          <span>/</span>
+          <b>{page.agent} (~/.{String(page.agent).toLowerCase()})</b>
+          <span>/</span>
+          <em className="version-chip">v{page.version}</em>
+          <em className="badge ok">immutable</em>
+        </nav>
+      </div>
 
       <div className="preview-grid">
-        <div className="preview-side">
-          <section className="side-card">
-            <div className="side-head">
-              <h2>Файлы манифеста</h2>
-              <span className="hint">{ruFiles(files.length)}</span>
-            </div>
-            <ul className="file-tree">
-              {files.map((file) => (
-                <li key={file.path}>
-                  <button
-                    type="button"
-                    aria-pressed={current?.path === file.path}
-                    onClick={() => setSelected(file.path)}
-                  >
-                    {file.path}
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <p className="hint">
-              Применение создаст {ruFiles(files.length)}. Перезапишет {current?.path || "файл"}.
-            </p>
-          </section>
-          <section className="side-card">
+        <div className="manifest">
+          <div className="side-head">
+            <h2>Файлы манифеста</h2>
+            <span className="count-pill">{ruTokens(skillTokenTotal(tree))}</span>
+          </div>
+          <div className="file-tree" role="tree" aria-label="Файлы манифеста">
+            <FileTree
+              nodes={tree}
+              depth={0}
+              open={open}
+              onToggle={toggleFolder}
+              selected={current?.path || ""}
+              onSelect={setSelected}
+            />
+          </div>
+          <p className="hint">{"У\u00A0скилла\u00A0— токены описания и\u00A0всех файлов папки."}</p>
+          <p className="hint">
+            Применение создаст {ruFiles(files.length)}.{current ? ` Перезапишет ${current.path}.` : ""}
+          </p>
+          <div className="excluded-box">
             <h2>Исключено из публикации</h2>
             <ul className="excluded">
               {(page.excluded || []).map((item) => (
@@ -108,26 +118,27 @@ export default function PublicationPage() {
                 </li>
               ))}
             </ul>
-          </section>
+          </div>
         </div>
 
-        <section className="side-card preview-file">
+        <section className="code-stage">
           <div className="side-head">
             <div>
-              <strong className="mono">{current?.path}</strong>
-              <em className="badge ok">Переносимый конфиг</em>
+              <strong className="mono">{current ? current.path : "Файл не выбран"}</strong>
+              {current ? <em className="badge ok">Переносимый конфиг</em> : null}
             </div>
-            <button type="button" onClick={() => copy(current?.body || "", "file")}>
-              {copied === "file" ? "Скопировано" : "Копировать"}
-            </button>
+            {current ? (
+              <button type="button" onClick={() => copy(current.body || "", "file")}>
+                {copied === "file" ? "Скопировано" : "Копировать"}
+              </button>
+            ) : null}
           </div>
-          <p className="hint">{byteLabel(current?.body || "")}</p>
-          <pre>{current?.body}</pre>
+          {current ? <pre>{current.body}</pre> : <p className="hint tree-empty">{"Откройте папку и\u00A0выберите файл."}</p>}
         </section>
       </div>
 
-      <section className="side-card">
-        <div className="side-head">
+      <section className="term-board">
+        <div className="section-title">
           <h2>Применение через командную строку</h2>
           <div className="terminal-tabs" role="tablist">
             {commandTabs.map((item) => (
@@ -149,19 +160,14 @@ export default function PublicationPage() {
             {copied === "cmd" ? "Скопировано" : "Скопировать команду"}
           </button>
         </div>
-        {agent.ok ? <button type="button">Применить</button> : null}
+        <p className="hint">Откат с этой машины: agentsync revert {page.agent}</p>
       </section>
     </article>
   );
 }
 
-function commandText(origin, author, agent) {
-  return `curl -sSL ${origin}/api/apply/${author}/${agent} | agentsync`;
-}
-
-function byteLabel(text) {
-  const size = new TextEncoder().encode(text).length;
-  return `${size}\u00a0Б`;
+function commandText(author, agent) {
+  return `agentsync apply ${author} ${agent}`;
 }
 
 function ruFiles(n) {
