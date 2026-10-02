@@ -15,12 +15,10 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
+      dockerfile: backend/Dockerfile
     environment:
       PORT: "8080"
-      WEB_ORIGIN: http://localhost:3000
+      WEB_ORIGIN: https://zwarder.ru
       DATABASE_URL: postgres://agentsync:agentsync@db:5432/agentsync?sslmode=disable
     depends_on:
       db:
@@ -29,9 +27,19 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      API_URL: http://api:8080
     depends_on:
       - api
+  angie:
+    image: docker.angie.software/angie:1.12.2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/angie/default.conf:/etc/angie/http.d/default.conf:ro
+      - angie-acme:/var/lib/angie/acme
+    depends_on:
+      - web
+      - api
+
+volumes:
+  angie-acme:
