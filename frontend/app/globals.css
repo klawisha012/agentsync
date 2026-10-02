@@ -138,6 +138,16 @@ input {
   justify-content: flex-end;
 }
 
+.stats-page h1 {
+  margin: 0 0 1rem;
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+}
+
+.stats-card {
+  max-width: 22rem;
+}
+
 .profile-menu {
   position: relative;
 }

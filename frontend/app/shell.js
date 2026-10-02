@@ -8,6 +8,7 @@ import Avatar from "./avatar";
 
 const links = [
   { href: "/accounts", label: "Список аккаунтов" },
+  { href: "/stats", label: "Статистика" },
 ];
 
 export default function Shell({ children }) {
@@ -58,7 +59,7 @@ export default function Shell({ children }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  aria-current={path === item.href || path === "/catalog" ? "page" : undefined}
+                  aria-current={path === item.href || (item.href === "/accounts" && path === "/catalog") ? "page" : undefined}
                 >
                   {item.label}
                 </Link>

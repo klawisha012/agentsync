@@ -4,24 +4,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import Avatar from "../avatar";
+import { agentExamples } from "../distribution";
 
 const sorts = [
   { id: "likes", label: "По лайкам" },
   { id: "views", label: "По просмотрам" },
   { id: "name", label: "По имени" },
   { id: "time", label: "По времени (0-публ. в\u00a0конце)" },
-];
-
-const examples = [
-  { name: "Grok", color: "var(--grok)" },
-  { name: "Agents", color: "var(--agents)" },
-  { name: "Claude", color: "var(--claude)" },
-];
-
-const policy = [
-  "Токены, ключи API и\u00a0секреты зачищаются локально до отправки в\u00a0сеть.",
-  "Абсолютные локальные пути хоста исключаются из манифестов MCP.",
-  "Применение среды валидируется контрольной суммой SHA-256.",
 ];
 
 export default function AccountList() {
@@ -55,7 +44,6 @@ export default function AccountList() {
   }, [query, sort]);
 
   const found = accounts || [];
-  const shares = distribution(found);
 
   return (
     <div className="directory">
@@ -88,7 +76,7 @@ export default function AccountList() {
           <p className="hint"><span className="ok-mark" aria-hidden="true">✓</span> Поиск без учёта регистра. Содержимое локальных файлов не индексируется.</p>
           <div className="examples" aria-label="Примеры ИИ-агентов">
             <span>Поддерживаемые агенты:</span>
-            {examples.map((item) => (
+            {agentExamples.map((item) => (
               <span key={item.name}>
                 <i style={{ background: item.color }} />
                 {item.name}
@@ -110,49 +98,16 @@ export default function AccountList() {
       </div>
       {explanation ? <p className="explanation">{explanation}</p> : null}
 
-      <div className="directory-grid">
-        <div className="cards">
-          {accounts === null ? <p className="lede">Открываем список…</p> : null}
-          {accounts && found.length === 0 ? (
-            <p className="lede cards-empty">
-              {query ? "Ничего не нашлось по этому имени." : "Пока нет аккаунтов."}
-            </p>
-          ) : null}
-          {found.map((account) => (
-            <AccountCard key={account.name} account={account} />
-          ))}
-        </div>
-        <aside className="side">
-          <section className="side-card">
-            <div className="side-kicker">
-              <h2>Распределение агентов</h2>
-              <span>сводка</span>
-            </div>
-            {shares.total === 0 ? (
-              <p className="hint">Нет публикаций в{"\u00a0"}этом списке.</p>
-            ) : (
-              <ShareRing shares={shares.rows} total={shares.total} />
-            )}
-            <ul className="share-table">
-              {shares.rows.map((row) => (
-                <li key={row.name}>
-                  <span>{row.name}</span>
-                  <b>{row.pct}%</b>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section className="side-card">
-            <h2>Политика строгой изоляции</h2>
-            <p className="hint">Учётные данные и машинные пути остаются на компьютере.</p>
-            <ul className="policy">
-              {policy.map((line) => (
-                <li key={line}><span className="ok-mark" aria-hidden="true">✓</span>{line}</li>
-              ))}
-            </ul>
-          </section>
-        </aside>
+      <div className="cards">
+        {accounts === null ? <p className="lede">Открываем список…</p> : null}
+        {accounts && found.length === 0 ? (
+          <p className="lede cards-empty">
+            {query ? "Ничего не нашлось по этому имени." : "Пока нет аккаунтов."}
+          </p>
+        ) : null}
+        {found.map((account) => (
+          <AccountCard key={account.name} account={account} />
+        ))}
       </div>
     </div>
   );
@@ -182,40 +137,6 @@ function AccountCard({ account }) {
         </div>
       </div>
     </article>
-  );
-}
-
-function ShareRing({ shares, total }) {
-  const radius = 38;
-  const circ = 2 * Math.PI * radius;
-  let offset = 0;
-  return (
-    <div className="ring-wrap">
-      <svg className="ring" viewBox="0 0 100 100" aria-hidden="true">
-        <circle cx="50" cy="50" r={radius} />
-        {shares.map((row) => {
-          const length = (row.pct / 100) * circ;
-          const dash = `${length} ${circ - length}`;
-          const node = (
-            <circle
-              key={row.name}
-              cx="50"
-              cy="50"
-              r={radius}
-              stroke={row.color}
-              strokeDasharray={dash}
-              strokeDashoffset={-offset}
-            />
-          );
-          offset += length;
-          return node;
-        })}
-      </svg>
-      <div className="ring-label">
-        <b>{total}</b>
-        <span>публикаций</span>
-      </div>
-    </div>
   );
 }
 
@@ -278,29 +199,6 @@ function HeartIcon({ filled }) {
       <path fill={filled ? "#fb7185" : "currentColor"} d="M12 19s-6.5-4.1-8.2-8.1C2.6 8.4 4 6 6.6 6c1.6 0 2.6.8 3.4 1.8C10.8 6.8 11.8 6 13.4 6 16 6 17.4 8.4 16.2 10.9 14.5 14.9 12 19 12 19z" />
     </svg>
   );
-}
-
-function distribution(accounts) {
-  const rows = examples.map((item) => ({ ...item, count: 0, pct: 0 }));
-  let total = 0;
-  for (const account of accounts) {
-    for (const agent of account.agents || []) {
-      if (agent.version == null) {
-        continue;
-      }
-      total += 1;
-      const row = rows.find((item) => item.name === agent.name);
-      if (row) {
-        row.count += 1;
-      }
-    }
-  }
-  if (total > 0) {
-    for (const row of rows) {
-      row.pct = Math.round((row.count / total) * 100);
-    }
-  }
-  return { total, rows };
 }
 
 function initials(name) {
