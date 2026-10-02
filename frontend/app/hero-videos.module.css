@@ -1,0 +1,53 @@
+.intro {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem 1.25rem;
+}
+
+:global(.hero) .muse {
+  width: min(13rem, 22vw);
+  height: auto;
+  flex: none;
+  display: block;
+  background: transparent;
+  pointer-events: none;
+}
+
+:global(.hero) .cast {
+  width: min(22rem, 36vw);
+  height: auto;
+  flex: none;
+  display: block;
+  background: transparent;
+  pointer-events: none;
+}
+
+:global(.hero) .title {
+  margin: 0;
+  max-width: 11em;
+  flex: 1 1 9rem;
+  min-width: min(100%, 8rem);
+  text-align: left;
+}
+
+@media (max-width: 980px) {
+  .intro {
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  :global(.hero) .muse {
+    width: min(12rem, 52vw);
+  }
+
+  :global(.hero) .cast {
+    width: min(18rem, 82vw);
+  }
+
+  :global(.hero) .title {
+    flex-basis: auto;
+    max-width: 12em;
+    text-align: center;
+  }
+}
