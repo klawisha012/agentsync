@@ -15,7 +15,6 @@ export default function VersionPage() {
   const agent = String(params.agent || "");
   const number = String(params.number || "");
   const [state, setState] = useState(null);
-  const [versions, setVersions] = useState([]);
   const [selected, setSelected] = useState("");
   const [open, setOpen] = useState(() => new Set());
   const [picked, setPicked] = useState(() => new Set());
@@ -32,11 +31,6 @@ export default function VersionPage() {
     api(`/accounts/${encodeURIComponent(name)}/versions/${encodeURIComponent(agent)}/${encodeURIComponent(number)}`).then((res) => {
       if (!gone) {
         setState(res);
-      }
-    });
-    api(`/accounts/${encodeURIComponent(name)}/versions/${encodeURIComponent(agent)}`).then((res) => {
-      if (!gone && res.ok) {
-        setVersions(res.body.versions || []);
       }
     });
     return () => {
@@ -73,7 +67,6 @@ export default function VersionPage() {
   const current = files.find((file) => file.path === selected)
     || (selected === "" ? files.find((file) => !String(file.path).includes("/")) : null)
     || null;
-  const ordered = [...versions].sort((a, b) => a.version - b.version);
 
   function toggleSkill(path) {
     setPicked((currentSet) => {
@@ -110,17 +103,6 @@ export default function VersionPage() {
             <span>/</span>
             <b>v{shot.version}</b>
           </nav>
-          <div className="version-switch" role="tablist" aria-label="Версии">
-            {ordered.map((item) => (
-              <Link
-                key={item.version}
-                href={`/${name}/store/${encodeURIComponent(agent)}/${item.version}`}
-                aria-current={item.version === shot.version ? "page" : undefined}
-              >
-                v{item.version}
-              </Link>
-            ))}
-          </div>
           <SkillCommand
             author={name}
             agent={agent}
