@@ -53,6 +53,12 @@ func TestParseSkillArgs(t *testing.T) {
 			skills:  "ru-text",
 		},
 		{
+			name:    "several skills after version",
+			args:    []string{"Author", "Grok", "--version", "4", "browser-skill", "frontend-design", "ru-check", "ru-gost", "ru-score", "ru-text", "zuzex-unit-tests"},
+			version: 4,
+			skills:  "browser-skill,frontend-design,ru-check,ru-gost,ru-score,ru-text,zuzex-unit-tests",
+		},
+		{
 			name: "both places",
 			args: []string{"Author", "Grok", "--version", "4", "--global", "--project", "--into", "cursor", "ru-text"},
 			err:  "одно место",
