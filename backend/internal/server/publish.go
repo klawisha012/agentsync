@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/zstd"
+	"github.com/klawisha012/agentsync/internal/agent"
 	"github.com/labstack/echo/v4"
 )
 
@@ -53,11 +54,7 @@ type publicationView struct {
 	Excluded []excludedNote `json:"excluded"`
 }
 
-var (
-	absolutePath = regexp.MustCompile(`(?i)(?:^|[\s"'=])(?:[a-z]:[\\/][^\s"']+|/(?:[a-z0-9._-]+/)*[a-z0-9._-]+)`)
-	secretValue  = regexp.MustCompile(`(?i)"?(?:api[_-]?key|secret|token|password|authorization)"?\s*[:=]\s*"?[A-Za-z0-9_+\-/]{8,}`)
-	knownSecret  = regexp.MustCompile(`(?:sk-[A-Za-z0-9]{10,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)`)
-)
+var absolutePath = regexp.MustCompile(`(?i)(?:^|[\s"'=])(?:[a-z]:[\\/][^\s"']+|/(?:[a-z0-9._-]+/)*[a-z0-9._-]+)`)
 
 func (s *store) push(sessionID, agentToken, agent string, missing bool, files []storedFile) (publicationView, int, string) {
 	agent = strings.TrimSpace(agent)
@@ -270,8 +267,8 @@ func classify(files []storedFile) ([]storedFile, string) {
 		if !portablePath(file.Path) {
 			continue
 		}
-		if secretValue.MatchString(file.Body) || knownSecret.MatchString(file.Body) {
-			return nil, "Секрет в файле " + file.Path + "."
+		if msg := agent.SecretExplanation(file.Path, file.Body); msg != "" {
+			return nil, msg
 		}
 		kept = append(kept, file)
 	}
@@ -354,7 +351,7 @@ func machineMCP(body string) bool {
 	if strings.Contains(strings.ToLower(body), "authorization") {
 		return true
 	}
-	return secretValue.MatchString(body)
+	return agent.HasAssignedSecret(body)
 }
 
 func packFiles(files []storedFile) ([]byte, error) {

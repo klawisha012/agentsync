@@ -120,10 +120,17 @@ func uniqueSkillBases(folders []skillFolder) ([]skillFolder, error) {
 		}
 		clashes = append(clashes, strings.Join(quoted, " и "))
 	}
-	if len(clashes) > 0 {
-		return nil, fmt.Errorf("Навыки %s называются одинаково. Оставьте один.", strings.Join(clashes, ", "))
+	if msg := sameFolderNameMessage(clashes); msg != "" {
+		return nil, errors.New(msg)
 	}
 	return folders, nil
+}
+
+func sameFolderNameMessage(groups []string) string {
+	if len(groups) == 0 {
+		return ""
+	}
+	return "Навыки " + strings.Join(groups, ", ") + " называются одинаково. Оставьте один."
 }
 
 func relocateSkills(folders []skillFolder) []File {

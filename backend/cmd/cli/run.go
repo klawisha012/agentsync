@@ -41,6 +41,12 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 	if err := item.execute(args[1:], stdout); err != nil {
+		var usage usageError
+		if errors.As(err, &usage) {
+			fmt.Fprintln(stderr, usage.Error())
+			fmt.Fprint(stderr, item.help())
+			return 2
+		}
 		fmt.Fprintln(stderr, err.Error())
 		return 1
 	}
@@ -75,6 +81,9 @@ func hasHelpFlag(args []string) bool {
 }
 
 func (item spec) execute(args []string, stdout io.Writer) error {
+	if item.name == "fanout" || item.name == "unfanout" {
+		return runShare(item.name, args)
+	}
 	root, server, token, account, cookie, err := clientSession()
 	if err != nil {
 		return err
@@ -202,13 +211,9 @@ func piped(stdin io.Reader) bool {
 }
 
 func clientSession() (string, string, string, string, string, error) {
-	root := strings.TrimSpace(os.Getenv("AGENTSYNC_ROOT"))
-	if root == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", "", "", "", "", err
-		}
-		root = home
+	root, err := agentRoot()
+	if err != nil {
+		return "", "", "", "", "", err
 	}
 	server := strings.TrimSpace(os.Getenv("AGENTSYNC_SERVER"))
 	if server == "" {
