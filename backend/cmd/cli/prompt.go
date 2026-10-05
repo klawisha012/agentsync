@@ -28,19 +28,19 @@ func fillSkillChoice(call skillCall) (skillCall, error) {
 		return call, err
 	}
 	defer term.Restore(fd, state)
-	if call.place == "" {
-		place, err := promptPlace(os.Stdin, os.Stderr)
-		if err != nil {
-			return call, err
-		}
-		call.place = place
-	}
 	if len(call.targets) == 0 {
 		slugs, err := promptReceivers(os.Stdin, os.Stderr, call.place)
 		if err != nil {
 			return call, err
 		}
 		call.targets = slugs
+	}
+	if call.place == "" {
+		place, err := promptPlace(os.Stdin, os.Stderr, call.targets)
+		if err != nil {
+			return call, err
+		}
+		call.place = place
 	}
 	return call, nil
 }
@@ -50,15 +50,36 @@ type placeChoice struct {
 	label string
 }
 
-func placeChoices() []placeChoice {
-	return []placeChoice{
-		{id: "global", label: "Во все проекты"},
-		{id: "project", label: "В этот проект"},
+func placeChoicesFor(slugs []string) []placeChoice {
+	project := true
+	global := true
+	for _, slug := range slugs {
+		item, ok := agent.FindReceiver(slug)
+		if !ok {
+			continue
+		}
+		if !item.HasProject() {
+			project = false
+		}
+		if !item.HasGlobal() {
+			global = false
+		}
 	}
+	var choices []placeChoice
+	if project {
+		choices = append(choices, placeChoice{id: "project", label: "Текущий проект"})
+	}
+	if global {
+		choices = append(choices, placeChoice{id: "global", label: "Глобально"})
+	}
+	return choices
 }
 
-func promptPlace(in *os.File, out io.Writer) (string, error) {
-	choices := placeChoices()
+func promptPlace(in *os.File, out io.Writer, slugs []string) (string, error) {
+	choices := placeChoicesFor(slugs)
+	if len(choices) == 0 {
+		return "", errors.New("У выбранных приёмников нет общего места установки.")
+	}
 	cursor := 0
 	height := 0
 	for {
@@ -78,7 +99,7 @@ func promptPlace(in *os.File, out io.Writer) (string, error) {
 			}
 		case "enter":
 			clearFrame(out, height)
-			fmt.Fprintf(out, "Куда поставить: %s\r\n", choices[cursor].label)
+			fmt.Fprintf(out, "Видимость: %s\r\n", choices[cursor].label)
 			return choices[cursor].id, nil
 		case "cancel":
 			clearFrame(out, height)
@@ -100,8 +121,19 @@ type receiverPicker struct {
 func newReceiverPicker(place string) receiverPicker {
 	all := make([]agent.ReceiverView, 0)
 	for _, item := range agent.ReceiverViews() {
-		if place == "project" && item.Project || place != "project" && item.Global {
-			all = append(all, item)
+		switch place {
+		case "project":
+			if item.Project {
+				all = append(all, item)
+			}
+		case "global":
+			if item.Global {
+				all = append(all, item)
+			}
+		default:
+			if item.Project || item.Global {
+				all = append(all, item)
+			}
 		}
 	}
 	return receiverPicker{all: all, selected: map[string]bool{}, order: []string{}}
@@ -209,7 +241,7 @@ func promptReceivers(in *os.File, out io.Writer, place string) ([]string, error)
 }
 
 func drawPlace(out io.Writer, choices []placeChoice, cursor, previous int) int {
-	lines := []string{"Куда поставить", "↑↓ ход, Enter подтвердить", ""}
+	lines := []string{"Видимость", "↑↓ ход, Enter подтвердить", ""}
 	for i, choice := range choices {
 		mark := "○"
 		if i == cursor {

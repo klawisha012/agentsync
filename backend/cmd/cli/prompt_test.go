@@ -53,4 +53,20 @@ func TestReceiverPickerSearchAndToggle(t *testing.T) {
 	if len(global.visible()) != 0 {
 		t.Fatalf("eve global %+v", global.visible())
 	}
+	anyPlace := newReceiverPicker("")
+	anyPlace.typeText("eve")
+	if len(anyPlace.visible()) != 1 || anyPlace.visible()[0].Slug != "eve" {
+		t.Fatalf("eve any %+v", anyPlace.visible())
+	}
+}
+
+func TestPlaceFollowsSelectedReceivers(t *testing.T) {
+	both := placeChoicesFor([]string{"cursor"})
+	if len(both) != 2 || both[0].id != "project" || both[1].id != "global" {
+		t.Fatalf("cursor %+v", both)
+	}
+	onlyProject := placeChoicesFor([]string{"cursor", "eve"})
+	if len(onlyProject) != 1 || onlyProject[0].id != "project" {
+		t.Fatalf("with eve %+v", onlyProject)
+	}
 }
