@@ -14,6 +14,7 @@ func TestPipeApplySnapshotsGrokHome(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("AGENTSYNC_ROOT", dir)
 	t.Setenv("AGENTSYNC_ACCOUNT", "zwarder")
+	t.Setenv("AGENTSYNC_STATE", t.TempDir())
 	home := filepath.Join(dir, ".grok")
 	write := func(rel, body string) {
 		t.Helper()
