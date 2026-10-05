@@ -20,6 +20,12 @@ export default function Comments({ name, access, owner }) {
   const [note, setNote] = useState("");
   const [pending, setPending] = useState(null);
   const [page, setPage] = useState(1);
+  const [seen, setSeen] = useState({ name, access });
+  if (seen.name !== name || seen.access !== access) {
+    setSeen({ name, access });
+    setPage(1);
+    setState(null);
+  }
 
   function load(nextPage = page) {
     return api(`/accounts/${encodeURIComponent(name)}/comments?page=${nextPage}`).then((res) => {
@@ -27,10 +33,6 @@ export default function Comments({ name, access, owner }) {
       return res;
     });
   }
-
-  useEffect(() => {
-    setPage(1);
-  }, [name, access]);
 
   useEffect(() => {
     let gone = false;

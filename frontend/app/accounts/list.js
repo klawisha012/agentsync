@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import { api } from "../api";
 import Avatar from "../avatar";
 
@@ -15,6 +15,7 @@ const sorts = [
 
 export default function AccountList() {
   const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
   const [sort, setSort] = useState("likes");
   const [accounts, setAccounts] = useState(null);
   const [explanation, setExplanation] = useState("");
@@ -22,8 +23,8 @@ export default function AccountList() {
   useEffect(() => {
     let gone = false;
     const params = new URLSearchParams();
-    if (query) {
-      params.set("q", query);
+    if (deferredQuery) {
+      params.set("q", deferredQuery);
     }
     params.set("sort", sort);
     api(`/accounts?${params.toString()}`).then((res) => {
@@ -41,7 +42,7 @@ export default function AccountList() {
     return () => {
       gone = true;
     };
-  }, [query, sort]);
+  }, [deferredQuery, sort]);
 
   const found = accounts || [];
 

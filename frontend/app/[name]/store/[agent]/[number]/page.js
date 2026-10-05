@@ -27,8 +27,12 @@ export default function VersionPage() {
     setOpen(new Set());
     setPicked(new Set());
     api(`/accounts/${encodeURIComponent(name)}/versions/${encodeURIComponent(agent)}/${encodeURIComponent(number)}`).then((res) => {
-      if (!gone) {
-        setState(res);
+      if (gone) {
+        return;
+      }
+      setState(res);
+      if (res.ok) {
+        setOpen(skillParentPaths(buildManifest(res.body.files || [])));
       }
     });
     return () => {
@@ -39,13 +43,6 @@ export default function VersionPage() {
   const tree = state?.ok ? buildManifest(state.body.files || []) : [];
   const skills = listSkillChoices(tree);
   const allOn = skills.length > 0 && skills.every((item) => picked.has(item.path));
-
-  useEffect(() => {
-    if (!state?.ok) {
-      return;
-    }
-    setOpen(skillParentPaths(buildManifest(state.body.files || [])));
-  }, [state]);
 
   useEffect(() => {
     if (allRef.current) {

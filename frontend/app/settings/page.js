@@ -33,41 +33,32 @@ export default function SettingsPage() {
     let gone = false;
     api("/session").then((res) => {
       if (gone) {
-        return;
+        return null;
       }
       if (!res.ok) {
         router.replace("/login");
-        return;
+        return null;
       }
       setSession(res.body);
       setNickname(res.body.name);
+      return api(`/accounts/${encodeURIComponent(res.body.name)}`);
+    }).then((res) => {
+      if (!res || gone || !res.ok) {
+        return;
+      }
+      setPage(res.body);
+      const comments = ["open", "users", "hidden"].includes(res.body.commentAccess) ? res.body.commentAccess : "hidden";
+      setShare({
+        copy: Boolean(res.body.shareCopy),
+        view: Boolean(res.body.shareView),
+        versions: Boolean(res.body.shareVersions),
+        comments,
+      });
     });
     return () => {
       gone = true;
     };
   }, [router]);
-
-  useEffect(() => {
-    if (!session?.name) {
-      return undefined;
-    }
-    let gone = false;
-    api(`/accounts/${encodeURIComponent(session.name)}`).then((res) => {
-      if (!gone && res.ok) {
-        setPage(res.body);
-        const comments = ["open", "users", "hidden"].includes(res.body.commentAccess) ? res.body.commentAccess : "hidden";
-        setShare({
-          copy: Boolean(res.body.shareCopy),
-          view: Boolean(res.body.shareView),
-          versions: Boolean(res.body.shareVersions),
-          comments,
-        });
-      }
-    });
-    return () => {
-      gone = true;
-    };
-  }, [session?.name]);
 
   function tell(text, bad) {
     setNote({ text, bad });

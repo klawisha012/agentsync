@@ -17,6 +17,9 @@ export default function Shell({ children }) {
   const bare = path === "/login";
 
   useEffect(() => {
+    if (path === "/login") {
+      return undefined;
+    }
     let gone = false;
     function load() {
       api("/session").then((res) => {
@@ -31,7 +34,7 @@ export default function Shell({ children }) {
       gone = true;
       window.removeEventListener("agentsync-session", load);
     };
-  }, [path]);
+  }, [path === "/login"]);
 
   if (bare) {
     return (

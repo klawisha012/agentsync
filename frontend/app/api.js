@@ -1,4 +1,24 @@
+const inflight = new Map();
+
 export async function api(path, options = {}) {
+  const method = String(options.method || "GET").toUpperCase();
+  const key = method === "GET" && !options.body ? path : "";
+  if (key && inflight.has(key)) {
+    return inflight.get(key);
+  }
+  const promise = request(path, options);
+  if (key) {
+    inflight.set(key, promise);
+    promise.finally(() => {
+      if (inflight.get(key) === promise) {
+        inflight.delete(key);
+      }
+    });
+  }
+  return promise;
+}
+
+async function request(path, options) {
   const headers = { ...(options.headers || {}) };
   if (options.body) {
     headers["Content-Type"] = "application/json";

@@ -125,9 +125,11 @@ function skillCommand(author, source, version, skills) {
   return parts.join(" ");
 }
 
+const plainArg = /^[A-Za-z0-9._@+:/-]+$/;
+
 function shellArg(value) {
   const text = String(value);
-  if (/^[A-Za-z0-9._@+:/-]+$/.test(text)) {
+  if (plainArg.test(text)) {
     return text;
   }
   if (!text.includes('"')) {

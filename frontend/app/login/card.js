@@ -30,6 +30,7 @@ export default function LoginCard() {
         setExplanation(res.body?.explanation || "Не удалось создать аккаунт.");
         return;
       }
+      window.dispatchEvent(new Event("agentsync-session"));
       router.push(`/${res.body.name}`);
       router.refresh();
       return;
@@ -46,6 +47,7 @@ export default function LoginCard() {
       setExplanation(res.body?.explanation || "Неверная почта или пароль.");
       return;
     }
+    window.dispatchEvent(new Event("agentsync-session"));
     router.push(`/${res.body.name}`);
     router.refresh();
   }
