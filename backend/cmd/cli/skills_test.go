@@ -47,9 +47,10 @@ func TestParseSkillArgs(t *testing.T) {
 			err:  "--fast",
 		},
 		{
-			name: "missing place",
-			args: []string{"Author", "Grok", "--version", "4", "--into", "cursor", "ru-text"},
-			err:  "глобальный каталог или проект",
+			name:    "command without place",
+			args:    []string{"Author", "Grok", "--version", "4", "ru-text"},
+			version: 4,
+			skills:  "ru-text",
 		},
 		{
 			name: "both places",

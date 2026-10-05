@@ -72,9 +72,6 @@ func parseSkillArgs(args []string) (skillCall, error) {
 	if !seenVersion {
 		return skillCall{}, fmt.Errorf("Назовите номер версии.")
 	}
-	if call.place == "" {
-		return skillCall{}, fmt.Errorf("Выберите глобальный каталог или проект.")
-	}
 	call.author = positional[0]
 	call.source = positional[1]
 	return call, nil

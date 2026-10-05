@@ -139,6 +139,10 @@ func (item spec) execute(args []string, stdout io.Writer) error {
 		if err != nil {
 			return err
 		}
+		call, err = fillSkillChoice(call)
+		if err != nil {
+			return err
+		}
 		return agent.CopySkills(ctx, server, root, account, token, cookie, agent.SkillCopy{
 			Author:  call.author,
 			Source:  call.source,
