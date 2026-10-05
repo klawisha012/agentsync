@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../../../api";
 import FileTree from "../../../../file-tree";
-import { buildManifest, ruTokens, skillTokenTotal } from "../../../../publications/[id]/manifest";
+import { buildManifest, loadTokenCounter, ruTokens, skillTokenTotal } from "../../../../publications/[id]/manifest";
 import CodeStage from "./stage";
 import SkillCommand, { listSkillChoices, skillParentPaths } from "./skills";
 
@@ -18,7 +18,20 @@ export default function VersionPage() {
   const [selected, setSelected] = useState("");
   const [open, setOpen] = useState(() => new Set());
   const [picked, setPicked] = useState(() => new Set());
+  const [countTokens, setCountTokens] = useState(null);
   const allRef = useRef(null);
+
+  useEffect(() => {
+    let gone = false;
+    loadTokenCounter().then((count) => {
+      if (!gone) {
+        setCountTokens(() => count);
+      }
+    });
+    return () => {
+      gone = true;
+    };
+  }, []);
 
   useEffect(() => {
     let gone = false;
@@ -40,7 +53,7 @@ export default function VersionPage() {
     };
   }, [name, agent, number]);
 
-  const tree = state?.ok ? buildManifest(state.body.files || []) : [];
+  const tree = state?.ok ? buildManifest(state.body.files || [], countTokens) : [];
   const skills = listSkillChoices(tree);
   const allOn = skills.length > 0 && skills.every((item) => picked.has(item.path));
 
@@ -111,7 +124,7 @@ export default function VersionPage() {
         <div className="manifest">
           <div className="side-head">
             <h2>Файлы версии</h2>
-            <span className="count-pill">{ruTokens(skillTokenTotal(tree))}</span>
+            <span className="count-pill">{countTokens ? ruTokens(skillTokenTotal(tree)) : "…"}</span>
           </div>
           <div className="file-tree" role="tree" aria-label="Файлы версии">
             {skills.length > 0 ? (

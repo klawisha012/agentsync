@@ -1,4 +1,4 @@
-import { strToU8, zipSync } from "fflate";
+
 
 export function isMarkdown(path) {
   return String(path || "").toLowerCase().endsWith(".md");
@@ -31,7 +31,8 @@ export function skillBundle(files, filePath) {
   return { name, zipName: `${safeName(name)}.zip`, entries };
 }
 
-export function skillZip(bundle) {
+export async function skillZip(bundle) {
+  const { strToU8, zipSync } = await import("fflate");
   const data = {};
   for (const entry of bundle.entries) {
     data[entry.path] = strToU8(entry.body);

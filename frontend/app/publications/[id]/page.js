@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "../../api";
 import FileTree from "../../file-tree";
-import { buildManifest, ruTokens, skillTokenTotal } from "./manifest";
+import { buildManifest, loadTokenCounter, ruTokens, skillTokenTotal } from "./manifest";
 
 const commandTabs = [
   { id: "mac", label: "macOS" },
@@ -20,6 +20,19 @@ export default function PublicationPage() {
   const [open, setOpen] = useState(() => new Set());
   const [tab, setTab] = useState("mac");
   const [copied, setCopied] = useState("");
+  const [countTokens, setCountTokens] = useState(null);
+
+  useEffect(() => {
+    let gone = false;
+    loadTokenCounter().then((count) => {
+      if (!gone) {
+        setCountTokens(() => count);
+      }
+    });
+    return () => {
+      gone = true;
+    };
+  }, []);
 
   useEffect(() => {
     let gone = false;
@@ -45,6 +58,7 @@ export default function PublicationPage() {
 
   const page = state.body;
   const files = page.files || [];
+  const tree = buildManifest(files, countTokens);
   const current = files.find((file) => file.path === selected)
     || (selected === "" ? files.find((file) => !String(file.path).includes("/")) : null)
     || null;
@@ -58,8 +72,6 @@ export default function PublicationPage() {
       setCopied("");
     }
   }
-
-  const tree = buildManifest(files);
 
   function toggleFolder(path) {
     setOpen((current) => {
@@ -92,7 +104,7 @@ export default function PublicationPage() {
         <div className="manifest">
           <div className="side-head">
             <h2>Файлы манифеста</h2>
-            <span className="count-pill">{ruTokens(skillTokenTotal(tree))}</span>
+            <span className="count-pill">{countTokens ? ruTokens(skillTokenTotal(tree)) : "…"}</span>
           </div>
           <div className="file-tree" role="tree" aria-label="Файлы манифеста">
             <FileTree

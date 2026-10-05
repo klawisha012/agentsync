@@ -33,7 +33,9 @@ export default function FileTree({ nodes, depth, open, onToggle, selected, onSel
               </span>
               {node.skill ? (
                 <em className="skill-tokens">
-                  описание {formatCount(node.skill.description)} · целиком {formatCount(node.skill.content)}
+                  {node.skill.description == null
+                    ? "считаем токены…"
+                    : `описание ${formatCount(node.skill.description)} · целиком ${formatCount(node.skill.content)}`}
                 </em>
               ) : null}
             </button>

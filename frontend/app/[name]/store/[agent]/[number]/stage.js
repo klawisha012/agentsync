@@ -40,12 +40,12 @@ export default function CodeStage({ files, current, onSelect }) {
     saveDownload(new TextEncoder().encode(current.body || ""), fileDownloadName(current.path), type, setNote);
   }
 
-  function downloadSkill() {
+  async function downloadSkill() {
     if (!skill) {
       return;
     }
     try {
-      saveDownload(skillZip(skill), skill.zipName, "application/zip", setNote);
+      saveDownload(await skillZip(skill), skill.zipName, "application/zip", setNote);
     } catch {
       setNote("Не удалось скачать.");
     }

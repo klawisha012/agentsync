@@ -1,7 +1,14 @@
-import { countTokens } from "gpt-tokenizer/encoding/cl100k_base";
+let tokenCounter = null;
 
-export function tokenCount(text) {
-  if (!text) {
+export function loadTokenCounter() {
+  if (!tokenCounter) {
+    tokenCounter = import("gpt-tokenizer/encoding/cl100k_base").then((mod) => mod.countTokens);
+  }
+  return tokenCounter;
+}
+
+export function tokenCount(text, countTokens) {
+  if (!text || !countTokens) {
     return 0;
   }
   return countTokens(text);
@@ -50,7 +57,7 @@ export function skillDescription(markdown) {
   return readDescription(text.slice(text.indexOf("\n") + 1, end).split(/\r?\n/));
 }
 
-export function buildManifest(files) {
+export function buildManifest(files, countTokens) {
   const root = { name: "", path: "", file: null, children: [] };
   const index = new Map([["", root]]);
   for (const file of files) {
@@ -72,7 +79,7 @@ export function buildManifest(files) {
     }
   }
   sortNodes(root);
-  annotateSkills(root);
+  annotateSkills(root, countTokens);
   return root.children;
 }
 
@@ -83,18 +90,20 @@ function sortNodes(node) {
   }
 }
 
-function annotateSkills(node) {
+function annotateSkills(node, countTokens) {
   const skillMd = node.children.find((child) => child.file && child.name.toLowerCase() === "skill.md");
   if (skillMd && node.path) {
     const bodies = [];
     collectBodies(node, bodies);
-    node.skill = {
-      description: tokenCount(skillDescription(skillMd.file.body || "")),
-      content: bodies.reduce((sum, body) => sum + tokenCount(body), 0),
-    };
+    node.skill = countTokens
+      ? {
+        description: tokenCount(skillDescription(skillMd.file.body || ""), countTokens),
+        content: bodies.reduce((sum, body) => sum + tokenCount(body, countTokens), 0),
+      }
+      : { description: null, content: null };
   }
   for (const child of node.children) {
-    annotateSkills(child);
+    annotateSkills(child, countTokens);
   }
 }
 
