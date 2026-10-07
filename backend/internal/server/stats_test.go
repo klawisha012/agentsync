@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -80,5 +81,18 @@ func TestStatsPeriods(t *testing.T) {
 		if body.Fresh != 1 || body.TopWeek != 1 || body.LastActivity == nil {
 			t.Fatalf("%s catalog %+v", period, body)
 		}
+	}
+}
+
+func TestStatsLeaderCarriesAvatar(t *testing.T) {
+	e := newServer(t)
+	owner := mustAccount(t, e, "owner@example.com", "secret", "Owner")
+	saved := postFile(t, e, "/account/avatar", "a.png", "image/png", onePixelPNG(t), owner)
+	if saved.Code != http.StatusOK {
+		t.Fatalf("avatar %d %s", saved.Code, saved.Body.String())
+	}
+	rec := getJSON(t, e, "/stats?period=all", nil)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"name":"Owner"`) || !strings.Contains(rec.Body.String(), `"hasAvatar":true`) || !strings.Contains(rec.Body.String(), `"avatarUpdated"`) {
+		t.Fatalf("stats %d %s", rec.Code, rec.Body.String())
 	}
 }

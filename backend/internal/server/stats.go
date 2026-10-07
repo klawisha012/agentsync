@@ -11,9 +11,11 @@ import (
 )
 
 type statsLeader struct {
-	Name     string `json:"name"`
-	Views    int    `json:"views"`
-	Verified bool   `json:"verified"`
+	Name          string     `json:"name"`
+	Views         int        `json:"views"`
+	Verified      bool       `json:"verified"`
+	HasAvatar     bool       `json:"hasAvatar"`
+	AvatarUpdated *time.Time `json:"avatarUpdated,omitempty"`
 }
 
 type statsAgent struct {
@@ -167,7 +169,10 @@ func (s *store) stats(period string, now time.Time) (statsReport, int, string) {
 			stamp := item.publishedAt.UTC()
 			last = &stamp
 		}
-		leaders = append(leaders, statsLeader{Name: item.name, Views: views, Verified: item.verified})
+		leaders = append(leaders, statsLeader{
+			Name: item.name, Views: views, Verified: item.verified,
+			HasAvatar: item.hasAvatar, AvatarUpdated: avatarStamp(item.avatarUpdated),
+		})
 		for _, slot := range item.publicationsIn(start, bounded) {
 			report.Publications++
 			counts[slot.Name]++

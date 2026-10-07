@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import AgentLogo from "../agent-logo";
+import Avatar from "../avatar";
 import { publicationWord } from "../distribution";
 
 const PERIODS = [
@@ -143,7 +144,7 @@ export default function StatsPage() {
               <div className="stats-leader-labels"><span>Аккаунт</span><span>Просмотры</span></div>
               {(report?.leaders || []).map((account, index) => (
                 <Link href={`/${encodeURIComponent(account.name)}`} key={account.name} className="stats-leader-row">
-                  <span className="stats-leader-avatar" aria-hidden="true">{account.name.slice(0, 1).toUpperCase()}</span>
+                  <Avatar className="stats-leader-avatar" name={account.name} updated={account.avatarUpdated} letter={account.name.slice(0, 1).toUpperCase()} />
                   <span className="stats-leader-name">
                     {account.name}
                     {account.verified ? <Glyph name="verified" size={13} label="Проверен" /> : null}
