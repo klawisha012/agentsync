@@ -1,92 +1,43 @@
-## Agent skills
+## Context pointers
 
-### Issue tracker
+- **Issue tracker**: GitHub Issues for klawisha012/agentsync. See `docs/agents/issue-tracker.md`.
+- **Triage labels**: five canonical roles matching role names. See `docs/agents/triage-labels.md`.
+- **Domain docs**: `CONTEXT.md` and `docs/adr/` at repo root. See `docs/agents/domain.md`.
+- **UI & Design**: before visual work, read `docs/DESIGN.md`. Colors, typography, spacing, component roles from it; state and behavior from this repo.
 
-Issues live in GitHub Issues for klawisha012/agentsync. See `docs/agents/issue-tracker.md`.
+## Graphify (Knowledge graph)
 
-### Triage labels
+Knowledge graph lives at `graphify-out/` (skill: `~/.agents/skills/graphify/SKILL.md`). Trigger: `/graphify`.
+- **Query & Navigation**: when `graphify-out/graph.json` exists, run `graphify query "<question>"`, `graphify path "<A>" "<B>"`, or `graphify explain "<concept>"` before reading raw files or grepping. Use `graphify-out/wiki/index.md` for navigation; read `GRAPH_REPORT.md` only for broad architecture overview.
+- **Cold start**: if no `graphify-out/` exists, run `/graphify .` for non-trivial architecture work. Skip for trivial single-file tasks.
+- **Invalidate & Update**: after modifying code, run `graphify update .` (add `--force` if files were deleted or renamed) to keep `graphify-out/` current. For doc or asset changes, run `/graphify --update`.
+- **Resilience**: if graphify fails due to environment/permissions, record blocker and proceed with standard navigation.
 
-Five canonical roles, label strings equal to the role names. See `docs/agents/triage-labels.md`.
+## Workflow & Git lifecycle
 
-### Domain docs
-
-Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
-
-### Design
-
-Before visual UI work, read `docs/DESIGN.md`. Take colors, type, spacing, and component roles from it. Take fields, copy, states, and behavior from this repo.
-
-### graphify
-
-- `graphify` skill: `~/.agents/skills/graphify/SKILL.md`.
-- Trigger: `/graphify`.
-- When the user types `/graphify`, invoke the graphify skill before doing anything else.
-- For non-trivial codebase or architecture work, if the project has no `graphify-out/`, build the graph first with `/graphify .`, then use it. Skip trivial one-file tasks.
-- Invalidate/refresh: after modifying code, run `graphify update .` (add `--force` if files were deleted or renamed) to keep `graphify-out/` current. For doc changes, run `/graphify --update`.
-- If graphify cannot be installed or run because of sandbox, network, credential, or approval restrictions, record the blocker and continue with normal local code navigation.
-
-### git
-После каждой задачи (когда считаешь, что выполнил задачу) делай коммит в локальный git и push на github
+- **Post-task completion**: после каждой выполненной задачи делай git commit и `git push origin main`.
 
 ## Behavioral guidelines (Karpathy)
 
-Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
-
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+Bias toward caution over speed.
 
 ### 1. Think Before Coding
-
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
-
-Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
+- State assumptions explicitly; ask if uncertain.
+- Surface tradeoffs and alternative interpretations — never pick silently.
+- Push back if a simpler approach exists. Stop and clarify if confusing.
 
 ### 2. Simplicity First
-
-**Minimum code that solves the problem. Nothing speculative.**
-
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
-
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+- Minimum code that solves the problem. Nothing speculative.
+- No unrequested abstractions, configurability, or handling for impossible scenarios.
+- Rewrite if 50 lines can replace 200.
 
 ### 3. Surgical Changes
-
-**Touch only what you must. Clean up only your own mess.**
-
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
-
-When your changes create orphans:
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
-
-The test: Every changed line should trace directly to the user's request.
+- Touch only what the task requires.
+- Match existing style; do not refactor working adjacent code or reformat untouched lines.
+- Clean up only own orphans (unused imports/functions). Leave pre-existing dead code alone.
+- Every changed line must trace directly to the request.
 
 ### 4. Goal-Driven Execution
-
-**Define success criteria. Loop until verified.**
-
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan:
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
-
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
-
+- Turn tasks into verifiable goals (reproduce bug with test → make test pass; check before and after).
+- State a brief 1-2-3 step plan with explicit verification criteria for each step.
+- Loop until verified.
