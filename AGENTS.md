@@ -22,6 +22,7 @@ Before visual UI work, read `docs/DESIGN.md`. Take colors, type, spacing, and co
 - Trigger: `/graphify`.
 - When the user types `/graphify`, invoke the graphify skill before doing anything else.
 - For non-trivial codebase or architecture work, if the project has no `graphify-out/`, build the graph first with `/graphify .`, then use it. Skip trivial one-file tasks.
+- Invalidate/refresh: after modifying code, run `graphify update .` (add `--force` if files were deleted or renamed) to keep `graphify-out/` current. For doc changes, run `/graphify --update`.
 - If graphify cannot be installed or run because of sandbox, network, credential, or approval restrictions, record the blocker and continue with normal local code navigation.
 
 ### git
