@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"bytes"
@@ -30,7 +30,7 @@ func TestPipeApplySnapshotsGrokHome(t *testing.T) {
 	write("credentials.json", "secret")
 	payload := bytes.NewBufferString(`{"author":"zwarder","agent":"Grok","files":[{"path":"AGENTS.md","body":"new"}]}`)
 	var out, err bytes.Buffer
-	if code := run(nil, payload, &out, &err); code != 0 {
+	if code := Run(nil, payload, &out, &err); code != 0 {
 		t.Fatalf("apply %d %s", code, err.String())
 	}
 	if body := readFile(t, filepath.Join(home, "AGENTS.md")); body != "new" {
@@ -98,7 +98,7 @@ func TestRunHelp(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var out, err bytes.Buffer
-			code := run(tt.args, nil, &out, &err)
+			code := Run(tt.args, nil, &out, &err)
 			if code != tt.code {
 				t.Fatalf("code %d", code)
 			}

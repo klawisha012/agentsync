@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/klawisha012/agentsync/internal/agent"
 )
 
-func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		if piped(stdin) {
 			return applyStream(stdin, stderr)

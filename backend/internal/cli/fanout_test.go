@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"bytes"
@@ -92,7 +92,7 @@ func TestFanoutSharesOutermostSkills(t *testing.T) {
 func runFanout(t *testing.T, args ...string) (int, string, string) {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
-	code := run(args, nil, &stdout, &stderr)
+	code := Run(args, nil, &stdout, &stderr)
 	return code, stdout.String(), stderr.String()
 }
 
@@ -632,7 +632,7 @@ func pipePublication(t *testing.T, body string) (int, string) {
 	t.Helper()
 	raw := `{"author":"zwarder","agent":"Grok","files":[{"path":"skills/shared/SKILL.md","body":"` + body + `"}]}`
 	var stdout, stderr bytes.Buffer
-	code := run(nil, strings.NewReader(raw), &stdout, &stderr)
+	code := Run(nil, strings.NewReader(raw), &stdout, &stderr)
 	return code, stderr.String()
 }
 
