@@ -69,7 +69,6 @@ export default function AccountView({ name }) {
   return (
     <section className="profile">
       <div className="identity">
-        <span className="profile-glow" aria-hidden="true" />
         <div className="identity-top">
           <div className="identity-main">
             <Avatar className="profile-mark" name={page.name} updated={page.avatarUpdated} letter={initials(page.name)} />

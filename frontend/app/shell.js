@@ -9,6 +9,7 @@ import Avatar from "./avatar";
 const links = [
   { href: "/accounts", label: "Список аккаунтов" },
   { href: "/stats", label: "Статистика" },
+  { href: "/docs", label: "Документация" },
 ];
 
 export default function Shell({ children }) {

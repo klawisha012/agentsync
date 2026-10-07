@@ -14,7 +14,7 @@ const ownerHint = {
 const months = ["янв.", "фев.", "мар.", "апр.", "мая", "июн.", "июл.", "авг.", "сент.", "окт.", "нояб.", "дек."];
 const commentLimit = 1000;
 
-export default function Comments({ name, access, owner }) {
+export default function Comments({ name, access, owner, fullPage = false }) {
   const [state, setState] = useState(null);
   const [text, setText] = useState("");
   const [note, setNote] = useState("");
@@ -103,12 +103,39 @@ export default function Comments({ name, access, owner }) {
   const comments = state.body.comments || [];
   const pages = state.body.pages || 0;
   const current = state.body.page || page;
+  const total = state.body.total || 0;
+
+  function pagination(position) {
+    if (hidden || pages <= 1) {
+      return null;
+    }
+    const label = position === "top" ? "Страницы комментариев" : "Страницы комментариев внизу";
+    return (
+      <nav className="comment-pages" aria-label={label}>
+        <button type="button" disabled={current <= 1} aria-label="Предыдущая страница" onClick={() => setPage(current - 1)}><Chevron dir="left" /></button>
+        {pageWindow(current, pages).map((item, index) => (
+          item === "…" ? <span key={`gap-${position}-${index}`}>…</span> : (
+            <button key={`${position}-${item}`} type="button" aria-label={`Страница ${item}`} aria-current={item === current ? "page" : undefined} onClick={() => setPage(item)}>{item}</button>
+          )
+        ))}
+        <button type="button" disabled={current >= pages} aria-label="Следующая страница" onClick={() => setPage(current + 1)}><Chevron dir="right" /></button>
+      </nav>
+    );
+  }
 
   return (
-    <section className="comments">
+    <section className="comments steam-comments">
       <div className="comments-bar">
         <h2>Комментарии</h2>
       </div>
+      {!hidden ? (
+        <div className="comments-navigation">
+          {fullPage ? <span className="comments-total">Все комментарии ({total})</span> : (
+            <Link className="comments-all" href={`/${encodeURIComponent(name)}/comments`}>Все комментарии ({total})</Link>
+          )}
+          {pagination("top")}
+        </div>
+      ) : null}
       {owner && ownerHint[access] ? <p className="hint">{ownerHint[access]}</p> : null}
       {hidden && !owner ? (
         <p className="hint">
@@ -118,7 +145,7 @@ export default function Comments({ name, access, owner }) {
       {state.body.canPost ? (
         <form className="comment-form" onSubmit={send}>
           <label htmlFor="comment-body">Комментарий</label>
-          <textarea id="comment-body" value={text} rows={3} aria-describedby="comment-limit" onChange={(event) => setText(clipComment(event.target.value))} />
+          <textarea id="comment-body" placeholder="Оставить комментарий" value={text} rows={2} aria-describedby="comment-limit" onChange={(event) => setText(clipComment(event.target.value))} />
           <div className="comment-submit">
             <button className="solid" type="submit">Отправить</button>
             <p id="comment-limit" className={commentLength(text) >= commentLimit ? "comment-count full" : "comment-count"}>{`${commentLength(text)}\u00a0из\u00a01\u202f000`}</p>
@@ -156,19 +183,18 @@ export default function Comments({ name, access, owner }) {
           </ul>
         )
       ) : null}
-      {!hidden && pages > 1 ? (
-        <nav className="comment-pages" aria-label="Страницы комментариев">
-          <button type="button" disabled={current <= 1} aria-label="Предыдущая страница" onClick={() => setPage(current - 1)}>‹</button>
-          {pageWindow(current, pages).map((item, index) => (
-            item === "…" ? <span key={`gap-${index}`}>…</span> : (
-              <button key={item} type="button" aria-current={item === current ? "page" : undefined} onClick={() => setPage(item)}>{item}</button>
-            )
-          ))}
-          <button type="button" disabled={current >= pages} aria-label="Следующая страница" onClick={() => setPage(current + 1)}>›</button>
-        </nav>
-      ) : null}
+      {pagination("bottom")}
       {note ? <p className="explanation">{note}</p> : null}
     </section>
+  );
+}
+
+function Chevron({ dir }) {
+  const d = dir === "left" ? "M15 6 9 12l6 6" : "M9 6l6 6-6 6";
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={d} />
+    </svg>
   );
 }
 

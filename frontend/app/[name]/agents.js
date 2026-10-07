@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { api } from "../api";
+import AgentLogo from "../agent-logo";
 
 const tones = {
   Grok: "grok",
@@ -78,7 +79,7 @@ export default function AgentBoard({ page, owner, onChange, onExplain }) {
               <div>
                 <div className="house-head">
                   <span>
-                    <i className={`agent-dot tone-${tone}`} />
+                    <AgentLogo name={agent.name} tone={tone} />
                     <strong>{agent.name}</strong>
                   </span>
                   {agent.version != null ? <em className={`version-chip tone-${tone}`}>v{agent.version}</em> : null}
@@ -120,7 +121,7 @@ export default function AgentBoard({ page, owner, onChange, onExplain }) {
                   <div className="house-actions">
                     {canCopy ? (
                       <button type="button" aria-label={`Скопировать команду ${command}`} onClick={() => copyText(`push:${agent.name}`, command)}>
-                        <Icon name="console" />
+                        <Icon name={copied === `push:${agent.name}` ? "check" : "copy"} />
                         {copied === `push:${agent.name}` ? "Скопировано" : "Скопировать"}
                       </button>
                     ) : null}
@@ -210,7 +211,7 @@ function Icon({ name }) {
     history: "M12 5a7 7 0 1 1-6.3 4H8l-3.2-3L1.5 9H4.1A9 9 0 1 0 12 3v2zm-1 3h2v5l3 2-.9 1.4L11 13.2V8z",
     unpublish: "M6 6h12v2H6V6zm2 4h8v8H8v-8z",
     copy: "M8 7h10v12H8V7zm-2 2H4v12h10v-2H6V9z",
-    console: "M4 5h16v14H4V5zm2 3 3 2-3 2V8zm5 5h7v2h-7v-2z",
+    check: "M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z",
   };
   return (
     <svg className="ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
