@@ -22,7 +22,7 @@ var (
 	foldKey  = cases.Fold()
 	reserved = map[string]struct{}{
 		"login": {}, "recover": {}, "accounts": {}, "catalog": {},
-		"health": {}, "backend": {},
+		"health": {}, "backend": {}, "docs": {}, "stats": {},
 	}
 )
 
@@ -49,7 +49,9 @@ type account struct {
 	resetExpires   time.Time
 	chains         map[string]string
 	viewers        map[string]struct{}
+	viewedAt       map[string]time.Time
 	agentLikes     map[string]map[string]struct{}
+	likedAt        map[string]map[string]time.Time
 	publications   []*publication
 	comments       []*profileComment
 	snapshots      []*snapshot
@@ -129,7 +131,9 @@ func (s *store) create(email, password, name string) (accountView, string, strin
 		password:      hash,
 		chains:        map[string]string{},
 		viewers:       map[string]struct{}{},
+		viewedAt:      map[string]time.Time{},
 		agentLikes:    map[string]map[string]struct{}{},
+		likedAt:       map[string]map[string]time.Time{},
 		publications:  []*publication{},
 		comments:      []*profileComment{},
 		commentAccess: "hidden",

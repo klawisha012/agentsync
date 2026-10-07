@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v4"
 )
@@ -30,20 +31,31 @@ func (s *store) bindVisitor(sessionID, visitorID string) {
 			s.dropViewerKey(page, to)
 			continue
 		}
+		seen := time.Now().UTC()
+		if page.viewedAt != nil && !page.viewedAt[from].IsZero() {
+			seen = page.viewedAt[from]
+		}
 		if err := s.dropView(context.Background(), page, from); err != nil {
 			continue
 		}
 		if _, ok := page.viewers[to]; !ok {
-			if err := s.putView(context.Background(), page, to); err != nil {
-				_ = s.putView(context.Background(), page, from)
+			if err := s.putView(context.Background(), page, to, seen); err != nil {
+				_ = s.putView(context.Background(), page, from, seen)
 				continue
 			}
 		}
 		delete(page.viewers, from)
+		delete(page.viewedAt, from)
 		if page.viewers == nil {
 			page.viewers = map[string]struct{}{}
 		}
+		if page.viewedAt == nil {
+			page.viewedAt = map[string]time.Time{}
+		}
 		page.viewers[to] = struct{}{}
+		if _, ok := page.viewedAt[to]; !ok {
+			page.viewedAt[to] = seen
+		}
 		page.views = len(page.viewers)
 	}
 }
@@ -59,6 +71,7 @@ func (s *store) dropViewerKey(page *account, key string) {
 		return
 	}
 	delete(page.viewers, key)
+	delete(page.viewedAt, key)
 	page.views = len(page.viewers)
 }
 
@@ -73,19 +86,27 @@ func (s *store) recordView(page, viewer *account, visitorID string) {
 	if page.viewers == nil {
 		page.viewers = map[string]struct{}{}
 	}
+	if page.viewedAt == nil {
+		page.viewedAt = map[string]time.Time{}
+	}
 	ctx := context.Background()
 	if viewer != nil {
 		key := "a:" + viewer.nameKey
-		if err := s.putView(ctx, page, key); err != nil {
-			return
+		if _, ok := page.viewers[key]; !ok {
+			seen := time.Now().UTC()
+			if err := s.putView(ctx, page, key, seen); err != nil {
+				return
+			}
+			page.viewers[key] = struct{}{}
+			page.viewedAt[key] = seen
 		}
 		if visitorID != "" {
 			if err := s.dropView(ctx, page, "v:"+visitorID); err != nil {
 				return
 			}
 			delete(page.viewers, "v:"+visitorID)
+			delete(page.viewedAt, "v:"+visitorID)
 		}
-		page.viewers[key] = struct{}{}
 		page.views = len(page.viewers)
 		return
 	}
@@ -93,10 +114,15 @@ func (s *store) recordView(page, viewer *account, visitorID string) {
 		return
 	}
 	key := "v:" + visitorID
-	if err := s.putView(ctx, page, key); err != nil {
+	if _, ok := page.viewers[key]; ok {
+		return
+	}
+	seen := time.Now().UTC()
+	if err := s.putView(ctx, page, key, seen); err != nil {
 		return
 	}
 	page.viewers[key] = struct{}{}
+	page.viewedAt[key] = seen
 	page.views = len(page.viewers)
 }
 
@@ -173,11 +199,22 @@ func (s *store) toggleLike(name, agent, sessionID string) (int, bool, int, int, 
 			return 0, false, 0, http.StatusInternalServerError, "Не удалось снять лайк."
 		}
 		delete(page.agentLikes[key], viewer.nameKey)
+		if page.likedAt[key] != nil {
+			delete(page.likedAt[key], viewer.nameKey)
+		}
 	} else {
-		if err := s.putAgentLike(ctx, page, key, viewer); err != nil {
+		created := time.Now().UTC()
+		if err := s.putAgentLike(ctx, page, key, viewer, created); err != nil {
 			return 0, false, 0, http.StatusInternalServerError, "Не удалось поставить лайк."
 		}
 		page.agentLikes[key][viewer.nameKey] = struct{}{}
+		if page.likedAt == nil {
+			page.likedAt = map[string]map[string]time.Time{}
+		}
+		if page.likedAt[key] == nil {
+			page.likedAt[key] = map[string]time.Time{}
+		}
+		page.likedAt[key][viewer.nameKey] = created
 	}
 	page.likes = page.publicationLikes()
 	return page.agentLikeCount(agent), !on, page.likes, http.StatusOK, ""

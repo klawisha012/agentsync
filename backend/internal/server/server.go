@@ -38,6 +38,7 @@ func New(webOrigin string, db *sql.DB) (*echo.Echo, error) {
 	e.GET("/receivers", listReceivers)
 	e.POST("/accounts", a.createAccount)
 	e.GET("/accounts", a.listAccounts)
+	e.GET("/stats", a.showStats)
 	e.GET("/accounts/:name", a.publicAccount)
 	e.GET("/accounts/:name/versions/:agent", a.listVersions)
 	e.GET("/accounts/:name/versions/:agent/:version", a.showVersion)

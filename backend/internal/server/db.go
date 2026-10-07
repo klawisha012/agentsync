@@ -137,14 +137,15 @@ func (s *store) load(ctx context.Context) error {
 }
 
 func (s *store) loadViews(ctx context.Context, byID map[string]*account) error {
-	rows, err := s.db.QueryContext(ctx, `SELECT account_id, viewer_key FROM page_views`)
+	rows, err := s.db.QueryContext(ctx, `SELECT account_id, viewer_key, seen_at FROM page_views`)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var accountID, key string
-		if err := rows.Scan(&accountID, &key); err != nil {
+		var seen sql.NullTime
+		if err := rows.Scan(&accountID, &key, &seen); err != nil {
 			return err
 		}
 		page := byID[accountID]
@@ -152,20 +153,24 @@ func (s *store) loadViews(ctx context.Context, byID map[string]*account) error {
 			continue
 		}
 		page.viewers[key] = struct{}{}
+		if seen.Valid {
+			page.viewedAt[key] = seen.Time
+		}
 		page.views = len(page.viewers)
 	}
 	return rows.Err()
 }
 
 func (s *store) loadLikes(ctx context.Context, byID map[string]*account) error {
-	rows, err := s.db.QueryContext(ctx, `SELECT account_id, agent_key, liker_id FROM publication_likes`)
+	rows, err := s.db.QueryContext(ctx, `SELECT account_id, agent_key, liker_id, created_at FROM publication_likes`)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var accountID, agentKey, likerID string
-		if err := rows.Scan(&accountID, &agentKey, &likerID); err != nil {
+		var created sql.NullTime
+		if err := rows.Scan(&accountID, &agentKey, &likerID, &created); err != nil {
 			return err
 		}
 		page, liker := byID[accountID], byID[likerID]
@@ -176,6 +181,12 @@ func (s *store) loadLikes(ctx context.Context, byID map[string]*account) error {
 			page.agentLikes[agentKey] = map[string]struct{}{}
 		}
 		page.agentLikes[agentKey][liker.nameKey] = struct{}{}
+		if created.Valid {
+			if page.likedAt[agentKey] == nil {
+				page.likedAt[agentKey] = map[string]time.Time{}
+			}
+			page.likedAt[agentKey][liker.nameKey] = created.Time
+		}
 	}
 	return rows.Err()
 }
@@ -258,7 +269,9 @@ func scanAccount(rows *sql.Rows) (*account, error) {
 	}
 	item.chains = map[string]string{}
 	item.viewers = map[string]struct{}{}
+	item.viewedAt = map[string]time.Time{}
 	item.agentLikes = map[string]map[string]struct{}{}
+	item.likedAt = map[string]map[string]time.Time{}
 	item.publications = []*publication{}
 	item.comments = []*profileComment{}
 	item.snapshots = []*snapshot{}
@@ -350,10 +363,13 @@ func nullTime(value time.Time) any {
 	return value
 }
 
-func (s *store) putView(ctx context.Context, page *account, key string) error {
+func (s *store) putView(ctx context.Context, page *account, key string, seen time.Time) error {
+	if seen.IsZero() {
+		seen = time.Now().UTC()
+	}
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO page_views (account_id, viewer_key) VALUES ($1, $2)
-		ON CONFLICT DO NOTHING`, page.id, key)
+		INSERT INTO page_views (account_id, viewer_key, seen_at) VALUES ($1, $2, $3)
+		ON CONFLICT DO NOTHING`, page.id, key, seen)
 	return err
 }
 
@@ -363,10 +379,14 @@ func (s *store) dropView(ctx context.Context, page *account, key string) error {
 	return err
 }
 
-func (s *store) putAgentLike(ctx context.Context, page *account, agentKey string, liker *account) error {
+func (s *store) putAgentLike(ctx context.Context, page *account, agentKey string, liker *account, created time.Time) error {
+	if created.IsZero() {
+		created = time.Now().UTC()
+	}
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO publication_likes (account_id, agent_key, liker_id) VALUES ($1, $2, $3)
-		ON CONFLICT DO NOTHING`, page.id, agentKey, liker.id)
+		INSERT INTO publication_likes (account_id, agent_key, liker_id, created_at)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT DO NOTHING`, page.id, agentKey, liker.id, created)
 	return err
 }
 
