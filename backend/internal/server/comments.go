@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	commentPageSize = 10
+	commentPageSize = 6
 	commentMaxRunes = 1000
 )
 
