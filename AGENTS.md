@@ -4,6 +4,7 @@
 - **Triage labels**: five canonical roles matching role names. See `docs/agents/triage-labels.md`.
 - **Domain docs**: `CONTEXT.md` and `docs/adr/` at repo root. See `docs/agents/domain.md`.
 - **UI & Design**: before visual work, read `docs/DESIGN.md`. Colors, typography, spacing, component roles from it; state and behavior from this repo.
+- **Controlled Technical Russian (Ru-STE)**: контролируемый технический язык для однозначных инструкций агентам, описаний инструментов, системных промптов и текстов ошибок без двусмысленности (аналог ASD-STE100 / ГОСТ 2.105). Навык: `~/.agents/skills/ru-ste/SKILL.md`.
 
 ## Graphify (Knowledge graph)
 
