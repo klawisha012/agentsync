@@ -30,12 +30,12 @@ services:
     depends_on:
       - api
   angie:
-    image: docker.angie.software/angie:1.12.2
+    build:
+      context: ./deploy/angie
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./deploy/angie/default.conf:/etc/angie/http.d/default.conf:ro
       - angie-acme:/var/lib/angie/acme
     depends_on:
       - web
