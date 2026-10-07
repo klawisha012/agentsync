@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { api } from "../api";
 import AgentLogo from "../agent-logo";
+import Icon from "../profile-icon";
 
 const tones = {
   Grok: "grok",
@@ -203,19 +204,4 @@ function ruUnit(n, one, few, many) {
   return `${n}\u00a0${word} назад`;
 }
 
-function Icon({ name }) {
-  const paths = {
-    folder: "M3 6h7l2 2h9v10H3V6z",
-    upload: "M12 4l5 5h-3v6h-4V9H7l5-5zm-7 14h14v2H5v-2z",
-    eye: "M12 6c4.5 0 8.2 2.8 9.5 6-1.3 3.2-5 6-9.5 6S3.8 15.2 2.5 12C3.8 8.8 7.5 6 12 6zm0 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",
-    history: "M12 5a7 7 0 1 1-6.3 4H8l-3.2-3L1.5 9H4.1A9 9 0 1 0 12 3v2zm-1 3h2v5l3 2-.9 1.4L11 13.2V8z",
-    unpublish: "M6 6h12v2H6V6zm2 4h8v8H8v-8z",
-    copy: "M8 7h10v12H8V7zm-2 2H4v12h10v-2H6V9z",
-    check: "M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z",
-  };
-  return (
-    <svg className="ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
-      <path fill="currentColor" d={paths[name]} />
-    </svg>
-  );
-}
+

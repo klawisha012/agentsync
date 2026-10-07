@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import Avatar from "../avatar";
+import Icon from "../profile-icon";
 import AgentBoard from "./agents";
 import Comments from "./comments";
 
@@ -162,22 +163,4 @@ function initials(name) {
 
 function formatCount(value) {
   return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, "\u202f");
-}
-
-function Icon({ name }) {
-  const paths = {
-    edit: "M4 17.5V20h2.5L17.8 8.7l-2.5-2.5L4 17.5zm14.7-9.2a1 1 0 0 0 0-1.4l-1.6-1.6a1 1 0 0 0-1.4 0l-1.1 1.1 3 3 1.1-1.1z",
-    verified: "M9.2 16.2 5.5 12.5l1.4-1.4 2.3 2.3 6-6 1.4 1.4-7.4 7.4z",
-    mail: "M4 6h16v12H4V6zm8 6.2L18.2 8H5.8L12 12.2z",
-    eye: "M12 6c4.5 0 8.2 2.8 9.5 6-1.3 3.2-5 6-9.5 6S3.8 15.2 2.5 12C3.8 8.8 7.5 6 12 6zm0 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",
-    heart: "M12 19s-6.5-4.1-8.2-8.1C2.6 8.4 4 6 6.6 6c1.6 0 2.6.8 3.4 1.8C10.8 6.8 11.8 6 13.4 6 16 6 17.4 8.4 16.2 10.9 14.5 14.9 12 19 12 19z",
-    laptop: "M4 6h16v10H4V6zm-1 12h18v1.5H3V18z",
-    unlink: "M8.5 13.5 6 16a3 3 0 0 0 4.2 4.2l2.5-2.5-1.4-1.4-2.5 2.5a1 1 0 0 1-1.4-1.4l2.5-2.5-1.4-1.4zm7-3 2.5-2.5A3 3 0 0 0 13.8 3.8L11.3 6.3l1.4 1.4 2.5-2.5a1 1 0 0 1 1.4 1.4L14.1 9.1l1.4 1.4z",
-    delete: "M8 4h8l1 2h4v2H3V6h4l1-2zm1 6h2v8H9v-8zm4 0h2v8h-2v-8z",
-  };
-  return (
-    <svg className="ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-      <path fill="currentColor" d={paths[name]} />
-    </svg>
-  );
 }
