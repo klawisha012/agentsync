@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import Avatar from "../avatar";
 
@@ -316,6 +316,138 @@ const commentHelp = {
   hidden: "Раздел скрыт. Комментарии видите и\u00a0пишете только вы.",
 };
 
+const flagOptions = [
+  { value: "open", label: "Открытый" },
+  { value: "hidden", label: "Скрытый" },
+];
+
+const commentOptions = [
+  { value: "open", label: "Оставлять комментарии могут все" },
+  { value: "users", label: "Оставлять комментарии могут только вошедшие" },
+  { value: "hidden", label: "Комментарии скрыты" },
+];
+
+function SteamSelect({ id, value, options, onChange, wide }) {
+  const [open, setOpen] = useState(false);
+  const [cursor, setCursor] = useState(0);
+  const rootRef = useRef(null);
+  const faceRef = useRef(null);
+  const active = options[cursor] || options[0];
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+    function onPointer(event) {
+      if (!rootRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", onPointer);
+    return () => document.removeEventListener("pointerdown", onPointer);
+  }, [open]);
+
+  function reveal() {
+    const index = options.findIndex((item) => item.value === value);
+    setCursor(index < 0 ? 0 : index);
+    setOpen(true);
+  }
+
+  function close() {
+    setOpen(false);
+    faceRef.current?.focus();
+  }
+
+  function choose(next) {
+    onChange(next);
+    close();
+  }
+
+  function onFaceKey(event) {
+    if (!open) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp" || event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        reveal();
+      }
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setCursor((index) => Math.min(options.length - 1, index + 1));
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setCursor((index) => Math.max(0, index - 1));
+      return;
+    }
+    if (event.key === "Home") {
+      event.preventDefault();
+      setCursor(0);
+      return;
+    }
+    if (event.key === "End") {
+      event.preventDefault();
+      setCursor(options.length - 1);
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      if (active) {
+        choose(active.value);
+      }
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      close();
+      return;
+    }
+    if (event.key === "Tab") {
+      setOpen(false);
+    }
+  }
+
+  const current = options.find((item) => item.value === value) || options[0];
+
+  return (
+    <div className={wide ? "steam-select wide" : "steam-select"} ref={rootRef}>
+      <button
+        id={id}
+        ref={faceRef}
+        type="button"
+        className="steam-select-face"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={`${id}-list`}
+        aria-activedescendant={open && active ? `${id}-opt-${active.value}` : undefined}
+        onClick={() => (open ? setOpen(false) : reveal())}
+        onKeyDown={onFaceKey}
+      >
+        {current?.label}
+      </button>
+      {open ? (
+        <ul id={`${id}-list`} className="steam-select-menu" role="listbox" aria-labelledby={id}>
+          {options.map((item, index) => (
+            <li key={item.value} role="none">
+              <div
+                role="option"
+                id={`${id}-opt-${item.value}`}
+                aria-selected={item.value === value}
+                className={index === cursor ? "steam-select-option active" : "steam-select-option"}
+                onMouseEnter={() => setCursor(index)}
+                onClick={() => choose(item.value)}
+              >
+                {item.label}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 function profileMode(share) {
   const opened = share.copy && share.view && share.versions && share.comments === "open";
   const closed = !share.copy && !share.view && !share.versions && share.comments === "hidden";
@@ -352,11 +484,12 @@ function PrivacyForm({ share, setShare, onSubmit }) {
       <div className="steam-block">
         <div className="steam-row">
           <label className="steam-label" htmlFor="privacy-profile">Мой профиль:</label>
-          <select id="privacy-profile" value={mode} onChange={(event) => applyProfile(event.target.value)}>
-            {mode === "partial" ? <option value="partial">Частичный</option> : null}
-            <option value="open">Открытый</option>
-            <option value="hidden">Скрытый</option>
-          </select>
+          <SteamSelect
+            id="privacy-profile"
+            value={mode}
+            options={mode === "partial" ? [{ value: "partial", label: "Частичный" }, ...flagOptions] : flagOptions}
+            onChange={applyProfile}
+          />
         </div>
         <p className="steam-help">{profileCopy[mode]}</p>
       </div>
@@ -385,11 +518,13 @@ function PrivacyForm({ share, setShare, onSubmit }) {
       <div className="steam-block">
         <div className="steam-row">
           <label className="steam-label" htmlFor="privacy-comments">Раздел комментариев:</label>
-          <select id="privacy-comments" className="steam-wide" value={share.comments} onChange={(event) => setShare({ ...share, comments: event.target.value })}>
-            <option value="open">Оставлять комментарии могут все</option>
-            <option value="users">Оставлять комментарии могут только вошедшие</option>
-            <option value="hidden">Комментарии скрыты</option>
-          </select>
+          <SteamSelect
+            id="privacy-comments"
+            wide
+            value={share.comments}
+            options={commentOptions}
+            onChange={(comments) => setShare({ ...share, comments })}
+          />
         </div>
         <p className="steam-help">{commentHelp[share.comments] || commentHelp.hidden}</p>
       </div>
@@ -403,10 +538,12 @@ function SteamFlag({ id, label, value, onChange, help }) {
     <div className="steam-block">
       <div className="steam-row">
         <label className="steam-label" htmlFor={id}>{label}</label>
-        <select id={id} value={value ? "open" : "hidden"} onChange={(event) => onChange(event.target.value === "open")}>
-          <option value="open">Открытый</option>
-          <option value="hidden">Скрытый</option>
-        </select>
+        <SteamSelect
+          id={id}
+          value={value ? "open" : "hidden"}
+          options={flagOptions}
+          onChange={(next) => onChange(next === "open")}
+        />
       </div>
       <p className="steam-help">{help}</p>
     </div>
