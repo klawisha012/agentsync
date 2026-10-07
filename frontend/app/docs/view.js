@@ -44,8 +44,6 @@ export default function DocsPage() {
 
   const index = FLAT.findIndex((item) => item.id === active);
   const current = FLAT[index] || FLAT[0];
-  const prev = FLAT[index - 1];
-  const next = FLAT[index + 1];
   const q = query.trim().toLowerCase();
 
   return (
@@ -176,10 +174,6 @@ export default function DocsPage() {
             <div className="docs-notice"><p>Этот раздел зарезервирован для будущей документации MCP.</p></div>
           </section>
         </div>
-        <nav className="vdocs-pager" aria-label="Соседние разделы">
-          {prev ? <a href={`#${prev.id}`}><small><Chevron dir="left" /> Назад</small>{prev.label}</a> : <span />}
-          {next ? <a href={`#${next.id}`} className="is-next"><small>Далее <Chevron /></small>{next.label}</a> : <span />}
-        </nav>
       </article>
       <aside className="vdocs-toc" aria-label="На этой странице">
         <span className="vdocs-group-title">На этой странице</span>
