@@ -72,10 +72,7 @@ export default function Shell({ children }) {
           </div>
           <div className="top-gap">
             {session ? (
-              <div className="who">
-                <Link href={`/${session.name}`}>{session.name}</Link>
-                <ProfileMenu name={session.name} updated={session.avatarUpdated} />
-              </div>
+              <ProfileMenu name={session.name} updated={session.avatarUpdated} />
             ) : session === null ? (
               <Link className="who" href="/login" aria-label="Войти">
                 <span className="person" aria-hidden="true"><PersonIcon /></span>
@@ -93,7 +90,6 @@ function ProfileMenu({ name, updated }) {
   const router = useRouter();
   const box = useRef(null);
   const [open, setOpen] = useState(false);
-  const [confirm, setConfirm] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -102,13 +98,11 @@ function ProfileMenu({ name, updated }) {
     function onPointer(event) {
       if (box.current && !box.current.contains(event.target)) {
         setOpen(false);
-        setConfirm(false);
       }
     }
     function onKey(event) {
       if (event.key === "Escape") {
         setOpen(false);
-        setConfirm(false);
       }
     }
     document.addEventListener("pointerdown", onPointer);
@@ -128,23 +122,28 @@ function ProfileMenu({ name, updated }) {
 
   return (
     <div className="profile-menu" ref={box}>
-      <button className="person" type="button" aria-label="Профиль" aria-expanded={open} aria-haspopup="menu" onClick={() => { setOpen((value) => !value); setConfirm(false); }}>
-        {updated ? <Avatar className="person-photo" name={name} updated={updated} letter="" /> : <PersonIcon />}
+      <button
+        className="who"
+        type="button"
+        aria-label="Профиль"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <span className="person" aria-hidden="true">
+          {updated ? <Avatar className="person-photo" name={name} updated={updated} letter="" /> : <PersonIcon />}
+        </span>
+        <span className="who-name">{name}</span>
+        <svg className="who-caret" viewBox="0 0 24 24" width="10" height="10" aria-hidden="true">
+          <path fill="currentColor" d="M5 9l7 7 7-7z" />
+        </svg>
       </button>
       {open ? (
         <div className="profile-pop" role="menu">
-          {confirm ? (
-            <>
-              <p className="menu-note">Сессия на этом сайте закончится.</p>
-              <button type="button" onClick={() => setConfirm(false)}>Остаться</button>
-              <button className="menu-leave" type="button" onClick={logout}>Выйти</button>
-            </>
-          ) : (
-            <>
-              <Link href="/settings" role="menuitem" onClick={() => setOpen(false)}>Настройки</Link>
-              <button className="menu-leave" type="button" role="menuitem" onClick={() => setConfirm(true)}>Выйти</button>
-            </>
-          )}
+          <Link href={`/${name}`} role="menuitem" onClick={() => setOpen(false)}>Открыть мой профиль</Link>
+          <Link href="/settings" role="menuitem" onClick={() => setOpen(false)}>Настройки</Link>
+          <div className="menu-sep" role="separator" />
+          <button className="menu-leave" type="button" role="menuitem" onClick={logout}>Выйти из аккаунта…</button>
         </div>
       ) : null}
     </div>
