@@ -7,9 +7,9 @@ import AgentLogo from "../agent-logo";
 import Icon from "../profile-icon";
 
 const tones = {
-  Grok: "grok",
-  Agents: "agents",
-  Claude: "claude",
+  grok: "grok",
+  agents: "agents",
+  claude: "claude",
 };
 
 export default function AgentBoard({ page, owner, onChange, onExplain }) {
@@ -71,7 +71,7 @@ export default function AgentBoard({ page, owner, onChange, onExplain }) {
       <div className="house-grid">
         {agents.map((agent) => {
           const command = owner ? `agentsync push ${agent.name}` : `agentsync apply ${page.name} ${agent.name}`;
-          const tone = tones[agent.name] || "plain";
+          const tone = tones[String(agent.name || "").trim().toLowerCase()] || "plain";
           const canCopy = owner || (page.shareCopy && agent.version != null);
           const canView = owner || (page.shareView && agent.version != null);
           const canVersions = owner || page.shareVersions;

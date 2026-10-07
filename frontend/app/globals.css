@@ -3296,6 +3296,17 @@ input:focus-visible {
 .stats-dist tfoot > tr > * { border-top:1px solid var(--profile-border); color:var(--muted); font-size:0.68rem; }
 .stats-dist tfoot td:last-child { text-align:right; }
 .stats-page .share-dot-label { gap:0.35rem; }
+.agent-logo.has-mark {
+  display: inline-block;
+  background: currentColor;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  mask-mode: alpha;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+}
 .stats-page .agent-logo { width:15px; height:15px; flex:none; }
 .stats-page .tone-claude { color:var(--claude); }
 .stats-page .tone-agents { color:var(--agents); }
