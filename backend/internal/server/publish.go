@@ -61,6 +61,9 @@ func (s *store) push(sessionID, agentToken, agent string, missing bool, files []
 	if agent == "" {
 		return publicationView{}, http.StatusBadRequest, "Назовите ИИ-агента."
 	}
+	if msg := safeAgentName(agent); msg != "" {
+		return publicationView{}, http.StatusBadRequest, msg
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	viewer := s.accountBySession(sessionID)
@@ -285,6 +288,9 @@ func privatePath(path string) bool {
 	case "credentials.json", "credentials", "auth.json", "session.json", ".env":
 		return true
 	}
+	if strings.HasPrefix(base, ".env") {
+		return true
+	}
 	if strings.HasSuffix(base, ".lock") || strings.HasSuffix(base, ".log") {
 		return true
 	}
@@ -298,11 +304,11 @@ func privatePath(path string) bool {
 }
 
 func portablePath(path string) bool {
-	clean := filepath.ToSlash(path)
-	if clean == ".." || strings.HasPrefix(clean, "../") {
+	clean, ok := agent.CleanRel(path)
+	if !ok {
 		return false
 	}
-	if isHook(path) || isMCP(path) {
+	if isHook(clean) || isMCP(clean) {
 		return true
 	}
 	base := strings.ToLower(filepath.Base(clean))

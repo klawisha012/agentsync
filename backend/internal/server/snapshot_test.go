@@ -10,14 +10,14 @@ func TestRecordKeepsSnapshotAfterRestart(t *testing.T) {
 	db := testDB(t)
 	e := mustServer(t, db)
 	created := postJSON(t, e, "/accounts", map[string]string{
-		"email": "keeper@example.com", "password": "secret", "name": "Keeper",
+		"email": "keeper@example.com", "password": "secret-pass", "name": "Keeper",
 	}, nil)
 	if created.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", created.Code, created.Body.String())
 	}
 	owner := readSessionCookie(t, created)
 	machine := postJSON(t, e, "/machine", map[string]string{
-		"id": "pc-keeper", "host": "desk", "listener": "127.0.0.1:49152",
+		"id": testMachineID("pc-keeper"), "host": "desk", "listener": "127.0.0.1:49152",
 	}, owner)
 	token := decodeMachine(t, machine.Body.Bytes()).AgentToken
 
@@ -69,7 +69,7 @@ func TestRecordKeepsSnapshotAfterRestart(t *testing.T) {
 		t.Fatalf("current snapshot %d %s", current.Code, current.Body.String())
 	}
 
-	other := mustAccount(t, next, "other-keeper@example.com", "secret", "OtherKeeper")
+	other := mustAccount(t, next, "other-keeper@example.com", "secret-pass", "OtherKeeper")
 	foreign := getJSON(t, next, "/agent/store/Grok", other)
 	if foreign.Code != http.StatusOK || strings.Contains(foreign.Body.String(), `"number":1`) {
 		t.Fatalf("other account saw the store %d %s", foreign.Code, foreign.Body.String())

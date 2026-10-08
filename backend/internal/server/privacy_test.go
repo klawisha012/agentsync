@@ -8,7 +8,7 @@ import (
 
 func TestPrivacyOpensProfileActions(t *testing.T) {
 	e := newServer(t)
-	owner := mustAccount(t, e, "owner@example.com", "secret", "Owner")
+	owner := mustAccount(t, e, "owner@example.com", "secret-pass", "Owner")
 	pushed := postAuth(t, e, "/agent/push", "", pushBody("Grok", false, pushFile{"rules/ok.md", "one"}), owner)
 	if pushed.Code != http.StatusCreated {
 		t.Fatalf("push %d %s", pushed.Code, pushed.Body.String())

@@ -47,6 +47,9 @@ func (s *store) record(ctx context.Context, sessionID, agentToken, agent string,
 	if agent == "" {
 		return snapshotView{}, http.StatusBadRequest, "Назовите ИИ-агента."
 	}
+	if msg := safeAgentName(agent); msg != "" {
+		return snapshotView{}, http.StatusBadRequest, msg
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	viewer, code, msg := s.owner(sessionID, agentToken, false)
@@ -136,8 +139,8 @@ func (s *store) owner(sessionID, agentToken string, needMachine bool) (*account,
 	if viewer != nil {
 		return viewer, 0, ""
 	}
-	bound := s.byAgentToken[agentToken]
-	if agentToken != "" && bound != nil && bound.account != nil {
+	bound := s.machineByToken(agentToken)
+	if bound != nil && bound.account != nil {
 		return bound.account, 0, ""
 	}
 	if needMachine {

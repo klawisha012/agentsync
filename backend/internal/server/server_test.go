@@ -32,7 +32,7 @@ func TestRegisterThenSessionShowsName(t *testing.T) {
 	e := newServer(t)
 	rec := postJSON(t, e, "/accounts", map[string]string{
 		"email":    "a@example.com",
-		"password": "secret",
+		"password": "secret-pass",
 		"name":     "Alice",
 	}, nil)
 	if rec.Code != http.StatusCreated {
@@ -62,7 +62,7 @@ func TestRegisterThenSessionShowsName(t *testing.T) {
 		t.Fatalf("public page leaked email: %s", public.Body.String())
 	}
 	again := postJSON(t, e, "/accounts", map[string]string{
-		"email": "a@example.com", "password": "secret", "name": "harbor",
+		"email": "a@example.com", "password": "secret-pass", "name": "harbor",
 	}, nil)
 	if again.Code != http.StatusConflict {
 		t.Fatalf("duplicate email %d %s", again.Code, again.Body.String())
@@ -70,7 +70,7 @@ func TestRegisterThenSessionShowsName(t *testing.T) {
 
 	out := postJSON(t, e, "/session", map[string]string{
 		"email":    "a@example.com",
-		"password": "secret",
+		"password": "secret-pass",
 	}, nil)
 	if out.Code != http.StatusOK {
 		t.Fatalf("login status %d body %s", out.Code, out.Body.String())
@@ -101,7 +101,7 @@ func TestRegisterRejectsName(t *testing.T) {
 	}
 	e := newServer(t)
 	first := postJSON(t, e, "/accounts", map[string]string{
-		"email": "first@example.com", "password": "secret", "name": "Alice",
+		"email": "first@example.com", "password": "secret-pass", "name": "Alice",
 	}, nil)
 	if first.Code != http.StatusCreated {
 		t.Fatalf("seed %d %s", first.Code, first.Body.String())
@@ -109,7 +109,7 @@ func TestRegisterRejectsName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rec := postJSON(t, e, "/accounts", map[string]string{
-				"email": tt.account + "@example.com", "password": "secret", "name": tt.account,
+				"email": tt.account + "@example.com", "password": "secret-pass", "name": tt.account,
 			}, nil)
 			if rec.Code != tt.wantCode {
 				t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
@@ -124,7 +124,7 @@ func TestRegisterRejectsName(t *testing.T) {
 func TestLoginRejectsWrongPassword(t *testing.T) {
 	e := newServer(t)
 	created := postJSON(t, e, "/accounts", map[string]string{
-		"email": "a@example.com", "password": "secret", "name": "harbor",
+		"email": "a@example.com", "password": "secret-pass", "name": "harbor",
 	}, nil)
 	if created.Code != http.StatusCreated {
 		t.Fatalf("seed %d %s", created.Code, created.Body.String())
@@ -135,7 +135,7 @@ func TestLoginRejectsWrongPassword(t *testing.T) {
 	}{
 		{name: "empty fields", body: map[string]string{"email": "", "password": ""}},
 		{name: "wrong password", body: map[string]string{"email": "a@example.com", "password": "nope"}},
-		{name: "unknown email", body: map[string]string{"email": "missing@example.com", "password": "secret"}},
+		{name: "unknown email", body: map[string]string{"email": "missing@example.com", "password": "secret-pass"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

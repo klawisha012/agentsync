@@ -10,13 +10,13 @@ func TestAccountSessionAndLetterSurviveRestart(t *testing.T) {
 	db := testDB(t)
 	first := mustServer(t, db)
 	created := postJSON(t, first, "/accounts", map[string]string{
-		"email": "ada@example.com", "password": "secret", "name": "Ada",
+		"email": "ada@example.com", "password": "secret-pass", "name": "Ada",
 	}, nil)
 	if created.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", created.Code, created.Body.String())
 	}
 	cookie := readSessionCookie(t, created)
-	confirmToken := pathToken(letterPath(t, created.Body.Bytes()))
+	confirmToken := testLetter(t, first, "ada@example.com", "confirm")
 
 	second := mustServer(t, db)
 	view := getJSON(t, second, "/session", cookie)
@@ -31,7 +31,7 @@ func TestAccountSessionAndLetterSurviveRestart(t *testing.T) {
 	if reset.Code != http.StatusOK {
 		t.Fatalf("recovery %d %s", reset.Code, reset.Body.String())
 	}
-	resetToken := pathToken(letterPath(t, reset.Body.Bytes()))
+	resetToken := testLetter(t, second, "ada@example.com", "reset")
 
 	third := mustServer(t, db)
 	changed := postJSON(t, third, "/recovery/password", map[string]string{
@@ -41,7 +41,7 @@ func TestAccountSessionAndLetterSurviveRestart(t *testing.T) {
 		t.Fatalf("reset after restart %d %s", changed.Code, changed.Body.String())
 	}
 	old := postJSON(t, third, "/session", map[string]string{
-		"email": "ada@example.com", "password": "secret",
+		"email": "ada@example.com", "password": "secret-pass",
 	}, nil)
 	if old.Code == http.StatusOK {
 		t.Fatal("old password still opens the account after restart")
@@ -58,17 +58,17 @@ func TestPageAndPublicationSurviveRestart(t *testing.T) {
 	db := testDB(t)
 	first := mustServer(t, db)
 	owner := postJSON(t, first, "/accounts", map[string]string{
-		"email": "owner@example.com", "password": "secret", "name": "Owner",
+		"email": "owner@example.com", "password": "secret-pass", "name": "Owner",
 	}, nil)
 	ownerCookie := readSessionCookie(t, owner)
 	confirm := postJSON(t, first, "/email/confirm", map[string]string{
-		"token": pathToken(letterPath(t, owner.Body.Bytes())),
+		"token": testLetter(t, first, "owner@example.com", "confirm"),
 	}, nil)
 	if confirm.Code != http.StatusOK {
 		t.Fatalf("confirm %d %s", confirm.Code, confirm.Body.String())
 	}
 	machine := postJSON(t, first, "/machine", map[string]string{
-		"id": "pc-owner", "host": "desk", "listener": "127.0.0.1:49152",
+		"id": testMachineID("pc-owner"), "host": "desk", "listener": "127.0.0.1:49152",
 	}, ownerCookie)
 	token := decodeMachine(t, machine.Body.Bytes()).AgentToken
 	pushed := postAuth(t, first, "/agent/push", token, pushBody("Grok", false, pushFile{"rules/ok.md", "hello"}), ownerCookie)
@@ -83,7 +83,7 @@ func TestPageAndPublicationSurviveRestart(t *testing.T) {
 		t.Fatalf("view %s", guest.Body.String())
 	}
 	liker := postJSON(t, first, "/accounts", map[string]string{
-		"email": "liker@example.com", "password": "secret", "name": "Liker",
+		"email": "liker@example.com", "password": "secret-pass", "name": "Liker",
 	}, nil)
 	likerCookie := readSessionCookie(t, liker)
 	liked := postJSON(t, first, "/accounts/Owner/agents/Grok/like", map[string]string{}, likerCookie)

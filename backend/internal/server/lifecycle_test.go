@@ -14,23 +14,23 @@ import (
 func TestApplyChainWithdrawRenameDelete(t *testing.T) {
 	e := newServer(t)
 	ownerRec := postJSON(t, e, "/accounts", map[string]string{
-		"email": "owner@example.com", "password": "secret", "name": "Owner",
+		"email": "owner@example.com", "password": "secret-pass", "name": "Owner",
 	}, nil)
 	owner := readSessionCookie(t, ownerRec)
 	postJSON(t, e, "/email/confirm", map[string]string{
-		"token": pathToken(letterPath(t, ownerRec.Body.Bytes())),
+		"token": testLetter(t, e, "owner@example.com", "confirm"),
 	}, nil)
 	machine := postJSON(t, e, "/machine", map[string]string{
-		"id": "pc-owner", "host": "desk", "listener": "127.0.0.1:49152",
+		"id": testMachineID("pc-owner"), "host": "desk", "listener": "127.0.0.1:49152",
 	}, owner)
 	ownerToken := decodeMachine(t, machine.Body.Bytes()).AgentToken
 
 	guestRec := postJSON(t, e, "/accounts", map[string]string{
-		"email": "guest@example.com", "password": "secret", "name": "Guest",
+		"email": "guest@example.com", "password": "secret-pass", "name": "Guest",
 	}, nil)
 	guest := readSessionCookie(t, guestRec)
 	guestMachine := postJSON(t, e, "/machine", map[string]string{
-		"id": "pc-guest", "host": "lap", "listener": "127.0.0.1:49152",
+		"id": testMachineID("pc-guest"), "host": "lap", "listener": "127.0.0.1:49152",
 	}, guest)
 	guestToken := decodeMachine(t, guestMachine.Body.Bytes()).AgentToken
 
@@ -49,6 +49,13 @@ func TestApplyChainWithdrawRenameDelete(t *testing.T) {
 	seedHome(t, dir)
 	if err := agent.Apply(t.Context(), ts.URL, dir, "Owner", "Grok", "", ownerToken, ""); err == nil || !strings.Contains(err.Error(), "браузере") {
 		t.Fatalf("own apply without a browser session: %v", err)
+	}
+	if err := agent.Apply(t.Context(), ts.URL, dir, "Owner", "Grok", "", guestToken, ""); err == nil || !strings.Contains(err.Error(), "скрыта") {
+		t.Fatalf("hidden apply: %v", err)
+	}
+	opened := postJSON(t, e, "/account/privacy", map[string]bool{"view": true}, owner)
+	if opened.Code != http.StatusOK {
+		t.Fatalf("privacy %d %s", opened.Code, opened.Body.String())
 	}
 	if err := agent.Apply(t.Context(), ts.URL, dir, "Owner", "Grok", "", guestToken, ""); err != nil {
 		t.Fatal(err)
@@ -126,7 +133,7 @@ func TestApplyChainWithdrawRenameDelete(t *testing.T) {
 		t.Fatal("withdrawn preview still opens")
 	}
 	plain := postJSON(t, e, "/accounts", map[string]string{
-		"email": "plain@example.com", "password": "secret", "name": "Plain",
+		"email": "plain@example.com", "password": "secret-pass", "name": "Plain",
 	}, nil)
 	blocked := postJSON(t, e, "/publications/"+pubID+"/withdraw", map[string]string{}, readSessionCookie(t, plain))
 	if blocked.Code == http.StatusOK || !strings.Contains(blocked.Body.String(), "не найдена") {
@@ -151,7 +158,7 @@ func TestApplyChainWithdrawRenameDelete(t *testing.T) {
 	if bad.Code == http.StatusOK || getJSON(t, e, "/accounts/NextName", nil).Code != http.StatusOK {
 		t.Fatalf("wrong password deleted the account %d", bad.Code)
 	}
-	gone := postJSON(t, e, "/account/delete", map[string]string{"password": "secret"}, owner)
+	gone := postJSON(t, e, "/account/delete", map[string]string{"password": "secret-pass"}, owner)
 	if gone.Code != http.StatusOK {
 		t.Fatalf("delete %d %s", gone.Code, gone.Body.String())
 	}

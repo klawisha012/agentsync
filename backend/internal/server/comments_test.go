@@ -10,9 +10,9 @@ import (
 
 func TestCommentAccess(t *testing.T) {
 	e := newServer(t)
-	owner := mustAccount(t, e, "owner@example.com", "secret", "Owner")
-	guest := mustAccount(t, e, "guest@example.com", "secret", "Guest")
-	other := mustAccount(t, e, "other@example.com", "secret", "Other")
+	owner := mustAccount(t, e, "owner@example.com", "secret-pass", "Owner")
+	guest := mustAccount(t, e, "guest@example.com", "secret-pass", "Guest")
+	other := mustAccount(t, e, "other@example.com", "secret-pass", "Other")
 
 	if got := getJSON(t, e, "/accounts/Owner", nil); !strings.Contains(got.Body.String(), `"commentAccess":"hidden"`) {
 		t.Fatalf("default access %s", got.Body.String())
@@ -79,7 +79,7 @@ func TestCommentAccess(t *testing.T) {
 
 func TestAddCommentRejects(t *testing.T) {
 	e := newServer(t)
-	owner := mustAccount(t, e, "owner@example.com", "secret", "Owner")
+	owner := mustAccount(t, e, "owner@example.com", "secret-pass", "Owner")
 	tests := []struct {
 		name string
 		body string
@@ -105,7 +105,7 @@ func TestAddCommentRejects(t *testing.T) {
 
 func TestCommentPages(t *testing.T) {
 	e := newServer(t)
-	owner := mustAccount(t, e, "owner@example.com", "secret", "Owner")
+	owner := mustAccount(t, e, "owner@example.com", "secret-pass", "Owner")
 	for i := 1; i <= commentPageSize+1; i++ {
 		posted := postJSON(t, e, "/accounts/Owner/comments", map[string]string{"body": fmt.Sprintf("запись %d", i)}, owner)
 		if posted.Code != http.StatusCreated {
@@ -129,7 +129,7 @@ func TestCommentPages(t *testing.T) {
 
 func TestCommentUTF8(t *testing.T) {
 	e := newServer(t)
-	owner := mustAccount(t, e, "owner@example.com", "secret", "Owner")
+	owner := mustAccount(t, e, "owner@example.com", "secret-pass", "Owner")
 	const body = "ёжик ♥ 🔥"
 	created := postJSON(t, e, "/accounts/Owner/comments", map[string]string{"body": body}, owner)
 	if created.Code != http.StatusCreated || !strings.Contains(strings.ToLower(created.Header().Get("Content-Type")), "utf-8") || !strings.Contains(created.Body.String(), body) {
@@ -143,7 +143,7 @@ func TestCommentUTF8(t *testing.T) {
 
 func TestPrivacyRejectsUnknownComments(t *testing.T) {
 	e := newServer(t)
-	owner := mustAccount(t, e, "owner@example.com", "secret", "Owner")
+	owner := mustAccount(t, e, "owner@example.com", "secret-pass", "Owner")
 	got := postJSON(t, e, "/account/privacy", map[string]any{"comments": "friends"}, owner)
 	if got.Code != http.StatusBadRequest || !strings.Contains(got.Body.String(), "Неизвестный доступ к комментариям.") {
 		t.Fatalf("unknown %d %s", got.Code, got.Body.String())

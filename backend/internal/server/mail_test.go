@@ -6,13 +6,15 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/labstack/echo/v4"
 )
 
 func TestEmailConfirmBlocksUploadAndResetPassword(t *testing.T) {
 	e := newServer(t)
 	const (
 		email    = "alex@studio.io"
-		password = "secret"
+		password = "secret-pass"
 		name     = "alex"
 	)
 	created := postJSON(t, e, "/accounts", map[string]string{
@@ -25,7 +27,10 @@ func TestEmailConfirmBlocksUploadAndResetPassword(t *testing.T) {
 		t.Fatalf("create leaked a secret: %s", created.Body.String())
 	}
 	cookie := readSessionCookie(t, created)
-	confirmPath := letterPath(t, created.Body.Bytes())
+	confirmToken := testLetter(t, e, email, "confirm")
+	if strings.Contains(created.Body.String(), "letterPath") {
+		t.Fatalf("create returned a letter: %s", created.Body.String())
+	}
 
 	blocked := postJSON(t, e, "/publications", map[string]string{}, cookie)
 	if blocked.Code != http.StatusNotImplemented || strings.Contains(blocked.Body.String(), "почт") {
@@ -44,14 +49,14 @@ func TestEmailConfirmBlocksUploadAndResetPassword(t *testing.T) {
 		t.Fatal("bad link confirmed the mail")
 	}
 
-	ok := postJSON(t, e, "/email/confirm", map[string]string{"token": pathToken(confirmPath)}, nil)
+	ok := postJSON(t, e, "/email/confirm", map[string]string{"token": confirmToken}, nil)
 	if ok.Code != http.StatusOK {
 		t.Fatalf("confirm %d %s", ok.Code, ok.Body.String())
 	}
 	if !ownerVerified(t, getJSON(t, e, "/accounts/"+name, cookie)) {
 		t.Fatal("letter did not confirm the mail")
 	}
-	again := postJSON(t, e, "/email/confirm", map[string]string{"token": pathToken(confirmPath)}, nil)
+	again := postJSON(t, e, "/email/confirm", map[string]string{"token": confirmToken}, nil)
 	if again.Code != http.StatusOK || !ownerVerified(t, getJSON(t, e, "/accounts/"+name, cookie)) {
 		t.Fatalf("repeat confirm %d %s", again.Code, again.Body.String())
 	}
@@ -77,7 +82,10 @@ func TestEmailConfirmBlocksUploadAndResetPassword(t *testing.T) {
 	if reset.Code != http.StatusOK {
 		t.Fatalf("recovery %d %s", reset.Code, reset.Body.String())
 	}
-	resetToken := pathToken(letterPath(t, reset.Body.Bytes()))
+	if strings.Contains(reset.Body.String(), "letterPath") {
+		t.Fatalf("recovery returned a letter: %s", reset.Body.String())
+	}
+	resetToken := testLetter(t, e, email, "reset")
 	wrong := postJSON(t, e, "/recovery/password", map[string]string{"token": "missing", "password": "newer"}, nil)
 	if wrong.Code == http.StatusOK {
 		t.Fatalf("bad reset changed the password: %s", wrong.Body.String())
@@ -105,25 +113,20 @@ func TestEmailConfirmBlocksUploadAndResetPassword(t *testing.T) {
 	}
 }
 
-func letterPath(t *testing.T, raw []byte) string {
+func testLetter(t *testing.T, e *echo.Echo, email, kind string) string {
 	t.Helper()
-	var body struct {
-		LetterPath string `json:"letterPath"`
+	value, ok := testStores.Load(e)
+	if !ok {
+		t.Fatal("хранилище писем не зарегистрировано")
 	}
-	if err := json.Unmarshal(raw, &body); err != nil {
-		t.Fatal(err)
+	s := value.(*store)
+	s.mu.Lock()
+	raw := s.letters[foldKey.String(email)+"\n"+kind]
+	s.mu.Unlock()
+	if raw == "" || strings.Contains(raw, "@") {
+		t.Fatalf("letter %s for %s is %q", kind, email, raw)
 	}
-	if body.LetterPath == "" || strings.Contains(body.LetterPath, "@") {
-		t.Fatalf("letter path %q", body.LetterPath)
-	}
-	return body.LetterPath
-}
-
-func pathToken(path string) string {
-	if i := strings.LastIndex(path, "/"); i >= 0 {
-		return path[i+1:]
-	}
-	return path
+	return raw
 }
 
 func ownerVerified(t *testing.T, rec *httptest.ResponseRecorder) bool {

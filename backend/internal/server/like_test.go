@@ -10,8 +10,8 @@ import (
 
 func TestOneViewAndLike(t *testing.T) {
 	e := newServer(t)
-	alice := mustAccount(t, e, "alice@example.com", "secret", "Alice")
-	bob := mustAccount(t, e, "bob@example.com", "secret", "Bob")
+	alice := mustAccount(t, e, "alice@example.com", "secret-pass", "Alice")
+	bob := mustAccount(t, e, "bob@example.com", "secret-pass", "Bob")
 
 	first := getJSON(t, e, "/accounts/Alice", nil)
 	if viewsOf(t, first) != 1 {
@@ -24,7 +24,7 @@ func TestOneViewAndLike(t *testing.T) {
 	}
 
 	login := postJSON(t, e, "/session", map[string]string{
-		"email": "bob@example.com", "password": "secret",
+		"email": "bob@example.com", "password": "secret-pass",
 	}, visitor)
 	if login.Code != http.StatusOK {
 		t.Fatalf("login %d %s", login.Code, login.Body.String())
@@ -82,8 +82,8 @@ func TestOneViewAndLike(t *testing.T) {
 
 func TestPublicationLikesSum(t *testing.T) {
 	e := newServer(t)
-	alice := mustAccount(t, e, "alice@example.com", "secret", "Alice")
-	bob := mustAccount(t, e, "bob@example.com", "secret", "Bob")
+	alice := mustAccount(t, e, "alice@example.com", "secret-pass", "Alice")
+	bob := mustAccount(t, e, "bob@example.com", "secret-pass", "Bob")
 	for _, agent := range []string{"Grok", "Claude"} {
 		pushed := postAuth(t, e, "/agent/push", "", pushBody(agent, false, pushFile{"rules/ok.md", "one"}), alice)
 		if pushed.Code != http.StatusCreated {
@@ -112,8 +112,8 @@ func TestPublicationLikesSum(t *testing.T) {
 
 func TestOwnerSelfViewIsDropped(t *testing.T) {
 	e := newServer(t)
-	mustAccount(t, e, "alice@example.com", "secret", "Alice")
-	mustAccount(t, e, "bob@example.com", "secret", "Bob")
+	mustAccount(t, e, "alice@example.com", "secret-pass", "Alice")
+	mustAccount(t, e, "bob@example.com", "secret-pass", "Bob")
 
 	first := getJSON(t, e, "/accounts/Alice", nil)
 	if viewsOf(t, first) != 1 {
@@ -121,7 +121,7 @@ func TestOwnerSelfViewIsDropped(t *testing.T) {
 	}
 	visitor := readNamedCookie(t, first, "visitor")
 	login := postJSON(t, e, "/session", map[string]string{
-		"email": "alice@example.com", "password": "secret",
+		"email": "alice@example.com", "password": "secret-pass",
 	}, visitor)
 	if login.Code != http.StatusOK {
 		t.Fatalf("login %d %s", login.Code, login.Body.String())

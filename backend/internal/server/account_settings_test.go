@@ -9,15 +9,18 @@ import (
 func TestChangeMailAndPassword(t *testing.T) {
 	e := newServer(t)
 	created := postJSON(t, e, "/accounts", map[string]string{
-		"email": "old@example.com", "password": "secret", "name": "Setter",
+		"email": "old@example.com", "password": "secret-pass", "name": "Setter",
 	}, nil)
 	cookie := readSessionCookie(t, created)
 
 	changed := postJSON(t, e, "/account/email", map[string]string{
-		"email": "next@example.com", "password": "secret",
+		"email": "next@example.com", "password": "secret-pass",
 	}, cookie)
-	if changed.Code != http.StatusOK || !strings.Contains(changed.Body.String(), "letterPath") || !strings.Contains(changed.Body.String(), `"verified":false`) {
+	if changed.Code != http.StatusOK || strings.Contains(changed.Body.String(), "letterPath") || !strings.Contains(changed.Body.String(), `"verified":false`) {
 		t.Fatalf("email %d %s", changed.Code, changed.Body.String())
+	}
+	if testLetter(t, e, "next@example.com", "confirm") == "" {
+		t.Fatal("email change did not keep a confirm token")
 	}
 	page := getJSON(t, e, "/accounts/Setter", cookie)
 	if !strings.Contains(page.Body.String(), "next@***.com") {
@@ -34,7 +37,7 @@ func TestChangeMailAndPassword(t *testing.T) {
 		t.Fatal("wrong password changed the account")
 	}
 	ok := postJSON(t, e, "/account/password", map[string]string{
-		"current": "secret", "next": "newer-secret",
+		"current": "secret-pass", "next": "newer-secret",
 	}, cookie)
 	if ok.Code != http.StatusOK {
 		t.Fatalf("password %d %s", ok.Code, ok.Body.String())

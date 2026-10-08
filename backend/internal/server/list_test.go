@@ -33,7 +33,7 @@ func TestAccountListSearchAndSort(t *testing.T) {
 	e := newServer(t)
 	for _, name := range []string{"Nova", "harbor"} {
 		rec := postJSON(t, e, "/accounts", map[string]string{
-			"email": name + "@example.com", "password": "secret", "name": name,
+			"email": name + "@example.com", "password": "secret-pass", "name": name,
 		}, nil)
 		if rec.Code != http.StatusCreated {
 			t.Fatalf("seed %s %d %s", name, rec.Code, rec.Body.String())
@@ -122,7 +122,7 @@ func decodeCards(t *testing.T, raw []byte) []listCard {
 
 func TestAccountListsOnlyPublishedAgents(t *testing.T) {
 	e := newServer(t)
-	owner := mustAccount(t, e, "owner@example.com", "secret", "Owner")
+	owner := mustAccount(t, e, "owner@example.com", "secret-pass", "Owner")
 	bare := getJSON(t, e, "/accounts/Owner", nil)
 	if bare.Code != http.StatusOK {
 		t.Fatalf("page %d %s", bare.Code, bare.Body.String())

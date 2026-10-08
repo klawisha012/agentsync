@@ -16,8 +16,8 @@ import (
 
 func TestAvatarKeepsGIF(t *testing.T) {
 	e := newServer(t)
-	owner := mustAccount(t, e, "owner@example.com", "secret", "Owner")
-	other := mustAccount(t, e, "other@example.com", "secret", "Other")
+	owner := mustAccount(t, e, "owner@example.com", "secret-pass", "Owner")
+	other := mustAccount(t, e, "other@example.com", "secret-pass", "Other")
 
 	raw := twoFrameGIF(t)
 	saved := postFile(t, e, "/account/avatar", "move.gif", "image/gif", raw, owner)
@@ -51,7 +51,7 @@ func TestAvatarKeepsGIF(t *testing.T) {
 
 func TestAvatarRejects(t *testing.T) {
 	e := newServer(t)
-	owner := mustAccount(t, e, "owner@example.com", "secret", "Owner")
+	owner := mustAccount(t, e, "owner@example.com", "secret-pass", "Owner")
 	tests := []struct {
 		name string
 		body []byte

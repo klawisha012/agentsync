@@ -10,14 +10,14 @@ import (
 func TestPreviewMatchesPortableFiles(t *testing.T) {
 	e := newServer(t)
 	created := postJSON(t, e, "/accounts", map[string]string{
-		"email": "preview@example.com", "password": "secret", "name": "Previewer",
+		"email": "preview@example.com", "password": "secret-pass", "name": "Previewer",
 	}, nil)
 	cookie := readSessionCookie(t, created)
 	postJSON(t, e, "/email/confirm", map[string]string{
-		"token": pathToken(letterPath(t, created.Body.Bytes())),
+		"token": testLetter(t, e, "preview@example.com", "confirm"),
 	}, nil)
 	machine := postJSON(t, e, "/machine", map[string]string{
-		"id": "pc-preview", "host": "desk", "listener": "127.0.0.1:49152",
+		"id": testMachineID("pc-preview"), "host": "desk", "listener": "127.0.0.1:49152",
 	}, cookie)
 	token := decodeMachine(t, machine.Body.Bytes()).AgentToken
 	secret := "sk-live-PREVIEWSECRET"

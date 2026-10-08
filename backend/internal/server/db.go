@@ -73,6 +73,12 @@ func (s *store) load(ctx context.Context) error {
 		s.byEmail[item.emailKey] = item
 		s.byName[item.nameKey] = item
 		byID[item.id] = item
+		if item.confirmToken != "" {
+			s.byConfirm[item.confirmToken] = item
+		}
+		if item.resetToken != "" {
+			s.byReset[item.resetToken] = item
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return err
@@ -306,7 +312,8 @@ func (s *store) saveAccount(ctx context.Context, item *account) error {
 	return err
 }
 
-func (s *store) insertSession(ctx context.Context, id string, item *account) error {
+func (s *store) insertSession(ctx context.Context, raw string, item *account) error {
+	id := hashToken(raw)
 	exp := time.Now().Add(sessionTTL)
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO sessions (id, account_id, expires_at) VALUES ($1, $2, $3)`,
@@ -319,12 +326,47 @@ func (s *store) insertSession(ctx context.Context, id string, item *account) err
 	return nil
 }
 
-func (s *store) deleteSession(ctx context.Context, id string) error {
+func (s *store) deleteSession(ctx context.Context, raw string) error {
+	if raw == "" {
+		return nil
+	}
+	return s.deleteStoredSession(ctx, hashToken(raw))
+}
+
+func (s *store) deleteStoredSession(ctx context.Context, id string) error {
+	if id == "" {
+		return nil
+	}
 	if _, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE id = $1`, id); err != nil {
 		return err
 	}
 	delete(s.sessions, id)
 	delete(s.sessionExpiry, id)
+	return nil
+}
+
+func (s *store) revokeAccount(ctx context.Context, owner *account, keepRaw string) error {
+	keep := ""
+	if keepRaw != "" {
+		keep = hashToken(keepRaw)
+	}
+	for id, item := range s.sessions {
+		if item == owner && id != keep {
+			if err := s.deleteStoredSession(ctx, id); err != nil {
+				return err
+			}
+		}
+	}
+	for id, bound := range s.machines {
+		if bound.account != owner {
+			continue
+		}
+		if err := s.deleteMachine(ctx, id); err != nil {
+			return err
+		}
+		delete(s.byAgentToken, bound.token)
+		delete(s.machines, id)
+	}
 	return nil
 }
 
@@ -335,7 +377,11 @@ func (s *store) saveSpent(ctx context.Context, token string, used time.Time) err
 	return err
 }
 
-func (s *store) accountBySession(id string) *account {
+func (s *store) accountBySession(raw string) *account {
+	if raw == "" {
+		return nil
+	}
+	id := hashToken(raw)
 	item := s.sessions[id]
 	if item == nil {
 		return nil

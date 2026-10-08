@@ -12,14 +12,14 @@ import (
 func TestPushKeepsPortableFiles(t *testing.T) {
 	e := newServer(t)
 	created := postJSON(t, e, "/accounts", map[string]string{
-		"email": "author@example.com", "password": "secret", "name": "Author",
+		"email": "author@example.com", "password": "secret-pass", "name": "Author",
 	}, nil)
 	if created.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", created.Code, created.Body.String())
 	}
 	author := readSessionCookie(t, created)
 	machine := postJSON(t, e, "/machine", map[string]string{
-		"id": "pc-author", "host": "desk", "listener": "127.0.0.1:49152",
+		"id": testMachineID("pc-author"), "host": "desk", "listener": "127.0.0.1:49152",
 	}, author)
 	if machine.Code != http.StatusOK {
 		t.Fatalf("machine %d %s", machine.Code, machine.Body.String())
@@ -31,14 +31,14 @@ func TestPushKeepsPortableFiles(t *testing.T) {
 		t.Fatalf("upload before mail %d %s", early.Code, early.Body.String())
 	}
 
-	confirmed := postJSON(t, e, "/email/confirm", map[string]string{"token": pathToken(letterPath(t, created.Body.Bytes()))}, nil)
+	confirmed := postJSON(t, e, "/email/confirm", map[string]string{"token": testLetter(t, e, "author@example.com", "confirm")}, nil)
 	if confirmed.Code != http.StatusOK {
 		t.Fatalf("confirm %d %s", confirmed.Code, confirmed.Body.String())
 	}
 
-	other := mustAccount(t, e, "other@example.com", "secret", "Other")
+	other := mustAccount(t, e, "other@example.com", "secret-pass", "Other")
 	otherMachine := postJSON(t, e, "/machine", map[string]string{
-		"id": "pc-other", "host": "lap", "listener": "127.0.0.1:49152",
+		"id": testMachineID("pc-other"), "host": "lap", "listener": "127.0.0.1:49152",
 	}, other)
 	otherToken := decodeMachine(t, otherMachine.Body.Bytes()).AgentToken
 	mismatch := postAuth(t, e, "/agent/push", otherToken, pushBody("Grok", false, pushFile{"rules/ok.md", "hello"}), author)
@@ -134,7 +134,7 @@ type pushFile struct {
 func TestPublishedNameStaysAsWritten(t *testing.T) {
 	e := newServer(t)
 	created := postJSON(t, e, "/accounts", map[string]string{
-		"email": "fold@example.com", "password": "secret", "name": "Folder",
+		"email": "fold@example.com", "password": "secret-pass", "name": "Folder",
 	}, nil)
 	if created.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", created.Code, created.Body.String())
@@ -166,7 +166,7 @@ func TestPublishedNameStaysAsWritten(t *testing.T) {
 func TestApplyReadsNamedVersion(t *testing.T) {
 	e := newServer(t)
 	created := postJSON(t, e, "/accounts", map[string]string{
-		"email": "versions@example.com", "password": "secret", "name": "Versions",
+		"email": "versions@example.com", "password": "secret-pass", "name": "Versions",
 	}, nil)
 	if created.Code != http.StatusCreated {
 		t.Fatalf("create %d %s", created.Code, created.Body.String())

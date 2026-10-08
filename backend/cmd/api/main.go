@@ -36,6 +36,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	e.Server.ReadHeaderTimeout = 10 * time.Second
+	e.Server.ReadTimeout = 5 * time.Minute
+	e.Server.WriteTimeout = 5 * time.Minute
+	e.Server.IdleTimeout = 2 * time.Minute
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 

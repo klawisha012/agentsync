@@ -212,6 +212,9 @@ func (a *app) listComments(c echo.Context) error {
 }
 
 func (a *app) postComment(c echo.Context) error {
+	if sessionID(c) == "" {
+		return writeExplanation(c, http.StatusUnauthorized, "Войдите, чтобы оставить комментарий.")
+	}
 	var req struct {
 		Body string `json:"body"`
 	}

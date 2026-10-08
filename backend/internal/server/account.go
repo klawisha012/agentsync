@@ -12,7 +12,6 @@ import (
 	"unicode"
 
 	"github.com/labstack/echo/v4"
-	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/text/cases"
 )
 
@@ -79,7 +78,10 @@ type store struct {
 	sessionExpiry map[string]time.Time
 	machines      map[string]*machine
 	byAgentToken  map[string]*machine
+	byConfirm     map[string]*account
+	byReset       map[string]*account
 	spentConfirms map[string]time.Time
+	letters       map[string]string
 }
 
 func newStore(ctx context.Context, db *sql.DB) (*store, error) {
@@ -91,7 +93,10 @@ func newStore(ctx context.Context, db *sql.DB) (*store, error) {
 		sessionExpiry: map[string]time.Time{},
 		machines:      map[string]*machine{},
 		byAgentToken:  map[string]*machine{},
+		byConfirm:     map[string]*account{},
+		byReset:       map[string]*account{},
 		spentConfirms: map[string]time.Time{},
+		letters:       map[string]string{},
 	}
 	if err := s.migrate(); err != nil {
 		return nil, err
@@ -102,25 +107,28 @@ func newStore(ctx context.Context, db *sql.DB) (*store, error) {
 	return s, nil
 }
 
-func (s *store) create(email, password, name string) (accountView, string, string, int, string) {
+func (s *store) create(email, password, name string) (accountView, string, int, string) {
 	email = strings.TrimSpace(email)
 	name = strings.TrimSpace(name)
 	if email == "" || password == "" || name == "" {
-		return accountView{}, "", "", http.StatusBadRequest, "Введите почту, пароль и имя."
+		return accountView{}, "", http.StatusBadRequest, "Введите почту, пароль и имя."
 	}
 	if !validEmail(email) {
-		return accountView{}, "", "", http.StatusBadRequest, "Введите почту в виде name@example.com."
+		return accountView{}, "", http.StatusBadRequest, "Введите почту в виде name@example.com."
 	}
 	if msg, code := checkName(name); msg != "" {
-		return accountView{}, "", "", code, msg
+		return accountView{}, "", code, msg
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if msg := passwordPolicy(password); msg != "" {
+		return accountView{}, "", http.StatusBadRequest, msg
+	}
+	hash, err := hashPassword(password)
 	if err != nil {
-		return accountView{}, "", "", http.StatusInternalServerError, "Не удалось создать аккаунт."
+		return accountView{}, "", http.StatusInternalServerError, "Не удалось создать аккаунт."
 	}
 	accountID, err := newID()
 	if err != nil {
-		return accountView{}, "", "", http.StatusInternalServerError, "Не удалось создать аккаунт."
+		return accountView{}, "", http.StatusInternalServerError, "Не удалось создать аккаунт."
 	}
 	item := &account{
 		id:            accountID,
@@ -142,37 +150,39 @@ func (s *store) create(email, password, name string) (accountView, string, strin
 	}
 	id, err := newID()
 	if err != nil {
-		return accountView{}, "", "", http.StatusInternalServerError, "Не удалось создать аккаунт."
+		return accountView{}, "", http.StatusInternalServerError, "Не удалось создать аккаунт."
 	}
 	letterToken, err := newID()
 	if err != nil {
-		return accountView{}, "", "", http.StatusInternalServerError, "Не удалось создать аккаунт."
+		return accountView{}, "", http.StatusInternalServerError, "Не удалось создать аккаунт."
 	}
-	item.confirmToken = letterToken
+	item.confirmToken = hashToken(letterToken)
 	item.confirmExpires = time.Now().Add(letterTTL)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, taken := s.byEmail[item.emailKey]; taken {
-		return accountView{}, "", "", http.StatusConflict, "Аккаунт с этой почтой уже есть."
+		return accountView{}, "", http.StatusConflict, "Аккаунт с этой почтой уже есть."
 	}
 	if _, taken := s.byName[item.nameKey]; taken {
-		return accountView{}, "", "", http.StatusConflict, "Это имя уже занято."
+		return accountView{}, "", http.StatusConflict, "Это имя уже занято."
 	}
 	ctx := context.Background()
 	if err := s.insertAccount(ctx, item); err != nil {
 		if msg, ok := uniqueMessage(err); ok {
-			return accountView{}, "", "", http.StatusConflict, msg
+			return accountView{}, "", http.StatusConflict, msg
 		}
-		return accountView{}, "", "", http.StatusInternalServerError, "Не удалось создать аккаунт."
+		return accountView{}, "", http.StatusInternalServerError, "Не удалось создать аккаунт."
 	}
 	if err := s.insertSession(ctx, id, item); err != nil {
 		_, _ = s.db.ExecContext(ctx, `DELETE FROM accounts WHERE id = $1`, item.id)
-		return accountView{}, "", "", http.StatusInternalServerError, "Не удалось создать аккаунт."
+		return accountView{}, "", http.StatusInternalServerError, "Не удалось создать аккаунт."
 	}
 	s.byEmail[item.emailKey] = item
 	s.byName[item.nameKey] = item
-	return item.view(), id, "/confirm/" + letterToken, http.StatusCreated, ""
+	s.byConfirm[item.confirmToken] = item
+	s.keepLetter(item.email, "confirm", letterToken)
+	return item.view(), id, http.StatusCreated, ""
 }
 
 func (s *store) open(email, password string) (accountView, string, int, string) {
@@ -180,15 +190,16 @@ func (s *store) open(email, password string) (accountView, string, int, string) 
 	if email == "" || password == "" {
 		return accountView{}, "", http.StatusBadRequest, "Введите почту и пароль."
 	}
+	key := foldKey.String(email)
 	s.mu.Lock()
-	item := s.byEmail[foldKey.String(email)]
-	var hash []byte
+	item := s.byEmail[key]
+	hash := append([]byte(nil), dummyPasswordHash...)
 	if item != nil {
 		hash = append([]byte(nil), item.password...)
 	}
 	s.mu.Unlock()
 
-	if item == nil || bcrypt.CompareHashAndPassword(hash, []byte(password)) != nil {
+	if err := checkPassword(hash, password); err != nil || item == nil {
 		return accountView{}, "", http.StatusUnauthorized, "Неверная почта или пароль."
 	}
 	id, err := newID()
@@ -197,10 +208,14 @@ func (s *store) open(email, password string) (accountView, string, int, string) 
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if err := s.insertSession(context.Background(), id, item); err != nil {
+	current := s.byEmail[key]
+	if current == nil || !sameBytes(current.password, hash) {
+		return accountView{}, "", http.StatusUnauthorized, "Неверная почта или пароль."
+	}
+	if err := s.insertSession(context.Background(), id, current); err != nil {
 		return accountView{}, "", http.StatusInternalServerError, "Не удалось войти."
 	}
-	return item.view(), id, http.StatusOK, ""
+	return current.view(), id, http.StatusOK, ""
 }
 
 func (s *store) close(id string) error {
@@ -272,7 +287,7 @@ func (a *app) createAccount(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return writeExplanation(c, http.StatusBadRequest, "Введите почту, пароль и имя.")
 	}
-	view, id, letter, code, msg := a.accounts.create(req.Email, req.Password, req.Name)
+	view, id, code, msg := a.accounts.create(req.Email, req.Password, req.Name)
 	if msg != "" {
 		return writeExplanation(c, code, msg)
 	}
@@ -280,11 +295,7 @@ func (a *app) createAccount(c echo.Context) error {
 	if cookie, err := c.Cookie(visitorCookie); err == nil {
 		a.accounts.bindVisitor(id, cookie.Value)
 	}
-	// Почтового сервера нет: путь в ответе и есть письмо.
-	return c.JSON(code, struct {
-		accountView
-		LetterPath string `json:"letterPath,omitempty"`
-	}{view, letter})
+	return c.JSON(code, view)
 }
 
 func (a *app) createSession(c echo.Context) error {
@@ -333,7 +344,11 @@ func (a *app) publicAccount(c echo.Context) error {
 	if cookie, err := c.Cookie(sessionCookie); err == nil {
 		sessionID = cookie.Value
 	}
-	view, code, msg := a.accounts.page(c.Param("name"), sessionID, ensureVisitor(c))
+	visitor := ""
+	if !strings.EqualFold(c.Request().Header.Get("Sec-Fetch-Site"), "cross-site") {
+		visitor = ensureVisitor(c)
+	}
+	view, code, msg := a.accounts.page(c.Param("name"), sessionID, visitor)
 	if msg != "" {
 		return writeExplanation(c, code, msg)
 	}
@@ -361,15 +376,11 @@ func (a *app) requestRecovery(c echo.Context) error {
 	if err := c.Bind(&req); err != nil {
 		return writeExplanation(c, http.StatusBadRequest, "Введите почту в виде name@example.com.")
 	}
-	letter, code, msg := a.accounts.requestReset(req.Email)
+	code, msg := a.accounts.requestReset(req.Email)
 	if code != http.StatusOK {
 		return writeExplanation(c, code, msg)
 	}
-	body := map[string]string{"explanation": msg}
-	if letter != "" {
-		body["letterPath"] = letter
-	}
-	return c.JSON(code, body)
+	return c.JSON(code, map[string]string{"explanation": msg})
 }
 
 func (a *app) resetPassword(c echo.Context) error {

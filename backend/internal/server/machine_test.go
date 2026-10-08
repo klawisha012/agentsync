@@ -1,6 +1,8 @@
 package server
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -10,8 +12,9 @@ import (
 
 func TestMachineConfirmSwitchesAccountAndKeepsChains(t *testing.T) {
 	e := newServer(t)
-	alice := mustAccount(t, e, "alice@example.com", "secret", "Alice")
-	body := map[string]string{"id": "pc-1", "host": "desk", "listener": "127.0.0.1:49152"}
+	alice := mustAccount(t, e, "alice@example.com", "secret-pass", "Alice")
+	id := testMachineID("pc-1")
+	body := map[string]string{"id": id, "host": "desk", "listener": "127.0.0.1:49152"}
 
 	guest := postJSON(t, e, "/machine", body, nil)
 	if guest.Code != http.StatusUnauthorized {
@@ -42,7 +45,7 @@ func TestMachineConfirmSwitchesAccountAndKeepsChains(t *testing.T) {
 		t.Fatalf("agent binding %+v", agent)
 	}
 
-	off := deleteCookie(t, e, "/machine/pc-1", alice)
+	off := deleteCookie(t, e, "/machine/"+id, alice)
 	if off.Code != http.StatusNoContent {
 		t.Fatalf("unbind %d %s", off.Code, off.Body.String())
 	}
@@ -119,6 +122,11 @@ func decodeMachine(t *testing.T, raw []byte) machineBody {
 		t.Fatal(err)
 	}
 	return body
+}
+
+func testMachineID(label string) string {
+	sum := sha256.Sum256([]byte(label))
+	return hex.EncodeToString(sum[:])
 }
 
 func getAuth(t *testing.T, h http.Handler, path, token string) *httptest.ResponseRecorder {

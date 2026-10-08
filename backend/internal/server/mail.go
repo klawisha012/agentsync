@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 const letterTTL = 24 * time.Hour
@@ -32,7 +30,6 @@ type publicPage struct {
 type ownerPage struct {
 	publicPage
 	MaskedMail string        `json:"maskedMail,omitempty"`
-	LetterPath string        `json:"letterPath,omitempty"`
 	Machines   []machinePage `json:"machines,omitempty"`
 }
 
@@ -40,91 +37,130 @@ func (s *store) confirmEmail(token string) (int, string) {
 	if token == "" {
 		return http.StatusBadRequest, letterStale
 	}
+	key := hashToken(token)
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if spent, ok := s.spentConfirms[token]; ok && time.Now().Before(spent.Add(letterTTL)) {
+	if spent, ok := s.spentConfirms[key]; ok && time.Now().Before(spent.Add(letterTTL)) {
 		return http.StatusOK, ""
 	}
-	item := s.accountByField(token, func(item *account) string { return item.confirmToken })
+	item := s.accountByToken(token, s.byConfirm, func(item *account) string { return item.confirmToken })
 	if item == nil || !time.Now().Before(item.confirmExpires) {
 		if item != nil {
-			item.confirmToken = ""
-			item.confirmExpires = time.Time{}
+			s.clearConfirm(item)
 			_ = s.saveAccount(context.Background(), item)
 		}
 		return http.StatusBadRequest, letterStale
 	}
 	prevVerified, prevToken, prevExpires := item.verified, item.confirmToken, item.confirmExpires
 	item.verified = true
-	item.confirmToken = ""
-	item.confirmExpires = time.Time{}
+	s.clearConfirm(item)
 	used := time.Now()
 	if err := s.saveAccount(context.Background(), item); err != nil {
 		item.verified, item.confirmToken, item.confirmExpires = prevVerified, prevToken, prevExpires
+		if prevToken != "" {
+			s.byConfirm[prevToken] = item
+		}
 		return http.StatusInternalServerError, "Не удалось подтвердить почту."
 	}
-	if err := s.saveSpent(context.Background(), token, used); err != nil {
+	if err := s.saveSpent(context.Background(), key, used); err != nil {
 		item.verified, item.confirmToken, item.confirmExpires = prevVerified, prevToken, prevExpires
+		if prevToken != "" {
+			s.byConfirm[prevToken] = item
+		}
 		_ = s.saveAccount(context.Background(), item)
 		return http.StatusInternalServerError, "Не удалось подтвердить почту."
 	}
-	s.spentConfirms[token] = used
+	s.spentConfirms[key] = used
 	return http.StatusOK, ""
 }
 
-func (s *store) requestReset(email string) (string, int, string) {
+func (s *store) requestReset(email string) (int, string) {
 	email = strings.TrimSpace(email)
 	ready := "Если эта почта есть, письмо со ссылкой уже готово."
 	if email == "" || !validEmail(email) {
-		return "", http.StatusBadRequest, "Введите почту в виде name@example.com."
+		return http.StatusBadRequest, "Введите почту в виде name@example.com."
 	}
 	token, err := newID()
 	if err != nil {
-		return "", http.StatusInternalServerError, "Не удалось подготовить письмо."
+		return http.StatusInternalServerError, "Не удалось подготовить письмо."
 	}
-	// Нет почтового сервера: путь письма возвращается вызывающему.
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	item := s.byEmail[foldKey.String(email)]
 	if item == nil {
-		return "", http.StatusOK, ready
+		return http.StatusOK, ready
 	}
 	prevToken, prevExpires := item.resetToken, item.resetExpires
-	item.resetToken = token
+	if prevToken != "" {
+		delete(s.byReset, prevToken)
+	}
+	item.resetToken = hashToken(token)
 	item.resetExpires = time.Now().Add(letterTTL)
 	if err := s.saveAccount(context.Background(), item); err != nil {
 		item.resetToken, item.resetExpires = prevToken, prevExpires
-		return "", http.StatusInternalServerError, "Не удалось подготовить письмо."
+		if prevToken != "" {
+			s.byReset[prevToken] = item
+		}
+		return http.StatusInternalServerError, "Не удалось подготовить письмо."
 	}
-	return "/recover/" + token, http.StatusOK, ready
+	s.byReset[item.resetToken] = item
+	s.keepLetter(item.email, "reset", token)
+	return http.StatusOK, ready
 }
 
 func (s *store) resetPassword(token, password string) (int, string) {
 	if strings.TrimSpace(password) == "" {
 		return http.StatusBadRequest, "Введите новый пароль."
 	}
+	if msg := passwordPolicy(password); msg != "" {
+		return http.StatusBadRequest, msg
+	}
 	if token == "" {
 		return http.StatusBadRequest, letterStale
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	s.mu.Lock()
+	item := s.accountByToken(token, s.byReset, func(item *account) string { return item.resetToken })
+	fresh := item != nil && time.Now().Before(item.resetExpires)
+	if !fresh {
+		if item != nil {
+			s.clearReset(item)
+			_ = s.saveAccount(context.Background(), item)
+		}
+		s.mu.Unlock()
+		return http.StatusBadRequest, letterStale
+	}
+	s.mu.Unlock()
+	hash, err := hashPassword(password)
 	if err != nil {
 		return http.StatusInternalServerError, "Не удалось сменить пароль."
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	item := s.accountByField(token, func(item *account) string { return item.resetToken })
+	item = s.accountByToken(token, s.byReset, func(item *account) string { return item.resetToken })
 	if item == nil || !time.Now().Before(item.resetExpires) {
 		if item != nil {
-			item.resetToken = ""
+			s.clearReset(item)
+			_ = s.saveAccount(context.Background(), item)
 		}
 		return http.StatusBadRequest, letterStale
 	}
-	prevHash, prevToken, prevExpires := append([]byte(nil), item.password...), item.resetToken, item.resetExpires
+	prevHash := append([]byte(nil), item.password...)
+	prevToken, prevExpires := item.resetToken, item.resetExpires
 	item.password = hash
-	item.resetToken = ""
-	item.resetExpires = time.Time{}
+	s.clearReset(item)
 	if err := s.saveAccount(context.Background(), item); err != nil {
 		item.password, item.resetToken, item.resetExpires = prevHash, prevToken, prevExpires
+		if prevToken != "" {
+			s.byReset[prevToken] = item
+		}
+		return http.StatusInternalServerError, "Не удалось сменить пароль."
+	}
+	if err := s.revokeAccount(context.Background(), item, ""); err != nil {
+		item.password, item.resetToken, item.resetExpires = prevHash, prevToken, prevExpires
+		if prevToken != "" {
+			s.byReset[prevToken] = item
+		}
+		_ = s.saveAccount(context.Background(), item)
 		return http.StatusInternalServerError, "Не удалось сменить пароль."
 	}
 	return http.StatusOK, ""
@@ -163,19 +199,23 @@ func (s *store) page(name, sessionID, visitorID string) (any, int, string) {
 		MaskedMail: maskMail(item.email),
 		Machines:   s.machinesOf(item),
 	}
-	if item.confirmToken != "" && time.Now().Before(item.confirmExpires) {
-		owner.LetterPath = "/confirm/" + item.confirmToken
-	}
 	return owner, http.StatusOK, ""
 }
 
-func (s *store) accountByField(token string, field func(*account) string) *account {
-	for _, item := range s.byEmail {
-		if field(item) == token {
-			return item
-		}
+func (s *store) clearConfirm(item *account) {
+	if item.confirmToken != "" {
+		delete(s.byConfirm, item.confirmToken)
 	}
-	return nil
+	item.confirmToken = ""
+	item.confirmExpires = time.Time{}
+}
+
+func (s *store) clearReset(item *account) {
+	if item.resetToken != "" {
+		delete(s.byReset, item.resetToken)
+	}
+	item.resetToken = ""
+	item.resetExpires = time.Time{}
 }
 
 func maskMail(email string) string {

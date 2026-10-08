@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/labstack/echo/v4"
 )
@@ -16,14 +17,15 @@ import (
 var cliBinaryName = regexp.MustCompile(`^agentsync-(linux|darwin|windows)-(amd64|arm64)(\.exe)?$`)
 
 type cliBinaries struct {
+	mu      sync.Mutex
 	dir     string
 	release string
 	sums    map[string]string
 }
 
-func (b cliBinaries) get(c echo.Context) error {
+func (b *cliBinaries) get(c echo.Context) error {
 	name := c.Param("file")
-	if b.dir == "" || !cliBinaryName.MatchString(name) {
+	if b == nil || b.dir == "" || !cliBinaryName.MatchString(name) {
 		return writeExplanation(c, http.StatusNotFound, "Файл не найден.")
 	}
 	path := filepath.Join(b.dir, name)
@@ -31,6 +33,7 @@ func (b cliBinaries) get(c echo.Context) error {
 	if err != nil || info.IsDir() {
 		return writeExplanation(c, http.StatusNotFound, "Файл не найден.")
 	}
+	b.noteFile(name)
 	f, err := os.Open(path)
 	if err != nil {
 		return writeExplanation(c, http.StatusNotFound, "Файл не найден.")
@@ -41,21 +44,39 @@ func (b cliBinaries) get(c echo.Context) error {
 	return nil
 }
 
-func (b cliBinaries) cliVersion(c echo.Context) error {
-	if b.dir == "" {
+func (b *cliBinaries) cliVersion(c echo.Context) error {
+	if b == nil || b.dir == "" {
 		return writeExplanation(c, http.StatusNotFound, "Файл не найден.")
 	}
-	sums := b.sums
-	if sums == nil {
-		sums = map[string]string{}
+	b.mu.Lock()
+	b.release = readCLIRelease(b.dir)
+	b.sums = hashCLIBinaries(b.dir)
+	release := b.release
+	sums := map[string]string{}
+	for name, sum := range b.sums {
+		sums[name] = sum
 	}
+	b.mu.Unlock()
 	return c.JSON(http.StatusOK, map[string]any{
-		"version": b.release,
+		"version": release,
 		"sha256":  sums,
 	})
 }
 
-func openCLIBinaries() cliBinaries {
+func (b *cliBinaries) noteFile(name string) {
+	sum, err := hashCLIFile(filepath.Join(b.dir, name))
+	if err != nil {
+		return
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.sums == nil {
+		b.sums = map[string]string{}
+	}
+	b.sums[name] = sum
+}
+
+func openCLIBinaries() *cliBinaries {
 	if dir := os.Getenv("AGENTSYNC_CLI_DIR"); dir != "" {
 		return loadCLIBinaries(dir)
 	}
@@ -71,7 +92,7 @@ func openCLIBinaries() cliBinaries {
 			return loadCLIBinaries(dir)
 		}
 	}
-	return cliBinaries{}
+	return &cliBinaries{}
 }
 
 func walkCLIBinaries(start string) (string, bool) {
@@ -89,8 +110,8 @@ func walkCLIBinaries(start string) (string, bool) {
 	}
 }
 
-func loadCLIBinaries(dir string) cliBinaries {
-	return cliBinaries{
+func loadCLIBinaries(dir string) *cliBinaries {
+	return &cliBinaries{
 		dir:     dir,
 		release: readCLIRelease(dir),
 		sums:    hashCLIBinaries(dir),

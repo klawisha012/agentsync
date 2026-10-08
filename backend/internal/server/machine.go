@@ -36,8 +36,11 @@ func (s *store) confirmMachine(sessionID, id, host, listener string) (machineVie
 	id = strings.TrimSpace(id)
 	host = strings.TrimSpace(host)
 	listener = strings.TrimSpace(listener)
-	if id == "" || host == "" {
+	if host == "" || id == "" {
 		return machineView{}, http.StatusBadRequest, "Укажите компьютер."
+	}
+	if msg := machineID(id); msg != "" {
+		return machineView{}, http.StatusBadRequest, msg
 	}
 	token, err := newID()
 	if err != nil {
@@ -66,12 +69,13 @@ func (s *store) confirmMachine(sessionID, id, host, listener string) (machineVie
 	if prev := s.machines[id]; prev != nil {
 		prevToken = prev.token
 	}
+	stored := hashToken(token)
 	bound := &machine{
 		id:       id,
 		host:     host,
 		listener: listener,
 		account:  item,
-		token:    token,
+		token:    stored,
 	}
 	if err := s.saveMachine(context.Background(), bound); err != nil {
 		return machineView{}, http.StatusInternalServerError, "Не удалось подтвердить машину."
@@ -80,7 +84,7 @@ func (s *store) confirmMachine(sessionID, id, host, listener string) (machineVie
 		delete(s.byAgentToken, prevToken)
 	}
 	s.machines[id] = bound
-	s.byAgentToken[token] = bound
+	s.byAgentToken[stored] = bound
 	return machineView{
 		ID:         id,
 		Host:       host,
@@ -113,7 +117,7 @@ func (s *store) releaseMachine(sessionID, id string) (int, string) {
 func (s *store) agentSession(token string) (machineView, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	bound := s.byAgentToken[token]
+	bound := s.machineByToken(token)
 	if bound == nil || bound.account == nil {
 		return machineView{}, false
 	}

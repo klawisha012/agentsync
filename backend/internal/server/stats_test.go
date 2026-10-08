@@ -37,14 +37,14 @@ func TestStatsPeriods(t *testing.T) {
 		t.Fatalf("unknown period %d %s", unknown.Code, unknown.Body.String())
 	}
 	blocked := postJSON(t, e, "/accounts", map[string]string{
-		"email": "docs@example.com", "password": "secret", "name": "docs",
+		"email": "docs@example.com", "password": "secret-pass", "name": "docs",
 	}, nil)
 	if blocked.Code != http.StatusConflict {
 		t.Fatalf("docs name %d %s", blocked.Code, blocked.Body.String())
 	}
 
-	alice := mustAccount(t, e, "alice@example.com", "secret", "Alice")
-	bob := mustAccount(t, e, "bob@example.com", "secret", "Bob")
+	alice := mustAccount(t, e, "alice@example.com", "secret-pass", "Alice")
+	bob := mustAccount(t, e, "bob@example.com", "secret-pass", "Bob")
 	pushed := postAuth(t, e, "/agent/push", "", pushBody("Grok", false, pushFile{"rules/ok.md", "one"}), alice)
 	if pushed.Code != http.StatusCreated {
 		t.Fatalf("push %d %s", pushed.Code, pushed.Body.String())
@@ -134,7 +134,7 @@ func TestStatsWindowSplitsDatedActivity(t *testing.T) {
 
 func TestStatsLeaderCarriesAvatar(t *testing.T) {
 	e := newServer(t)
-	owner := mustAccount(t, e, "owner@example.com", "secret", "Owner")
+	owner := mustAccount(t, e, "owner@example.com", "secret-pass", "Owner")
 	saved := postFile(t, e, "/account/avatar", "a.png", "image/png", onePixelPNG(t), owner)
 	if saved.Code != http.StatusOK {
 		t.Fatalf("avatar %d %s", saved.Code, saved.Body.String())
