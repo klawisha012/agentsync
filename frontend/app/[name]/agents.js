@@ -5,6 +5,7 @@ import { useState } from "react";
 import { api } from "../api";
 import AgentLogo from "../agent-logo";
 import Icon from "../profile-icon";
+import { shellCommand } from "../shell-arg";
 
 const tones = {
   grok: "grok",
@@ -70,7 +71,9 @@ export default function AgentBoard({ page, owner, onChange, onExplain }) {
       </div>
       <div className="house-grid">
         {agents.map((agent) => {
-          const command = owner ? `agentsync push ${agent.name}` : `agentsync apply ${page.name} ${agent.name}`;
+          const command = owner
+            ? shellCommand(["agentsync", "push", agent.name])
+            : shellCommand(["agentsync", "apply", page.name, agent.name]);
           const tone = tones[String(agent.name || "").trim().toLowerCase()] || "plain";
           const canCopy = owner || (page.shareCopy && agent.version != null);
           const canView = owner || (page.shareView && agent.version != null);
@@ -87,7 +90,7 @@ export default function AgentBoard({ page, owner, onChange, onExplain }) {
                 </div>
                 <p className="path-line">
                   <Icon name="folder" />
-                  ~/.{agent.name.toLowerCase()}
+                  ~/{agent.name}
                 </p>
                 <p className="house-copy">Переносимая настройка без учётных данных и машинного MCP.</p>
                 <dl className="house-stats">

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
@@ -90,11 +89,10 @@ export default function SettingsPage() {
       ...(current || {}),
       maskedMail: res.body.maskedMail,
       verified: false,
-      letterPath: res.body.letterPath,
     }));
     setEmail("");
     setEmailPassword("");
-    tell("Почта изменена. Подтвердите её по ссылке из письма.", false);
+    tell("Почта изменена. Ссылка для подтверждения придёт на новую почту, когда почтовый сервер будет подключён.", false);
   }
 
   async function savePassword(event) {
@@ -242,7 +240,6 @@ export default function SettingsPage() {
               <p className="mail-line">
                 {page?.verified ? "Почта подтверждена" : "Почта не подтверждена"}
                 {page?.maskedMail ? <>: <span className="mono">{page.maskedMail}</span></> : null}
-                {page?.letterPath ? <> · <Link href={page.letterPath}>Открыть письмо</Link></> : null}
               </p>
               <form className="settings-form" onSubmit={saveEmail}>
                 <label htmlFor="settings-email">Новая почта</label>

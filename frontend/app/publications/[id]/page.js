@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../api";
 import FileTree from "../../file-tree";
 import { buildManifest, loadTokenCounter, ruTokens, skillTokenTotal } from "./manifest";
+import { shellCommand } from "../../shell-arg";
 
 const commandTabs = [
   { id: "mac", label: "macOS" },
@@ -172,14 +173,14 @@ export default function PublicationPage() {
             {copied === "cmd" ? "Скопировано" : "Скопировать команду"}
           </button>
         </div>
-        <p className="hint">Откат с этой машины: agentsync revert {page.agent}</p>
+        <p className="hint">Откат с этой машины: {shellCommand(["agentsync", "revert", page.agent])}</p>
       </section>
     </article>
   );
 }
 
 function commandText(author, agent) {
-  return `agentsync apply ${author} ${agent}`;
+  return shellCommand(["agentsync", "apply", author, agent]);
 }
 
 function ruFiles(n) {

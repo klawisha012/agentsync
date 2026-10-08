@@ -2,13 +2,11 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: agentsync
-      POSTGRES_PASSWORD: agentsync
-      POSTGRES_DB: agentsync
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-agentsync}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-agentsync}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U agentsync -d agentsync"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 2s
       timeout: 5s
       retries: 20
@@ -21,7 +19,7 @@ services:
     environment:
       PORT: "8080"
       WEB_ORIGIN: https://zwarder.ru
-      DATABASE_URL: postgres://agentsync:agentsync@db:5432/agentsync?sslmode=disable
+      DATABASE_URL: postgres://${POSTGRES_USER:-agentsync}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-agentsync}?sslmode=disable
     depends_on:
       db:
         condition: service_healthy

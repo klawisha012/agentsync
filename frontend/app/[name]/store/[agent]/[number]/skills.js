@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { shellCommand } from "../../../../shell-arg";
 
 export default function SkillCommand({ author, agent, version, skills, picked }) {
   const [copied, setCopied] = useState(false);
@@ -111,32 +112,13 @@ function skillCommand(author, source, version, skills) {
   if (skills.length === 0) {
     return "";
   }
-  const parts = [
+  return shellCommand([
     "agentsync",
     "skills",
-    shellArg(author),
-    shellArg(source),
+    author,
+    source,
     "--version",
     String(version),
-  ];
-  for (const skill of skills) {
-    parts.push(shellArg(skill.label || skill.path));
-  }
-  return parts.join(" ");
-}
-
-const plainArg = /^[A-Za-z0-9._@+:/-]+$/;
-
-function shellArg(value) {
-  const text = String(value);
-  if (plainArg.test(text)) {
-    return text;
-  }
-  if (!text.includes('"')) {
-    return `"${text}"`;
-  }
-  if (!text.includes("'")) {
-    return `'${text}'`;
-  }
-  return `"${text.replaceAll('"', '\\"')}"`;
+    ...skills.map((skill) => skill.label || skill.path),
+  ]);
 }
