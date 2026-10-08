@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import AgentLogo from "../agent-logo";
 import Avatar from "../avatar";
@@ -105,14 +105,10 @@ export default function StatsPage() {
     <div className="stats-page">
       <div className="stats-head">
         <h1>Статистика</h1>
-        <label className="stats-period">
-          <span>Промежуток</span>
-          <select value={period} onChange={(event) => setPeriod(event.target.value)} aria-label="Промежуток статистики">
-            {PERIODS.map((item) => (
-              <option key={item.value} value={item.value}>{item.label}</option>
-            ))}
-          </select>
-        </label>
+        <div className="stats-period">
+          <span id="stats-period-label">Промежуток</span>
+          <PeriodSelect id="stats-period" labelId="stats-period-label" value={period} options={PERIODS} onChange={setPeriod} />
+        </div>
       </div>
       <div className="stats-layout">
         <div className="stats-sections">
@@ -155,13 +151,15 @@ export default function StatsPage() {
               ))}
               {report === null && !failed ? <p className="hint">Загрузка…</p> : null}
               {failed ? <p className="hint">Не удалось открыть статистику.</p> : null}
-              {ready && !failed && (report.leaders || []).length === 0 ? <p className="hint">Нет аккаунтов.</p> : null}
+              {ready && !failed && (report.leaders || []).length === 0 ? (
+                <p className="hint">{report.accounts === 0 ? "Нет аккаунтов." : "Нет просмотров за этот промежуток."}</p>
+              ) : null}
             </div>
           </section>
           <section className="side-card stats-card" aria-busy={report === null}>
             <header className="stats-section-heading">
               <h2 className="stats-section-title">Распределение агентов</h2>
-              <span>{ready ? `${report.sharesTotal} ${publicationWord(report.sharesTotal)}` : ""}</span>
+              <span>{selected.label}</span>
             </header>
             {failed ? <p className="hint">Не удалось открыть сводку.</p> : null}
             {report === null && !failed ? <p className="hint">Открываем сводку…</p> : null}
@@ -208,6 +206,117 @@ export default function StatsPage() {
           </section>
         </aside>
       </div>
+    </div>
+  );
+}
+
+function PeriodSelect({ id, labelId, value, options, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [cursor, setCursor] = useState(0);
+  const rootRef = useRef(null);
+  const faceRef = useRef(null);
+  const current = options.find((item) => item.value === value) || options[0];
+  const active = options[cursor] || options[0];
+
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+    function onPointer(event) {
+      if (!rootRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", onPointer);
+    return () => document.removeEventListener("pointerdown", onPointer);
+  }, [open]);
+
+  function reveal() {
+    const index = options.findIndex((item) => item.value === value);
+    setCursor(index < 0 ? 0 : index);
+    setOpen(true);
+  }
+
+  function close() {
+    setOpen(false);
+    faceRef.current?.focus();
+  }
+
+  function choose(next) {
+    onChange(next);
+    close();
+  }
+
+  function onFaceKey(event) {
+    if (!open) {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp" || event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        reveal();
+      }
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setCursor((index) => Math.min(options.length - 1, index + 1));
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setCursor((index) => Math.max(0, index - 1));
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      if (active) {
+        choose(active.value);
+      }
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      close();
+      return;
+    }
+    if (event.key === "Tab") {
+      setOpen(false);
+    }
+  }
+
+  return (
+    <div className="stats-period-control" ref={rootRef}>
+      <button
+        id={id}
+        ref={faceRef}
+        type="button"
+        className="stats-period-face"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={`${id}-list`}
+        aria-label={`Промежуток: ${current?.label || ""}`}
+        aria-activedescendant={open && active ? `${id}-opt-${active.value}` : undefined}
+        onClick={() => (open ? setOpen(false) : reveal())}
+        onKeyDown={onFaceKey}
+      >
+        {current?.label}
+      </button>
+      {open ? (
+        <ul id={`${id}-list`} className="stats-period-menu" role="listbox" aria-labelledby={labelId}>
+          {options.map((item, index) => (
+            <li key={item.value} role="none">
+              <div
+                role="option"
+                id={`${id}-opt-${item.value}`}
+                aria-selected={item.value === value}
+                className={index === cursor ? "stats-period-option active" : "stats-period-option"}
+                onMouseEnter={() => setCursor(index)}
+                onClick={() => choose(item.value)}
+              >
+                {item.label}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }

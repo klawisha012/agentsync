@@ -3252,10 +3252,14 @@ input:focus-visible {
 .stats-page h1{margin:0;font-size:1.35rem;letter-spacing:0}
 .stats-head{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin:0 0 1rem}
 .stats-period{display:inline-flex;align-items:center;gap:0.55rem;font-size:0.78rem;color:oklch(0.552 0.014 286)}
-.stats-period select{appearance:none;padding:0.45rem 2.1rem 0.45rem 0.8rem;border:1px solid oklch(0.274 0.006 286);border-radius:0.6rem;background:oklch(0.141 0.005 286) url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%238e8e93' d='M5 9l7 7 7-7z'/%3E%3C/svg%3E") no-repeat right 0.65rem center/0.65rem;color:oklch(0.985 0 0);font:inherit;font-size:0.82rem;cursor:pointer}
-.stats-period select:hover{border-color:oklch(0.37 0.01 286)}
-.stats-period select:focus-visible{outline:2px solid oklch(0.623 0.214 259);outline-offset:1px}
-.stats-period select option{background:oklch(0.141 0.005 286);color:oklch(0.985 0 0)}
+.stats-period-control{position:relative}
+.stats-period-face{appearance:none;padding:0.45rem 2.1rem 0.45rem 0.8rem;border:1px solid oklch(0.274 0.006 286);border-radius:0.6rem;background:oklch(0.141 0.005 286) url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%238e8e93' d='M5 9l7 7 7-7z'/%3E%3C/svg%3E") no-repeat right 0.65rem center/0.65rem;color:oklch(0.985 0 0);font:inherit;font-size:0.82rem;line-height:1.2;text-align:left;cursor:pointer}
+.stats-period-face:hover{border-color:oklch(0.37 0.01 286)}
+.stats-period-face:focus-visible{outline:2px solid oklch(0.623 0.214 259);outline-offset:1px}
+.stats-period-menu{position:absolute;z-index:30;top:calc(100% + 6px);left:0;min-width:100%;margin:0;padding:4px;list-style:none;background:#1d1d1f;border:1px solid var(--line);border-radius:14px}
+.stats-period-option{display:block;padding:8px 12px;border-radius:10px;color:var(--text);font-size:0.82rem;line-height:1.3;white-space:nowrap;cursor:pointer}
+.stats-period-option.active,.stats-period-option:hover{background:#333336}
+.stats-period-option[aria-selected="true"]{font-weight:600}
 .stats-page { letter-spacing: 0; }
 .stats-layout { display:grid; grid-template-columns:minmax(0, 1fr) minmax(17rem, 0.43fr); gap:2rem; align-items:start; }
 .stats-sections { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:2rem 1.5rem; align-items:start; }
