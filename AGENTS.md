@@ -17,6 +17,12 @@ Knowledge graph lives at `graphify-out/` (skill: `~/.agents/skills/graphify/SKIL
 ## Workflow & Git lifecycle
 
 - **Post-task completion**: после каждой выполненной задачи делай git commit и `git push origin main`.
+- **Commit subject**: Conventional Commit, `type: текст`. Types used here are `feat`, `fix`, and `docs`. The text after the colon is Russian. See `## Language`.
+  - `feat: добавить команду agentsync all`
+  - `fix: направить пересылку Next /api в контейнер api`
+  - `docs: описать тему коммита в Agents.md`
+- **Pull request**: when you open one, set the title to the commit subject. A squash merge keeps the title as the commit on `main`. In the body, state the behavior change, list the verification commands, and link the issue when one exists.
+- **Commit contents**: commit the files the task changes. Leave `for-me.txt` and `graphify-out/` untracked.
 
 ## Behavioral guidelines (Karpathy)
 
@@ -49,7 +55,7 @@ Default working language is Russian.
 
 Use Russian for:
 - chat replies;
-- commit messages after the conventional-commit prefix;
+- commit messages after the conventional-commit prefix (see `## Workflow & Git lifecycle`);
 - issue and PR titles/bodies;
 - specs, plans, tasks, checklists, READMEs, ADRs, and other human-facing generated docs.
 
