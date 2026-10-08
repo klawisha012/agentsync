@@ -84,6 +84,53 @@ func TestStatsPeriods(t *testing.T) {
 	}
 }
 
+func TestStatsWindowSplitsDatedActivity(t *testing.T) {
+	now := time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
+	old := now.AddDate(0, 0, -20)
+	recent := now.Add(-time.Hour)
+	page := &account{
+		name:    "Alice",
+		views:   2,
+		viewers: map[string]struct{}{"old": {}, "new": {}},
+		viewedAt: map[string]time.Time{
+			"old": old,
+			"new": recent,
+		},
+		publications: []*publication{
+			{agent: "Grok", version: 1, created: old},
+			{agent: "Grok", version: 2, created: recent},
+			{agent: "Claude", version: 1, created: old, withdrawn: true},
+		},
+	}
+	quiet := &account{name: "Bob", viewers: map[string]struct{}{}, viewedAt: map[string]time.Time{}}
+	store := &store{byName: map[string]*account{"alice": page, "bob": quiet}}
+
+	week, code, msg := store.stats("7", now)
+	if code != http.StatusOK || msg != "" {
+		t.Fatalf("week %d %s", code, msg)
+	}
+	if week.ViewsTotal != 1 || week.Publications != 1 || week.SharesTotal != 1 {
+		t.Fatalf("week totals %+v", week)
+	}
+	if week.ViewsLeader == nil || week.ViewsLeader.Name != "Alice" || week.ViewsLeader.Views != 1 || len(week.Leaders) != 1 {
+		t.Fatalf("week leader %+v list %+v", week.ViewsLeader, week.Leaders)
+	}
+	if week.TopAgent == nil || week.TopAgent.Name != "Grok" || week.TopAgent.Count != 1 {
+		t.Fatalf("week agent %+v", week.TopAgent)
+	}
+
+	all, code, msg := store.stats("all", now)
+	if code != http.StatusOK || msg != "" {
+		t.Fatalf("all %d %s", code, msg)
+	}
+	if all.ViewsTotal != 2 || all.Publications != 2 || all.SharesTotal != 2 {
+		t.Fatalf("all totals %+v", all)
+	}
+	if len(all.Leaders) != 2 || all.Leaders[0].Name != "Alice" {
+		t.Fatalf("all leaders %+v", all.Leaders)
+	}
+}
+
 func TestStatsLeaderCarriesAvatar(t *testing.T) {
 	e := newServer(t)
 	owner := mustAccount(t, e, "owner@example.com", "secret", "Owner")

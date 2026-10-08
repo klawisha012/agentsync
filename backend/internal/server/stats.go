@@ -108,16 +108,13 @@ func (a *account) likesIn(start time.Time, bounded bool) int {
 	return total
 }
 
-func (a *account) publicationsIn(start time.Time, bounded bool) []agentSlot {
-	slots := a.agentSlots()
-	if !bounded {
-		return slots
-	}
-	kept := make([]agentSlot, 0, len(slots))
-	for _, slot := range slots {
-		if slot.PublishedAt != nil && inWindow(*slot.PublishedAt, start, true) {
-			kept = append(kept, slot)
+func (a *account) publicationsIn(start time.Time, bounded bool) []*publication {
+	kept := make([]*publication, 0, len(a.publications))
+	for _, pub := range a.publications {
+		if pub.withdrawn || !inWindow(pub.created, start, bounded) {
+			continue
 		}
+		kept = append(kept, pub)
 	}
 	return kept
 }
@@ -149,7 +146,6 @@ func (s *store) stats(period string, now time.Time) (statsReport, int, string) {
 	}
 	var last *time.Time
 	counts := map[string]int{}
-	shareCounts := map[string]int{}
 	for _, item := range s.byName {
 		card := item.card()
 		card.PublishedAt = item.publishedAt
@@ -173,13 +169,9 @@ func (s *store) stats(period string, now time.Time) (statsReport, int, string) {
 			Name: item.name, Views: views, Verified: item.verified,
 			HasAvatar: item.hasAvatar, AvatarUpdated: avatarStamp(item.avatarUpdated),
 		})
-		for _, slot := range item.publicationsIn(start, bounded) {
+		for _, pub := range item.publicationsIn(start, bounded) {
 			report.Publications++
-			counts[slot.Name]++
-		}
-		for _, slot := range item.agentSlots() {
-			report.SharesTotal++
-			shareCounts[slot.Name]++
+			counts[pub.agent]++
 		}
 	}
 	markTopWeek(cards, now)
@@ -201,7 +193,16 @@ func (s *store) stats(period string, now time.Time) (statsReport, int, string) {
 		}
 		return foldedCompare(a.Name, b.Name)
 	})
-	if len(leaders) > 0 {
+	if bounded {
+		kept := make([]statsLeader, 0, len(leaders))
+		for _, leader := range leaders {
+			if leader.Views > 0 {
+				kept = append(kept, leader)
+			}
+		}
+		leaders = kept
+	}
+	if len(leaders) > 0 && leaders[0].Views > 0 {
 		best := leaders[0]
 		report.ViewsLeader = &best
 	}
@@ -219,7 +220,8 @@ func (s *store) stats(period string, now time.Time) (statsReport, int, string) {
 	if bestCount > 0 {
 		report.TopAgent = &statsAgent{Name: bestName, Count: bestCount}
 	}
-	report.Shares = shareRows(shareCounts, report.SharesTotal)
+	report.SharesTotal = report.Publications
+	report.Shares = shareRows(counts, report.SharesTotal)
 	return report, http.StatusOK, ""
 }
 
