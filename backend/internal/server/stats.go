@@ -109,12 +109,22 @@ func (a *account) likesIn(start time.Time, bounded bool) int {
 }
 
 func (a *account) publicationsIn(start time.Time, bounded bool) []*publication {
-	kept := make([]*publication, 0, len(a.publications))
+	latest := map[string]*publication{}
 	for _, pub := range a.publications {
-		if pub.withdrawn || !inWindow(pub.created, start, bounded) {
+		if pub.withdrawn {
 			continue
 		}
-		kept = append(kept, pub)
+		key := foldKey.String(pub.agent)
+		prev := latest[key]
+		if prev == nil || pub.version > prev.version {
+			latest[key] = pub
+		}
+	}
+	kept := make([]*publication, 0, len(latest))
+	for _, pub := range latest {
+		if inWindow(pub.created, start, bounded) {
+			kept = append(kept, pub)
+		}
 	}
 	return kept
 }

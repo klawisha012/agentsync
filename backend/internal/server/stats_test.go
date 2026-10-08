@@ -99,6 +99,7 @@ func TestStatsWindowSplitsDatedActivity(t *testing.T) {
 		publications: []*publication{
 			{agent: "Grok", version: 1, created: old},
 			{agent: "Grok", version: 2, created: recent},
+			{agent: "Agents", version: 1, created: old},
 			{agent: "Claude", version: 1, created: old, withdrawn: true},
 		},
 	}
@@ -123,7 +124,7 @@ func TestStatsWindowSplitsDatedActivity(t *testing.T) {
 	if code != http.StatusOK || msg != "" {
 		t.Fatalf("all %d %s", code, msg)
 	}
-	if all.ViewsTotal != 2 || all.Publications != 2 || all.SharesTotal != 2 {
+	if all.ViewsTotal != 2 || all.Publications != 2 || all.SharesTotal != 2 || len(all.Shares) != 2 {
 		t.Fatalf("all totals %+v", all)
 	}
 	if len(all.Leaders) != 2 || all.Leaders[0].Name != "Alice" {
