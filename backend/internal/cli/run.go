@@ -12,6 +12,9 @@ import (
 )
 
 func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if shouldAutoUpdate(args) {
+		maybeAutoUpdate(stderr)
+	}
 	if len(args) == 0 {
 		if piped(stdin) {
 			return applyStream(stdin, stderr)
@@ -81,8 +84,17 @@ func hasHelpFlag(args []string) bool {
 }
 
 func (item spec) execute(args []string, stdout io.Writer) error {
-	if item.name == "fanout" || item.name == "unfanout" {
+	switch item.name {
+	case "fanout", "unfanout":
 		return runShare(item.name, args)
+	case "version":
+		if len(args) > 0 {
+			return usageError{text: "Неизвестный аргумент «" + args[0] + "»."}
+		}
+		fmt.Fprintf(stdout, "agentsync %s\n", Version)
+		return nil
+	case "update":
+		return updateCommand(args, stdout)
 	}
 	root, server, token, account, cookie, err := clientSession()
 	if err != nil {

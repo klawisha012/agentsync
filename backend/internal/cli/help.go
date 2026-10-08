@@ -141,6 +141,33 @@ func commands() []spec {
 			missing:  "Назовите автора и\u00a0ИИ-агента.",
 		},
 		{
+			name:     "version",
+			summary:  "Печатает версию этой команды",
+			usage:    "agentsync version",
+			about:    "Номер вшивается при сборке. Сборка без номера печатает dev.",
+			examples: []string{"agentsync version"},
+		},
+		{
+			name:    "update",
+			summary: "Обновляет команду agentsync до опубликованной сборки",
+			usage:   "agentsync update [--check]",
+			about: "Команда скачивает бинарник с того же адреса, что и установка, и заменяет текущий файл.\n" +
+				"Сервер без описания версии тоже подходит: команда сравнивает содержимое файла.\n" +
+				"Флаг --check только сообщает, есть ли другая сборка, и файл не меняет.\n" +
+				"Копия в ~/.agentsync проверяет обновление сама, не чаще раза в сутки, перед другими командами.\n" +
+				"AGENTSYNC_AUTO_UPDATE=0 выключает эту проверку. Команда agentsync update при этом работает.\n" +
+				"Если локальный номер новее опубликованного, автоматическая замена не выполняется.\n" +
+				"Пароль в команду не входит.",
+			envs: []envLine{
+				{name: "AGENTSYNC_SERVER", text: "Адрес API"},
+				{name: "AGENTSYNC_AUTO_UPDATE", text: "0 выключает автоматическую проверку"},
+			},
+			examples: []string{
+				"agentsync update",
+				"agentsync update --check",
+			},
+		},
+		{
 			name:    "help",
 			summary: "Показывает справку",
 			usage:   "agentsync help [команда]",
@@ -180,6 +207,7 @@ func rootHelp() string {
 		{"AGENTSYNC_TOKEN", "Токен аккаунта. Файл в\u00a0домашнем каталоге: ~/.agentsync/token"},
 		{"AGENTSYNC_ACCOUNT", "Имя аккаунта, чья цепочка лежит на машине"},
 		{"AGENTSYNC_COOKIE", "Cookie сессии. Файл в\u00a0домашнем каталоге: ~/.agentsync/cookie"},
+		{"AGENTSYNC_AUTO_UPDATE", "0 выключает автоматическое обновление копии в ~/.agentsync"},
 	}))
 	b.WriteString("\nПримеры:\n")
 	b.WriteString(formatExamples([]string{
@@ -188,6 +216,8 @@ func rootHelp() string {
 		"agentsync store Grok 2",
 		"agentsync apply Author Grok",
 		"agentsync skills Author Grok --version 4 ru-text",
+		"agentsync version",
+		"agentsync update",
 		"agentsync help apply",
 	}))
 	b.WriteString("\nЧтобы открыть справку по команде, запустите agentsync help <команда>.\n")

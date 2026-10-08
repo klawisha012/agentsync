@@ -87,7 +87,7 @@ export default function DocsPage() {
                 Скачайте и запустите установщик для своей системы. Команда появится в терминале.
               </Step>
               <Step n="2" title="Войдите в аккаунт" href="#login" link="Вход" code="agentsync login">
-                Без входа работает только просмотр справки. Почту можно указать сразу: agentsync login alice@example.com.
+                Без входа работают справка, версия и обновление программы. Почту можно указать сразу: agentsync login alice@example.com.
               </Step>
               <Step n="3" title="Опубликуйте свою конфигурацию" href="#publish" link="Публикация" code="agentsync push Grok">
                 Отправьте настройку своего AI-агента на сервер, чтобы ею могли пользоваться другие. Grok в команде — пример имени.
@@ -114,6 +114,9 @@ export default function DocsPage() {
             <Command code="iwr https://zwarder.ru/api/install.ps1 -useb | iex" />
             <p>Откройте новый терминал после установки и проверьте доступность команды.</p>
             <Command code="agentsync help" />
+            <h3>Обновление</h3>
+            <p><code>agentsync update</code> заменяет программу на сборку с того же адреса, что и установка. Копия в <code>~/.agentsync</code> проверяет обновление сама, не чаще раза в сутки. <code>AGENTSYNC_AUTO_UPDATE=0</code> выключает автоматическую проверку. <code>agentsync update --check</code> только показывает, есть ли другая сборка.</p>
+            <Command code="agentsync update" />
             <a className="docs-reference" href="https://github.com/klawisha012/agentsync/tree/main/scripts" target="_blank" rel="noopener noreferrer">Исходные скрипты установки <External /></a>
           </section>
           <section className="docs-section" id="login">
