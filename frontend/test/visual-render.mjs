@@ -27,6 +27,17 @@ await esbuild.build({
   define: {
     "process.env.NODE_ENV": '"test"',
   },
+  plugins: [{
+    name: "css-modules",
+    setup(build) {
+      build.onLoad({ filter: /\.module\.css$/ }, async (args) => {
+        const css = await fs.promises.readFile(args.path, "utf8");
+        const names = [...css.matchAll(/\.([_a-zA-Z][\w-]*)/g)].map((match) => match[1]);
+        const fields = [...new Set(names)].map((name) => `${JSON.stringify(name)}:${JSON.stringify(name)}`).join(",");
+        return { contents: `export default {${fields}};`, loader: "js" };
+      });
+    },
+  }],
 });
 process.on("exit", () => {
   fs.rmSync(bundlePath, { force: true });
@@ -311,6 +322,372 @@ const gaps = [
 ];
 fs.writeFileSync(path.join(scratch, "visual-gaps.txt"), gaps.map((line) => line + "\n").join(""), "utf8");
 fs.writeFileSync(path.join(scratch, "visual-gaps-repeat.txt"), gaps.map((line) => line + "\n").join(""), "utf8");
+
+const iconGroups = {
+  markdown: ["agents.md", "claude.md", "sample.md", "sample.mdx", "sample.markdown"],
+  text: ["LICENSE", "sample.txt"],
+  docker: ["Dockerfile", "docker-compose.yml", "docker-compose.yaml"],
+  git: [".gitignore", ".gitattributes"],
+  lock: [".env"],
+  json: ["sample.json", "sample.jsonc"],
+  javascript: ["sample.js", "sample.jsx", "sample.mjs", "sample.cjs"],
+  typescript: ["sample.ts", "sample.tsx"],
+  css: ["sample.css", "sample.scss", "sample.less"],
+  html: ["sample.html", "sample.htm"],
+  python: ["sample.py"],
+  image: ["sample.png", "sample.jpg", "sample.jpeg", "sample.gif", "sample.svg", "sample.webp", "sample.webm", "sample.mp4"],
+  yaml: ["sample.yml", "sample.yaml", "sample.toml", "loose.yml"],
+  shell: ["sample.sh", "sample.bash", "sample.zsh"],
+  file: ["mystery.bin"],
+};
+
+function fileEntry(filePath, body = "x") {
+  return { path: filePath, body };
+}
+
+const skillBody = "---\ndescription: Пример\n---\nТекст навыка\n";
+const versionFiles = [
+  fileEntry("agents.md", "# Агенты\n"),
+  ...Object.values(iconGroups).flat().filter((name) => name !== "agents.md" && name !== "loose.yml").map((name) => fileEntry(name)),
+  fileEntry("pack/loose.yml", "key: 1\n"),
+  fileEntry("pack/alpha/SKILL.md", skillBody),
+  fileEntry("pack/alpha/body.md", "заметка\n"),
+  fileEntry("other/alpha/SKILL.md", skillBody),
+  fileEntry("guide/SKILL.md", skillBody),
+];
+
+function versionBody(files, version) {
+  return { version, created: "2026-10-01T12:00:00Z", files };
+}
+
+function publicationRoutes(url) {
+  const target = String(url);
+  if (target.endsWith("/api/accounts/alice/versions/grok/1")) {
+    return { status: 200, body: versionBody(versionFiles, 1) };
+  }
+  if (target.endsWith("/api/accounts/alice/versions/grok/2")) {
+    return { status: 200, body: versionBody([fileEntry("solo.txt", "один\n")], 2) };
+  }
+  if (target.endsWith("/api/publications/pub-1")) {
+    return {
+      status: 200,
+      body: { author: "alice", agent: "grok", version: 1, files: versionFiles, excluded: [] },
+    };
+  }
+  return { status: 404, body: { explanation: "нет" } };
+}
+
+function rowName(button) {
+  const name = button.querySelector(".tree-name");
+  if (!name) {
+    return "";
+  }
+  const clone = name.cloneNode(true);
+  for (const node of clone.querySelectorAll(".tree-mark, svg")) {
+    node.remove();
+  }
+  return clone.textContent.trim();
+}
+
+function namedButton(root, name) {
+  return [...root.querySelectorAll("button.tree-dir, button.tree-file")].find((button) => rowName(button) === name) || null;
+}
+
+function directDir(branch) {
+  const wrap = branch.firstElementChild;
+  return wrap ? wrap.querySelector(":scope > button.tree-dir") : null;
+}
+
+function folderRow(root, name) {
+  return [...root.querySelectorAll(".tree-branch")].find((node) => {
+    const button = directDir(node);
+    return button && rowName(button) === name;
+  }) || null;
+}
+
+function rowCheck(branch) {
+  const wrap = branch?.firstElementChild;
+  return wrap ? wrap.querySelector(":scope > input.tree-check") : null;
+}
+
+function iconSignature(button) {
+  const svg = button?.querySelector("svg.file-icon");
+  if (!svg) {
+    return "";
+  }
+  return [...svg.querySelectorAll("path")].map((pathNode) => `${pathNode.getAttribute("fill")}|${pathNode.getAttribute("d")}`).join(";");
+}
+
+function isRound(style) {
+  const radius = style.borderRadius;
+  if (radius === "50%" || radius === "999px") {
+    return true;
+  }
+  const width = parseFloat(style.width);
+  const height = parseFloat(style.height);
+  const value = parseFloat(radius);
+  return width > 0 && Math.abs(width - height) < 0.2 && value >= width / 2 - 0.2;
+}
+
+function ruleText(selector) {
+  let found = "";
+  const walk = (rules) => {
+    for (const rule of rules) {
+      if (rule.selectorText === selector) {
+        found = rule.cssText;
+      }
+      if (rule.cssRules) {
+        walk(rule.cssRules);
+      }
+    }
+  };
+  walk(window.document.styleSheets[0].cssRules);
+  try {
+    return decodeURIComponent(found);
+  } catch {
+    return found;
+  }
+}
+
+function flat(text) {
+  return String(text || "").replaceAll("\u00A0", " ");
+}
+
+function mediaText() {
+  const chunks = [];
+  const walk = (rules) => {
+    for (const rule of rules) {
+      if (rule.media && String(rule.conditionText || rule.media.mediaText || "").includes("560px")) {
+        chunks.push(rule.cssText);
+      }
+      if (rule.cssRules) {
+        walk(rule.cssRules);
+      }
+    }
+  };
+  walk(window.document.styleSheets[0].cssRules);
+  return chunks.join("\n");
+}
+
+async function userClick(el) {
+  await act(async () => {
+    el.click();
+  });
+  await flush();
+}
+
+async function waitFor(host, pred) {
+  for (let i = 0; i < 50; i += 1) {
+    if (pred(host)) {
+      return true;
+    }
+    await flush();
+  }
+  return pred(host);
+}
+
+function commandText(host) {
+  return host.querySelector(".skill-command code")?.textContent || "";
+}
+
+function assertIcons(root, label) {
+  const signatures = new Map();
+  for (const [kind, names] of Object.entries(iconGroups)) {
+    const signs = names.map((name) => iconSignature(namedButton(root, name)));
+    check(`${label} иконка ${kind}`, signs.every((sign) => sign && sign === signs[0]), signs.join(" | "));
+    signatures.set(kind, signs[0]);
+  }
+  const kinds = [...signatures.keys()];
+  for (let i = 0; i < kinds.length; i += 1) {
+    for (let j = i + 1; j < kinds.length; j += 1) {
+      check(
+        `${label} разные ${kinds[i]}/${kinds[j]}`,
+        signatures.get(kinds[i]) !== signatures.get(kinds[j]),
+        "совпали",
+      );
+    }
+  }
+  const folders = [...root.querySelectorAll("button.tree-dir")].map(iconSignature);
+  check(`${label} папки`, folders.length > 0 && folders.every((sign) => sign && sign === folders[0]), String(folders.length));
+  check(`${label} папка не файл`, folders[0] && folders[0] !== signatures.get("file") && folders[0] !== signatures.get("markdown"), folders[0]);
+  const bare = [...root.querySelectorAll("button.tree-dir, button.tree-file")].filter((button) => !button.querySelector("svg.file-icon"));
+  check(`${label} у каждой строки есть иконка`, bare.length === 0, bare.map(rowName).join(","));
+}
+
+function snapshot(host) {
+  const sw = host.querySelector("[aria-label='Режим выделения навыков']");
+  const checks = [...host.querySelectorAll("input.tree-check")].map((el) => {
+    return `${el.getAttribute("aria-label")}:${el.checked ? "1" : "0"}${el.indeterminate ? "?" : ""}`;
+  }).sort();
+  const stage = host.querySelector(".code-stage");
+  const stageText = stage?.textContent || "";
+  const hints = [...host.querySelectorAll(".skill-pick .hint")].map((el) => el.textContent).join("|");
+  const clash = host.querySelector(".skill-pick .explanation")?.textContent || "";
+  return [
+    `switch=${sw ? sw.getAttribute("aria-checked") : "none"}`,
+    `checks=${checks.join(",")}`,
+    `code=${commandText(host)}`,
+    `hint=${hints}`,
+    `clash=${clash}`,
+    `selectAll=${host.textContent.includes("Выделить все")}`,
+    `stageControls=${Boolean(stage?.querySelector("[aria-label='Режим выделения навыков'], input"))}`,
+    `preview=${stageText.includes("Просмотр")}`,
+    `source=${stageText.includes("Исходник")}`,
+    `copy=${stageText.includes("Копировать")}`,
+    `download=${Boolean(stage?.querySelector("[aria-label^='Скачать ']"))}`,
+    `skillZip=${stageText.includes("Скачать навык")}`,
+    `crumbs=${host.querySelector("nav[aria-label='Путь']")?.textContent || ""}`,
+    `pill=${host.querySelector(".side-head-files .count-pill")?.textContent || ""}`,
+    `grouped=${Boolean(host.querySelector(".side-head-title h2")) && host.querySelector(".side-head-title")?.textContent.includes("Выделение") && Boolean(host.querySelector(".side-head-files .count-pill"))}`,
+  ].join("\n");
+}
+
+async function runVersionPass() {
+  const lines = [];
+  routes = publicationRoutes;
+  mod.__setParams({ id: "pub-1", name: "alice", agent: "grok", number: "1" });
+  const view = await render(createElement(mod.VersionPage));
+  const host = view.host;
+  const ready = await waitFor(host, (node) => Boolean(namedButton(node, "loose.yml")) && node.querySelector(".side-head-files .count-pill")?.textContent !== "…");
+  check("версия открылась", ready, host.textContent.slice(0, 180));
+  assertIcons(host, "версия");
+  const sw = host.querySelector("[aria-label='Режим выделения навыков']");
+  const swStyle = sw ? window.getComputedStyle(sw) : null;
+  const thumb = sw?.querySelector(".skill-switch-thumb");
+  const thumbStyle = thumb ? window.getComputedStyle(thumb) : null;
+  check("переключатель выключен", sw?.getAttribute("aria-checked") === "false", sw?.getAttribute("aria-checked"));
+  check("нет флажков", host.querySelectorAll("input.tree-check").length === 0, String(host.querySelectorAll("input").length));
+  check("нет Выделить все", !host.textContent.includes("Выделить все"), "надпись осталась");
+  check("нет команды", !host.querySelector(".skill-pick"), host.querySelector(".skill-pick")?.textContent || "");
+  check("пилюля", Boolean(swStyle) && isRound(swStyle) && parseFloat(swStyle.width) > parseFloat(swStyle.height), swStyle ? `${swStyle.width} ${swStyle.height} ${swStyle.borderRadius}` : "");
+  check("бегунок", Boolean(thumbStyle) && isRound(thumbStyle) && thumbStyle.width === thumbStyle.height, thumbStyle ? `${thumbStyle.width} ${thumbStyle.borderRadius}` : "");
+  const headStyle = window.getComputedStyle(host.querySelector(".side-head-files"));
+  check("шапка в одну строку", headStyle.flexWrap === "nowrap", headStyle.flexWrap);
+  const narrow = mediaText();
+  check("узкая шапка", narrow.includes("flex-wrap: wrap") && narrow.includes("margin-left: auto"), narrow);
+  check("группа заголовка", host.querySelector(".side-head-title h2")?.textContent === "Файлы версии" && Boolean(host.querySelector(".side-head-files .count-pill")), "шапка");
+  const stage = host.querySelector(".code-stage");
+  check("сцена без выделения", stage && !stage.querySelector("input, [role='switch']") && stage.textContent.includes("Просмотр") && stage.textContent.includes("Исходник"), stage?.textContent?.slice(0, 120) || "");
+  check("крошки", host.querySelector("nav[aria-label='Путь']")?.textContent.includes("v1"), host.querySelector("nav")?.textContent || "");
+  await userClick(namedButton(host, "guide"));
+  await userClick(namedButton(host, "SKILL.md"));
+  check("скачивание навыка", host.querySelector(".code-stage")?.textContent.includes("Скачать навык"), "нет кнопки");
+  lines.push("start");
+  lines.push(snapshot(host));
+
+  await userClick(sw);
+  check("режим включён", host.querySelector("[aria-label='Режим выделения навыков']")?.getAttribute("aria-checked") === "true", "не включился");
+  check("команда пустого выбора", flat(host.textContent).includes("Отметьте навыки в списке файлов"), host.querySelector(".skill-pick")?.textContent || "");
+  const pack = folderRow(host, "pack");
+  const alpha = folderRow(pack, "alpha");
+  const guide = folderRow(host, "guide");
+  const other = folderRow(host, "other");
+  const otherAlpha = folderRow(other, "alpha");
+  check("флажок навыка", rowCheck(guide)?.getAttribute("aria-label") === "Навык guide" && guide.querySelectorAll(":scope > .tree-line > input.tree-check").length === 1, rowCheck(guide)?.getAttribute("aria-label"));
+  check("флажок папки", rowCheck(pack)?.getAttribute("aria-label") === "Папка pack со всеми вложениями", rowCheck(pack)?.getAttribute("aria-label"));
+  const nestedFile = namedButton(host, "loose.yml");
+  check("нет флажка вложенного файла", !nestedFile?.parentElement?.classList.contains("tree-line"), nestedFile?.parentElement?.className || "");
+  const rootFile = namedButton(host, "sample.txt");
+  const rootCheck = rootFile?.parentElement?.classList.contains("tree-line") ? rootFile.parentElement.querySelector(":scope > input.tree-check") : null;
+  check("флажок корневого файла", rootCheck?.getAttribute("aria-label") === "Файл sample.txt", rootCheck?.getAttribute("aria-label") || "нет");
+  lines.push("mode-on");
+  lines.push(snapshot(host));
+
+  await userClick(rowCheck(alpha));
+  check("папка частично", rowCheck(pack)?.indeterminate === true && rowCheck(pack)?.checked === false, `indeterminate=${rowCheck(pack)?.indeterminate}`);
+  const partialStyle = window.getComputedStyle(rowCheck(pack));
+  const dashRule = ruleText(".tree-check:indeterminate");
+  check("черта indeterminate", isRound(partialStyle) && partialStyle.backgroundColor === "oklch(0.62 0.17 250)" && dashRule.includes("M3.5 8h9"), `${partialStyle.backgroundColor} ${dashRule.slice(0, 160)}`);
+  lines.push("partial");
+  lines.push(snapshot(host));
+
+  await userClick(rowCheck(pack));
+  const folderCode = commandText(host);
+  check("команда только навык папки", folderCode.includes("agentsync") && folderCode.includes("skills") && folderCode.includes("pack/alpha") && !folderCode.includes("loose.yml") && !folderCode.includes("SKILL.md") && !folderCode.includes("sample.txt") && !folderCode.includes("guide"), folderCode);
+  check("папка отмечена целиком", rowCheck(pack)?.checked === true && rowCheck(pack)?.indeterminate === false, `checked=${rowCheck(pack)?.checked}`);
+  const checkedStyle = window.getComputedStyle(rowCheck(alpha));
+  const markRule = ruleText(".tree-check:checked");
+  check("галка флажка", isRound(checkedStyle) && checkedStyle.backgroundColor === "oklch(0.62 0.17 250)" && markRule.includes("M3 8.5") && markRule.includes("L13 5"), `${checkedStyle.backgroundColor} ${markRule.slice(0, 160)}`);
+  const fileCheck = namedButton(host, "sample.txt")?.parentElement?.querySelector(":scope > input.tree-check");
+  await userClick(fileCheck);
+  check("файл отмечен", fileCheck?.checked === true, String(fileCheck?.checked));
+  check("файл не входит в команду", commandText(host) === folderCode && !commandText(host).includes("sample.txt"), commandText(host));
+  await userClick(rowCheck(guide));
+  const both = commandText(host);
+  check("два навыка", both.includes("guide") && both.includes("pack/alpha") && !both.includes("sample.txt"), both);
+  await userClick(rowCheck(otherAlpha));
+  check("конфликт имён", (host.querySelector(".skill-pick .explanation")?.textContent || "").includes("называются одинаково") && commandText(host) === "", host.querySelector(".skill-pick")?.textContent || "");
+  lines.push("clash");
+  lines.push(snapshot(host));
+
+  const kept = host.querySelector(".skill-pick")?.textContent || "";
+  await userClick(host.querySelector("[aria-label='Режим выделения навыков']"));
+  check("выключение прячет флажки", host.querySelectorAll("input.tree-check").length === 0, String(host.querySelectorAll("input.tree-check").length));
+  check("выбор сохранён", host.querySelector(".skill-pick")?.textContent === kept && kept.includes("называются одинаково"), host.querySelector(".skill-pick")?.textContent || "");
+  await userClick(host.querySelector("[aria-label='Режим выделения навыков']"));
+  check("отметки на месте", rowCheck(guide)?.checked === true && rowCheck(otherAlpha)?.checked === true, snapshot(host));
+  lines.push("kept");
+  lines.push(snapshot(host));
+
+  mod.__setParams({ id: "pub-1", name: "alice", agent: "grok", number: "2" });
+  await act(async () => {
+    view.root.render(createElement(mod.VersionPage));
+  });
+  const second = await waitFor(host, (node) => node.textContent.includes("v2") && Boolean(namedButton(node, "solo.txt")));
+  check("другая версия", second, host.textContent.slice(0, 160));
+  check("без навыков нет переключателя", !host.querySelector("[aria-label='Режим выделения навыков']") && !host.querySelector(".skill-pick") && host.querySelectorAll("input.tree-check").length === 0, snapshot(host));
+  check("иконка файла без навыков", Boolean(iconSignature(namedButton(host, "solo.txt"))), "нет иконки");
+  lines.push("v2");
+  lines.push(snapshot(host));
+
+  mod.__setParams({ id: "pub-1", name: "alice", agent: "grok", number: "1" });
+  await act(async () => {
+    view.root.render(createElement(mod.VersionPage));
+  });
+  const back = await waitFor(host, (node) => node.textContent.includes("v1") && Boolean(namedButton(node, "loose.yml")));
+  check("возврат сбрасывает режим", back && host.querySelector("[aria-label='Режим выделения навыков']")?.getAttribute("aria-checked") === "false" && !host.querySelector(".skill-pick") && host.querySelectorAll("input.tree-check").length === 0, snapshot(host));
+  lines.push("reset");
+  lines.push(snapshot(host));
+
+  const manifest = await render(createElement(mod.PublicationPage));
+  const manifestReady = await waitFor(manifest.host, (node) => Boolean(namedButton(node, "agents.md")));
+  check("манифест открылся", manifestReady, manifest.host.textContent.slice(0, 160));
+  await userClick(namedButton(manifest.host, "pack"));
+  await waitFor(manifest.host, (node) => Boolean(namedButton(node, "loose.yml")));
+  assertIcons(manifest.host, "манифест");
+  check("манифест без выделения", manifest.host.querySelectorAll("input.tree-check").length === 0 && !manifest.host.textContent.includes("Выделение") && !manifest.host.textContent.includes("Выделить все") && !manifest.host.querySelector("[role='switch']"), manifest.host.textContent.slice(0, 180));
+  lines.push("manifest");
+  lines.push(`icons=${Boolean(namedButton(manifest.host, "loose.yml")?.querySelector("svg.file-icon"))}`);
+  lines.push(`checks=${manifest.host.querySelectorAll("input.tree-check").length}`);
+  lines.push(`switch=${Boolean(manifest.host.querySelector("[role='switch']"))}`);
+
+  await act(async () => {
+    view.root.unmount();
+    manifest.root.unmount();
+  });
+  view.host.remove();
+  manifest.host.remove();
+  return lines.join("\n");
+}
+
+const versionReports = [];
+for (let pass = 1; pass <= 2; pass += 1) {
+  versionReports.push(await runVersionPass());
+}
+function firstDiff(left, right) {
+  const a = left.split("\n");
+  const b = right.split("\n");
+  const count = Math.max(a.length, b.length);
+  for (let i = 0; i < count; i += 1) {
+    if (a[i] !== b[i]) {
+      return `строка ${i + 1}: ${a[i] || ""} <> ${b[i] || ""}`;
+    }
+  }
+  return "";
+}
+check("прогоны версии совпали", versionReports[0] === versionReports[1], firstDiff(versionReports[0], versionReports[1]));
+const publicationLog = ["pass 1", versionReports[0], "pass 2", versionReports[1]].join("\n");
+console.log(publicationLog);
 
 if (failures.length) {
   const text = failures.join("\n");

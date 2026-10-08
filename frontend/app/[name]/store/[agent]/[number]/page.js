@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../../../api";
 import FileTree from "../../../../file-tree";
 import { buildManifest, loadTokenCounter, ruTokens, skillTokenTotal } from "../../../../publications/[id]/manifest";
@@ -18,8 +18,8 @@ export default function VersionPage() {
   const [selected, setSelected] = useState("");
   const [open, setOpen] = useState(() => new Set());
   const [picked, setPicked] = useState(() => new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
   const [countTokens, setCountTokens] = useState(null);
-  const allRef = useRef(null);
 
   useEffect(() => {
     let gone = false;
@@ -39,6 +39,7 @@ export default function VersionPage() {
     setSelected("");
     setOpen(new Set());
     setPicked(new Set());
+    setSelectionMode(false);
     api(`/accounts/${encodeURIComponent(name)}/versions/${encodeURIComponent(agent)}/${encodeURIComponent(number)}`).then((res) => {
       if (gone) {
         return;
@@ -55,13 +56,6 @@ export default function VersionPage() {
 
   const tree = state?.ok ? buildManifest(state.body.files || [], countTokens) : [];
   const skills = listSkillChoices(tree);
-  const allOn = skills.length > 0 && skills.every((item) => picked.has(item.path));
-
-  useEffect(() => {
-    if (allRef.current) {
-      allRef.current.indeterminate = picked.size > 0 && !allOn;
-    }
-  }, [picked, allOn]);
 
   if (!state) {
     return <p className="lede">Открываем версию…</p>;
@@ -83,6 +77,20 @@ export default function VersionPage() {
         next.delete(path);
       } else {
         next.add(path);
+      }
+      return next;
+    });
+  }
+
+  function toggleSkills(paths, checked) {
+    setPicked((currentSet) => {
+      const next = new Set(currentSet);
+      for (const path of paths) {
+        if (checked) {
+          next.add(path);
+        } else {
+          next.delete(path);
+        }
       }
       return next;
     });
@@ -111,35 +119,32 @@ export default function VersionPage() {
             <span>/</span>
             <b>v{shot.version}</b>
           </nav>
-          <SkillCommand
-            author={name}
-            agent={agent}
-            version={shot.version}
-            skills={skills}
-            picked={picked}
-          />
+          {selectionMode || picked.size > 0 ? (
+            <SkillCommand
+              author={name}
+              agent={agent}
+              version={shot.version}
+              skills={skills}
+              picked={picked}
+            />
+          ) : null}
         </div>
       </div>
       <div className="preview-grid">
         <div className="manifest">
-          <div className="side-head">
-            <h2>Файлы версии</h2>
+          <div className="side-head side-head-files">
+            <div className="side-head-title">
+              <h2>Файлы версии</h2>
+              {skills.length > 0 ? (
+                <label className="skill-toggle" htmlFor="skill-selection-mode">
+                  <span>Выделение</span>
+                  <SelectionSwitch checked={selectionMode} onChange={setSelectionMode} />
+                </label>
+              ) : null}
+            </div>
             <span className="count-pill">{countTokens ? ruTokens(skillTokenTotal(tree)) : "…"}</span>
           </div>
           <div className="file-tree" role="tree" aria-label="Файлы версии">
-            {skills.length > 0 ? (
-              <label className="tree-all">
-                <input
-                  ref={allRef}
-                  type="checkbox"
-                  checked={allOn}
-                  onChange={(event) => {
-                    setPicked(event.target.checked ? new Set(skills.map((item) => item.path)) : new Set());
-                  }}
-                />
-                <span>{allOn ? "Убрать выделение" : "Выделить все"}</span>
-              </label>
-            ) : null}
             <FileTree
               nodes={tree}
               depth={0}
@@ -148,7 +153,8 @@ export default function VersionPage() {
               selected={current?.path || ""}
               onSelect={setSelected}
               picked={picked}
-              onToggleSkill={toggleSkill}
+              onToggleSkill={selectionMode ? toggleSkill : undefined}
+              onToggleSkills={selectionMode ? toggleSkills : undefined}
             />
           </div>
           <p className="hint">{stamp(shot.created)} · манифест v{shot.version}</p>
@@ -156,6 +162,22 @@ export default function VersionPage() {
         <CodeStage files={files} current={current} onSelect={setSelected} />
       </div>
     </article>
+  );
+}
+
+function SelectionSwitch({ checked, onChange }) {
+  return (
+    <button
+      id="skill-selection-mode"
+      type="button"
+      role="switch"
+      className="skill-switch"
+      aria-checked={checked}
+      aria-label="Режим выделения навыков"
+      onClick={() => onChange(!checked)}
+    >
+      <span className="skill-switch-thumb" />
+    </button>
   );
 }
 

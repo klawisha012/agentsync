@@ -1,4 +1,5 @@
 let pathname = "/";
+let params = {};
 const pushes = [];
 
 export function usePathname() {
@@ -17,8 +18,16 @@ export function useRouter() {
   };
 }
 
+export function useParams() {
+  return params;
+}
+
 export function __setPathname(value) {
   pathname = value;
+}
+
+export function __setParams(value) {
+  params = value || {};
 }
 
 export function __takePushes() {
