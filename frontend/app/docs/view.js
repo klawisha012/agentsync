@@ -130,6 +130,8 @@ export default function DocsPage() {
             <p><code>push</code> отправляет переносимую конфигурацию выбранного AI-агента на сервер. Учётные данные в запрос не входят.</p>
             <Command code="agentsync push Grok" />
             <p>В примерах используется <code>Grok</code>. Подставьте имя своего агента и проверьте файлы перед отправкой.</p>
+            <p><code>agentsync all</code> публикует каждый найденный ИИ-агент. Папка подходит, если в ней сразу лежат навыки, правила, конфиг или <code>AGENTS.md</code>.</p>
+            <Command code="agentsync all" />
           </section>
           <section className="docs-section" id="snapshots">
             <h2>Локальные снимки</h2>

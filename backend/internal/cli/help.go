@@ -49,6 +49,20 @@ func commands() []spec {
 			missing:  "Назовите ИИ-агента.",
 		},
 		{
+			name:    "all",
+			summary: "Публикует всех найденных ИИ-агентов",
+			usage:   "agentsync all",
+			about: "Команда ищет домашние папки в\u00a0каталоге с\u00a0ИИ-агентами.\n" +
+				"Папка подходит, если в\u00a0ней сразу лежат навыки, правила, конфиг или AGENTS.md.\n" +
+				"Каждая такая папка публикуется отдельно, тем\u00a0же способом, что agentsync push.\n" +
+				"Имя берётся из имени папки. Точка в\u00a0начале имени не входит в\u00a0имя ИИ-агента.\n" +
+				"Пустая папка и\u00a0каталог .agentsync не публикуются.\n" +
+				"Если одна публикация не проходит, команда продолжает остальные.\n" +
+				"Нужен вход в\u00a0аккаунт. Пароль в\u00a0команду не входит.",
+			envs:     []envLine{root, server, token, cookie},
+			examples: []string{"agentsync all"},
+		},
+		{
 			name:    "record",
 			summary: "Записывает снимок в\u00a0хранилище",
 			usage:   "agentsync record <ии-агент>",
@@ -213,6 +227,7 @@ func rootHelp() string {
 	b.WriteString(formatExamples([]string{
 		"agentsync login",
 		"agentsync push Grok",
+		"agentsync all",
 		"agentsync store Grok 2",
 		"agentsync apply Author Grok",
 		"agentsync skills Author Grok --version 4 ru-text",

@@ -101,7 +101,7 @@ func (item spec) execute(args []string, stdout io.Writer) error {
 		return err
 	}
 	ctx := context.Background()
-	if (item.name == "push" || item.name == "record") && token == "" && cookie == "" {
+	if (item.name == "push" || item.name == "all" || item.name == "record") && token == "" && cookie == "" {
 		return errors.New("Войдите в\u00a0аккаунт: agentsync login")
 	}
 	switch item.name {
@@ -120,6 +120,11 @@ func (item spec) execute(args []string, stdout io.Writer) error {
 			token,
 			cookie,
 		)
+	case "all":
+		if len(args) > 0 {
+			return usageError{text: "Неизвестный аргумент «" + args[0] + "»."}
+		}
+		return pushAll(ctx, server, root, token, cookie, stdout)
 	case "record":
 		raw, err := agent.Record(
 			ctx,
