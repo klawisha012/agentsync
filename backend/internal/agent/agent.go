@@ -6,7 +6,9 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -36,6 +38,11 @@ func Install(dir string) error {
 }
 
 func Push(ctx context.Context, server, root, agentName, token, cookie string) error {
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	files, err := readTree(agentHome(root, agentName))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -48,6 +55,11 @@ func Push(ctx context.Context, server, root, agentName, token, cookie string) er
 }
 
 func Apply(ctx context.Context, server, root, author, agentName, account, token, cookie string) error {
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	payload, err := fetchPublication(ctx, server, author, agentName, token, cookie, 0)
 	if err != nil {
 		return err
@@ -59,6 +71,11 @@ func Apply(ctx context.Context, server, root, author, agentName, account, token,
 }
 
 func ApplyBody(ctx context.Context, server, root, account, token, cookie string, raw []byte) error {
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	var payload publicationPayload
 	if err := json.Unmarshal(raw, &payload); err != nil || payload.Author == "" || payload.Agent == "" {
 		var explained struct {
@@ -84,6 +101,11 @@ func applyOwned(root, account string, payload publicationPayload) error {
 }
 
 func ApplyBroken(ctx context.Context, server, root, author, agentName, token, cookie string) error {
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	payload, err := fetchPublication(ctx, server, author, agentName, token, cookie, 0)
 	if err != nil {
 		return err
@@ -92,6 +114,11 @@ func ApplyBroken(ctx context.Context, server, root, author, agentName, token, co
 }
 
 func Revert(root, account, agentName string) error {
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	snaps := Chain(root, account, agentName)
 	if len(snaps) == 0 {
 		snaps = soleChain(root, agentName)
@@ -101,6 +128,9 @@ func Revert(root, account, agentName string) error {
 	}
 	latest := snaps[0]
 	home := agentHome(root, agentName)
+	if err := pathsFit(latest.Files); err != nil {
+		return err
+	}
 	if err := clearPortable(home); err != nil {
 		return err
 	}
@@ -168,11 +198,11 @@ func Chain(root, account, agentName string) []Snapshot {
 }
 
 func fetchPublication(ctx context.Context, server, author, agentName, token, cookie string, version int) (publicationPayload, error) {
-	url := strings.TrimRight(server, "/") + "/api/apply/" + author + "/" + agentName
+	target := strings.TrimRight(server, "/") + "/api/apply/" + url.PathEscape(author) + "/" + url.PathEscape(agentName)
 	if version > 0 {
-		url += "?version=" + strconv.Itoa(version)
+		target += "?version=" + strconv.Itoa(version)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
 		return publicationPayload{}, err
 	}
@@ -199,6 +229,9 @@ func fetchPublication(ctx context.Context, server, author, agentName, token, coo
 }
 
 func applyFiles(root, account, agentName string, next []File, broken bool) error {
+	if err := pathsFit(next); err != nil {
+		return err
+	}
 	home := agentHome(root, agentName)
 	current, err := readTree(home)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -280,7 +313,11 @@ func chainDir(root, account, agentName string) string {
 }
 
 func sanitize(name string) string {
-	return strings.ToLower(strings.TrimSpace(name))
+	name = strings.ToLower(strings.TrimSpace(name))
+	if name == "" || name == "." || name == ".." || strings.ContainsAny(name, `/\`) {
+		return "_"
+	}
+	return name
 }
 
 func fmtSeq(n int) string {
@@ -325,11 +362,37 @@ func agentHome(root, name string) string {
 	if info, err := os.Stat(literal); err == nil && info.IsDir() {
 		return literal
 	}
-	dotted := filepath.Join(root, "."+strings.ToLower(name))
-	if info, err := os.Stat(dotted); err == nil && info.IsDir() {
-		return dotted
+	if dot := catalogDotHome(name); dot != "" {
+		return filepath.Join(root, dot)
 	}
 	return literal
+}
+
+func catalogDotHome(name string) string {
+	for _, item := range receivers {
+		if !strings.EqualFold(item.Slug, name) && !strings.EqualFold(item.Display, name) {
+			continue
+		}
+		if item.OpenClaw {
+			return ".openclaw"
+		}
+		for _, candidate := range []string{item.Global, item.Project} {
+			seg := firstPathSegment(candidate)
+			if strings.HasPrefix(seg, ".") && seg != "." && seg != ".." {
+				return seg
+			}
+		}
+	}
+	return ""
+}
+
+func firstPathSegment(value string) string {
+	value = strings.TrimSpace(filepath.ToSlash(value))
+	if value == "" {
+		return ""
+	}
+	seg, _, _ := strings.Cut(value, "/")
+	return seg
 }
 
 func EnvOrHome(envName, fileName string) string {
@@ -362,6 +425,11 @@ func SaveHomeFile(name, body string) error {
 	if err != nil {
 		return err
 	}
+	unlock, err := lockDir(dir, 0o700)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
@@ -418,16 +486,41 @@ func readTree(root string) ([]File, error) {
 	return files, err
 }
 
+func pathsFit(files []File) error {
+	for _, file := range files {
+		if _, ok := CleanRel(file.Path); !ok {
+			return errors.New("путь файла вне ИИ-агента")
+		}
+	}
+	return nil
+}
+
 func writeFile(root string, file File) error {
-	clean := filepath.ToSlash(file.Path)
-	if clean == "" || strings.HasPrefix(clean, "/") || strings.Contains(clean, "..") {
+	rel, ok := CleanRel(file.Path)
+	if !ok {
 		return errors.New("путь файла вне ИИ-агента")
 	}
-	target := filepath.Join(root, filepath.FromSlash(clean))
-	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+	if err := os.MkdirAll(root, 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(target, []byte(file.Body), 0o644)
+	base, err := os.OpenRoot(root)
+	if err != nil {
+		return err
+	}
+	defer base.Close()
+	dir := path.Dir(rel)
+	if dir != "." {
+		if err := base.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+	}
+	out, err := base.OpenFile(rel, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = out.Write([]byte(file.Body))
+	return err
 }
 
 func min(a, b int) int {

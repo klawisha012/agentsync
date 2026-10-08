@@ -43,6 +43,11 @@ type catalogUndo struct {
 // Fanout shows every outermost skill from one agent's home in each named
 // receiver's global catalog. The receiver name and the canon folder are one record.
 func Fanout(root, agentName string, targets []string) error {
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	home := agentHome(root, agentName)
 	skills, files, err := canonSkills(home)
 	if err != nil {
@@ -73,6 +78,11 @@ func Fanout(root, agentName string, targets []string) error {
 // Unfanout removes receiver names whose record belongs to this agent's home.
 // The home itself stays. A copied folder that is not that record stays.
 func Unfanout(root, agentName string, targets []string) error {
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	home := agentHome(root, agentName)
 	catalogs, err := unfanoutCatalogs(root, targets)
 	if err != nil {

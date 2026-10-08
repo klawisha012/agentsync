@@ -34,11 +34,21 @@ func remember(ctx context.Context, server, root, agentName, token, cookie string
 	if len(files) == 0 {
 		return nil
 	}
-	_, err = Record(ctx, server, root, agentName, token, cookie)
+	_, err = recordFiles(ctx, server, root, agentName, token, cookie)
 	return err
 }
 
 func Record(ctx context.Context, server, root, agentName, token, cookie string) ([]byte, error) {
+	var raw []byte
+	err := withRootLock(root, func() error {
+		var callErr error
+		raw, callErr = recordFiles(ctx, server, root, agentName, token, cookie)
+		return callErr
+	})
+	return raw, err
+}
+
+func recordFiles(ctx context.Context, server, root, agentName, token, cookie string) ([]byte, error) {
 	files, missing, err := readHome(root, agentName)
 	if err != nil {
 		return nil, err
@@ -61,6 +71,11 @@ func Record(ctx context.Context, server, root, agentName, token, cookie string) 
 }
 
 func ReadStore(ctx context.Context, server, root, agentName, number, token, cookie string) ([]byte, error) {
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return nil, err
+	}
+	defer unlock()
 	target := strings.TrimRight(server, "/") + "/agent/store/" + url.PathEscape(agentName)
 	if number != "" {
 		target += "/" + url.PathEscape(number)

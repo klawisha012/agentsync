@@ -40,9 +40,6 @@ func login(ctx context.Context, server, email string, stdout io.Writer) error {
 }
 
 func readPassword() (string, error) {
-	if value := strings.TrimSpace(os.Getenv("AGENTSYNC_PASSWORD")); value != "" {
-		return value, nil
-	}
 	fmt.Fprint(os.Stderr, "Пароль: ")
 	raw, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Fprintln(os.Stderr)

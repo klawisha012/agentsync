@@ -31,6 +31,7 @@ var (
 	errUpdateCheck    = errors.New("Не удалось проверить обновление.")
 	errUpdateDownload = errors.New("Не удалось скачать agentsync.")
 	errUpdateBinary   = errors.New("Скачанный файл не похож на программу agentsync.")
+	errUpdateHash     = errors.New("Скачанный файл не совпал с опубликованной суммой.")
 	errUpdateReplace  = errors.New("Не удалось заменить agentsync.")
 	errUpdateBusy     = errors.New("Обновление уже выполняется.")
 	errUpdateArch     = errors.New("Эта архитектура не поддерживается.")
@@ -168,8 +169,11 @@ func syncRelease(ctx context.Context, server, exe string, mode releaseMode) (rel
 	if found {
 		remoteVer = strings.TrimSpace(manifest.Version)
 		if manifest.SHA256 != nil {
-			remoteHash = manifest.SHA256[name]
+			remoteHash = strings.TrimSpace(manifest.SHA256[name])
 		}
+	}
+	if !found || remoteHash == "" {
+		return releaseOutcome{}, errUpdateCheck
 	}
 	known, changed := releaseChanged(Version, remoteVer, localHash, remoteHash)
 	explicit := mode != releaseAuto
@@ -186,10 +190,13 @@ func syncRelease(ctx context.Context, server, exe string, mode releaseMode) (rel
 	if err != nil {
 		return releaseOutcome{}, err
 	}
+	sum := sha256.Sum256(body)
+	if !strings.EqualFold(hex.EncodeToString(sum[:]), remoteHash) {
+		return releaseOutcome{}, errUpdateHash
+	}
 	if !binaryMagic(runtime.GOOS, body) {
 		return releaseOutcome{}, errUpdateBinary
 	}
-	sum := sha256.Sum256(body)
 	if localHash != "" && strings.EqualFold(localHash, hex.EncodeToString(sum[:])) {
 		return releaseOutcome{kind: releaseCurrent, remote: remoteVer}, nil
 	}

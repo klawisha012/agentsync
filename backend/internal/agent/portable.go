@@ -38,6 +38,9 @@ func privatePath(path string) bool {
 	case "credentials.json", "credentials", "auth.json", "session.json", ".env":
 		return true
 	}
+	if strings.HasPrefix(base, ".env") {
+		return true
+	}
 	if strings.HasSuffix(base, ".lock") || strings.HasSuffix(base, ".log") {
 		return true
 	}
@@ -51,9 +54,12 @@ func privatePath(path string) bool {
 }
 
 func portablePath(path string) bool {
-	clean := filepath.ToSlash(path)
-	if clean == ".." || strings.HasPrefix(clean, "../") || isHook(path) || isMCP(path) {
-		return clean != ".." && !strings.HasPrefix(clean, "../")
+	clean, ok := CleanRel(path)
+	if !ok {
+		return false
+	}
+	if isHook(clean) || isMCP(clean) {
+		return true
 	}
 	base := strings.ToLower(filepath.Base(clean))
 	switch base {

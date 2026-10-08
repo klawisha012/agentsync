@@ -142,14 +142,14 @@ func TestUpdateOldServerComparesFile(t *testing.T) {
 	t.Setenv("AGENTSYNC_SERVER", same.URL)
 	var out, err bytes.Buffer
 	before := fileStamp(t, exe)
-	if code := Run([]string{"update"}, nil, &out, &err); code != 0 {
-		t.Fatalf("same %d %s", code, err.String())
+	if code := Run([]string{"update"}, nil, &out, &err); code == 0 {
+		t.Fatalf("same succeeded without a manifest: %s", out.String())
 	}
-	if out.String() != "Уже стоит последняя версия.\n" {
-		t.Fatalf("same stdout %q", out.String())
+	if !bytes.Contains(err.Bytes(), []byte("Не удалось проверить обновление.")) {
+		t.Fatalf("same stderr %q", err.String())
 	}
-	if fileStamp(t, exe) != before {
-		t.Fatal("same file was rewritten")
+	if got := readFile(t, exe); got != string(body) || fileStamp(t, exe) != before {
+		t.Fatal("missing manifest changed the binary")
 	}
 
 	next := fakeCLI(t, 'c')
@@ -157,18 +157,11 @@ func TestUpdateOldServerComparesFile(t *testing.T) {
 	t.Setenv("AGENTSYNC_SERVER", other.URL)
 	out.Reset()
 	err.Reset()
-	before = fileStamp(t, exe)
-	if code := Run([]string{"update"}, nil, &out, &err); code != 0 {
-		t.Fatalf("other %d %s", code, err.String())
+	if code := Run([]string{"update"}, nil, &out, &err); code == 0 {
+		t.Fatalf("other succeeded without a manifest: %s", out.String())
 	}
-	if out.String() != "AgentSync обновлён.\n" {
-		t.Fatalf("other stdout %q", out.String())
-	}
-	if got := readFile(t, exe); got != string(next) {
-		t.Fatal("old server did not replace the binary")
-	}
-	if fileStamp(t, exe) == before {
-		t.Fatal("replaced file kept the old stamp")
+	if got := readFile(t, exe); got != string(body) {
+		t.Fatal("missing manifest replaced the binary")
 	}
 }
 
@@ -177,7 +170,7 @@ func TestUpdateRejectsPage(t *testing.T) {
 	exe := withExecutable(t, body)
 	page := bytes.Repeat([]byte("x"), 80)
 	copy(page, []byte("<html>"))
-	srv := releaseServer(t, "", map[string][]byte{mustReleaseName(t): page}, false)
+	srv := releaseServer(t, "", map[string][]byte{mustReleaseName(t): page}, true)
 	t.Setenv("AGENTSYNC_SERVER", srv.URL)
 
 	var out, err bytes.Buffer

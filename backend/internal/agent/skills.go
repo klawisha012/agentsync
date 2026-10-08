@@ -24,6 +24,11 @@ type SkillCopy struct {
 // CopySkills reads one publication version and adds the named skill folders
 // to each receiver's skills directory. Other skills stay in place. The store is not written.
 func CopySkills(ctx context.Context, server, root, account, token, cookie string, copy SkillCopy) error {
+	unlock, err := lockRoot(root)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	if copy.Version < 1 {
 		return errors.New("Назовите номер версии.")
 	}
@@ -273,7 +278,7 @@ func skillFolders(all []File) []skillFolder {
 	dirs := map[string]struct{}{}
 	cleaned := make([]File, 0, len(all))
 	for _, file := range all {
-		rel, ok := cleanRel(file.Path)
+		rel, ok := CleanRel(file.Path)
 		if !ok {
 			continue
 		}
@@ -315,7 +320,7 @@ func matchFolders(folders []skillFolder, wanted string) ([]skillFolder, error) {
 		}
 		return oneFolder(raw, hits)
 	}
-	want, ok := cleanRel(raw)
+	want, ok := CleanRel(raw)
 	if !ok {
 		return nil, fmt.Errorf("В этой версии нет навыка «%s».", raw)
 	}
@@ -343,13 +348,14 @@ func oneFolder(name string, hits []skillFolder) ([]skillFolder, error) {
 	return hits, nil
 }
 
-func cleanRel(value string) (string, bool) {
+// CleanRel keeps a publication path inside one directory on every OS.
+func CleanRel(value string) (string, bool) {
 	value = strings.TrimSpace(strings.ReplaceAll(value, "\\", "/"))
-	if value == "" || strings.Contains(value, "\x00") {
+	if value == "" || strings.Contains(value, "\x00") || strings.ContainsAny(value, ":$`'\"") {
 		return "", false
 	}
 	cleaned := path.Clean(value)
-	if cleaned == "." || cleaned == ".." || strings.HasPrefix(cleaned, "../") || strings.HasPrefix(cleaned, "/") {
+	if cleaned == "." || cleaned == ".." || strings.HasPrefix(cleaned, "../") || strings.HasPrefix(cleaned, "/") || strings.ContainsAny(cleaned, ":$`'\"") {
 		return "", false
 	}
 	return cleaned, true
