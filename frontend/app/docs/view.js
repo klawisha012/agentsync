@@ -154,7 +154,7 @@ export default function DocsPage() {
           </section>
           <section className="docs-section" id="skills">
             <h2>Установка отдельных навыков</h2>
-            <p><code>skills</code> копирует выбранные навыки из конкретной версии публикации в каталоги выбранных приёмников.</p>
+            <p><code>skills</code> копирует выбранные навыки из конкретной версии публикации в каталоги выбранных приёмников. Вход в аккаунт не нужен. Скрытую версию команда не копирует, пока её не открывает сессия владельца или подтверждённая машина владельца.</p>
             <Command code="agentsync skills Author Grok --version 4 --global --into cursor ru-text" />
             <ul>
               <li><code>Author Grok</code> — автор и агент.</li>

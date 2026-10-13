@@ -13,10 +13,13 @@ import (
 func TestCopySkillsPlacesChosenFolders(t *testing.T) {
 	var gotVersion string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/apply/zwarder/Grok" {
+		if r.URL.Path != "/accounts/zwarder/versions/Grok/4" {
 			t.Errorf("path %s", r.URL.Path)
 		}
-		gotVersion = r.URL.Query().Get("version")
+		if r.Header.Get("Authorization") != "" || r.Header.Get("Cookie") != "" {
+			t.Errorf("auth header %q cookie %q", r.Header.Get("Authorization"), r.Header.Get("Cookie"))
+		}
+		gotVersion = r.URL.Path[strings.LastIndex(r.URL.Path, "/")+1:]
 		raw, err := json.Marshal(publicationPayload{
 			Author:  "zwarder",
 			Agent:   "Grok",

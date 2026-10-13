@@ -48,7 +48,7 @@ func CopySkills(ctx context.Context, server, root, account, token, cookie string
 	if err != nil {
 		return err
 	}
-	payload, err := fetchPublication(ctx, server, copy.Author, copy.Source, token, cookie, copy.Version)
+	payload, err := fetchSkillPublication(ctx, server, copy.Author, copy.Source, token, cookie, copy.Version)
 	if err != nil {
 		return err
 	}

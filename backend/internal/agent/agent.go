@@ -202,6 +202,15 @@ func fetchPublication(ctx context.Context, server, author, agentName, token, coo
 	if version > 0 {
 		target += "?version=" + strconv.Itoa(version)
 	}
+	return getPublication(ctx, target, token, cookie)
+}
+
+func fetchSkillPublication(ctx context.Context, server, author, agentName, token, cookie string, version int) (publicationPayload, error) {
+	target := strings.TrimRight(server, "/") + "/accounts/" + url.PathEscape(author) + "/versions/" + url.PathEscape(agentName) + "/" + strconv.Itoa(version)
+	return getPublication(ctx, target, token, cookie)
+}
+
+func getPublication(ctx context.Context, target, token, cookie string) (publicationPayload, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
 		return publicationPayload{}, err

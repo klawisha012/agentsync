@@ -152,7 +152,7 @@ func (a *app) listVersions(c echo.Context) error {
 	return c.JSON(code, map[string]any{"versions": heads})
 }
 
-func (s *store) version(name, agentName, sessionID string, number int) (publicationView, int, string) {
+func (s *store) version(name, agentName, sessionID, token string, number int) (publicationView, int, string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	page := s.byName[foldKey.String(name)]
@@ -176,6 +176,11 @@ func (s *store) version(name, agentName, sessionID string, number int) (publicat
 		return publicationView{}, http.StatusNotFound, "Версия не найдена."
 	}
 	viewer := s.accountBySession(sessionID)
+	if viewer == nil {
+		if machine := s.machineByToken(token); machine != nil {
+			viewer = machine.account
+		}
+	}
 	if viewer != page && !page.shareVersions && !(page.shareView && latest != nil && latest.id == found.id) {
 		return publicationView{}, http.StatusNotFound, "Эта версия скрыта."
 	}
@@ -187,7 +192,8 @@ func (a *app) showVersion(c echo.Context) error {
 	if err != nil || number < 1 {
 		return writeExplanation(c, http.StatusNotFound, "Версия не найдена.")
 	}
-	view, code, msg := a.accounts.version(c.Param("name"), c.Param("agent"), sessionID(c), number)
+	token := strings.TrimSpace(strings.TrimPrefix(c.Request().Header.Get(echo.HeaderAuthorization), "Bearer "))
+	view, code, msg := a.accounts.version(c.Param("name"), c.Param("agent"), sessionID(c), token, number)
 	if msg != "" {
 		return writeExplanation(c, code, msg)
 	}

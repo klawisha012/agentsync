@@ -5,8 +5,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/klawisha012/agentsync/internal/agent"
 )
 
 func TestPushKeepsPortableFiles(t *testing.T) {
@@ -197,6 +201,60 @@ func TestApplyReadsNamedVersion(t *testing.T) {
 	if bad.Code != http.StatusNotFound {
 		t.Fatalf("bad version %d %s", bad.Code, bad.Body.String())
 	}
+}
+
+func TestSkillInstallWithoutLogin(t *testing.T) {
+	e := newServer(t)
+	owner := mustAccount(t, e, "skills@example.com", "secret-pass", "Skills")
+	machine := postJSON(t, e, "/machine", map[string]string{
+		"id": testMachineID("pc-skills"), "host": "desk", "listener": "127.0.0.1:49152",
+	}, owner)
+	if machine.Code != http.StatusOK {
+		t.Fatalf("machine %d %s", machine.Code, machine.Body.String())
+	}
+	token := decodeMachine(t, machine.Body.Bytes()).AgentToken
+	pushed := postAuth(t, e, "/agent/push", "", pushBody("Grok", false, pushFile{"skills/ru-text/SKILL.md", "text"}), owner)
+	if pushed.Code != http.StatusCreated {
+		t.Fatalf("push %d %s", pushed.Code, pushed.Body.String())
+	}
+
+	hidden := getJSON(t, e, "/accounts/Skills/versions/Grok/1", nil)
+	if hidden.Code != http.StatusNotFound || !strings.Contains(hidden.Body.String(), "скрыта") {
+		t.Fatalf("hidden %d %s", hidden.Code, hidden.Body.String())
+	}
+	owned := getBearer(t, e, "/accounts/Skills/versions/Grok/1", token)
+	if owned.Code != http.StatusOK || !strings.Contains(owned.Body.String(), "text") {
+		t.Fatalf("owner token %d %s", owned.Code, owned.Body.String())
+	}
+
+	opened := postJSON(t, e, "/account/privacy", map[string]bool{"view": true}, owner)
+	if opened.Code != http.StatusOK {
+		t.Fatalf("privacy %d %s", opened.Code, opened.Body.String())
+	}
+	ts := httptest.NewServer(e)
+	t.Cleanup(ts.Close)
+	root := t.TempDir()
+	t.Setenv("GROK_HOME", "")
+	err := agent.CopySkills(t.Context(), ts.URL, root, "", "", "", agent.SkillCopy{
+		Author: "Skills", Source: "Grok", Version: 1, Place: "global",
+		Skills: []string{"ru-text"}, Targets: []string{"grok"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := os.ReadFile(filepath.Join(root, ".grok", "skills", "ru-text", "SKILL.md"))
+	if err != nil || string(body) != "text" {
+		t.Fatalf("installed %q %v", body, err)
+	}
+}
+
+func getBearer(t *testing.T, h http.Handler, path, token string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
 }
 
 func pushBody(agent string, missing bool, files ...pushFile) map[string]any {
