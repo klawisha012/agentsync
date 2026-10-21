@@ -148,7 +148,13 @@ func Revert(root, account, agentName string) error {
 			return err
 		}
 	}
-	return os.RemoveAll(latest.dir)
+	if err := os.RemoveAll(latest.dir); err != nil {
+		return err
+	}
+	if isCanonCard(agentName) {
+		return reconnect(root, account)
+	}
+	return nil
 }
 
 type Snapshot struct {
@@ -367,6 +373,12 @@ func clearPortableFiles(home string) error {
 		if machine := machineServers(file.Body); len(machine) > 0 {
 			top, _, _ := mcpServers(file.Body)
 			if err := os.WriteFile(target, []byte(encodeMCP(top, machine)), 0o644); err != nil {
+				return err
+			}
+			continue
+		}
+		if machine := onlyMachineHooks(file.Path, file.Body); machine != "" {
+			if err := os.WriteFile(target, []byte(machine), 0o644); err != nil {
 				return err
 			}
 			continue

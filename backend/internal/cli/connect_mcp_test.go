@@ -151,3 +151,17 @@ func TestOnGivesGeminiAnHTTPServerUnderHTTPURL(t *testing.T) {
 		t.Fatalf("docs %v", docs)
 	}
 }
+
+func TestCanonApplyReconnectsConnectedAgents(t *testing.T) {
+	root := connectRoot(t)
+	writeRel(t, filepath.Join(root, ".agents"), "mcp.json", `{"mcpServers":{"old":{"command":"old"}}}`)
+	if code, _, stderr := runCLI(t, "claude", "on"); code != 0 {
+		t.Fatal(stderr)
+	}
+	if code, stderr := pipeApply(t, `{"author":"zwarder","agent":"agents","files":[{"path":"mcp.json","body":"{\"mcpServers\":{\"fresh\":{\"command\":\"fresh\"}}}"}]}`); code != 0 {
+		t.Fatalf("canon apply %s", stderr)
+	}
+	if _, servers := claudeServers(t, root); servers["fresh"] == nil || servers["old"] != nil {
+		t.Fatalf("connected agent not updated %v", servers)
+	}
+}

@@ -122,3 +122,70 @@ func TestPipeApplyOldGeminiCardSendsHooksToTheCanonInClaudeForm(t *testing.T) {
 		t.Fatalf("gemini not connected %v", gemini)
 	}
 }
+
+func TestOnTwiceKeepsOneCopyOfAHookWithAmpersands(t *testing.T) {
+	root := connectRoot(t)
+	writeRel(t, filepath.Join(root, ".agents"), "hooks.json", `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"lint && say <done>"}]}]}}`)
+	settings := filepath.Join(root, ".claude", "settings.json")
+	for range 2 {
+		if code, _, stderr := runCLI(t, "claude", "on"); code != 0 {
+			t.Fatal(stderr)
+		}
+	}
+	if hooks := settingsHooks(t, settings); len(hooks["Stop"]) != 1 {
+		t.Fatalf("hooks %v", hooks)
+	}
+	if code, _, stderr := runCLI(t, "claude", "off"); code != 0 {
+		t.Fatal(stderr)
+	}
+	if hooks := settingsHooks(t, settings); len(hooks) != 0 {
+		t.Fatalf("off left %v", hooks)
+	}
+}
+
+func TestRevertAndCanonApplyKeepMachineHooks(t *testing.T) {
+	root := connectRoot(t)
+	machine := `{"hooks":[{"type":"command","command":"/Users/me/run.sh"}]}`
+	writeRel(t, root, ".claude/settings.json", `{"theme":"dark","hooks":{"Stop":[`+machine+`]}}`)
+	writeRel(t, root, ".agents/hooks.json", `{"hooks":{"Stop":[`+machine+`]}}`)
+	writeRel(t, root, ".agents/skills/note/SKILL.md", "note")
+	if code, stderr := pipeApply(t, `{"author":"zwarder","agent":"claude","files":[{"path":"settings.json","body":"{\"theme\":\"light\"}"},{"path":"agentsync.json","body":"{}"}]}`); code != 0 {
+		t.Fatalf("apply %s", stderr)
+	}
+	if code, _, stderr := runCLI(t, "revert", "claude"); code != 0 {
+		t.Fatalf("revert %s", stderr)
+	}
+	if body := readFile(t, filepath.Join(root, ".claude", "settings.json")); !strings.Contains(body, "/Users/me/run.sh") || !strings.Contains(body, "dark") {
+		t.Fatalf("revert lost the machine hook %s", body)
+	}
+	if code, stderr := pipeApply(t, `{"author":"zwarder","agent":"agents","files":[{"path":"skills/other/SKILL.md","body":"other"}]}`); code != 0 {
+		t.Fatalf("canon apply %s", stderr)
+	}
+	if body := readFile(t, filepath.Join(root, ".agents", "hooks.json")); !strings.Contains(body, "/Users/me/run.sh") {
+		t.Fatalf("canon apply lost the machine hook %s", body)
+	}
+}
+
+func TestPushKeepsPortableHooksAndDropsMachineHookFiles(t *testing.T) {
+	var sent string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		sent = string(raw)
+		w.WriteHeader(http.StatusCreated)
+	}))
+	t.Cleanup(srv.Close)
+	root := connectRoot(t)
+	writeRel(t, root, ".claude/settings.json", `{"hooks":{"PreToolUse":[{"hooks":[{"type":"command","command":"\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check.sh"}]}],"Stop":[{"hooks":[{"type":"command","command":"npm test > /dev/null"}]}]}}`)
+	writeRel(t, root, ".claude/hooks/extra.json", `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"say hi"}]}]},"env":{"LOG":"/Users/me/log"}}`)
+	t.Setenv("AGENTSYNC_SERVER", srv.URL)
+	t.Setenv("AGENTSYNC_TOKEN", "machine")
+	if code, _, stderr := runCLI(t, "push", "claude"); code != 0 {
+		t.Fatalf("push %s", stderr)
+	}
+	if !strings.Contains(sent, "check.sh") || !strings.Contains(sent, "npm test") {
+		t.Fatalf("portable hooks dropped %s", sent)
+	}
+	if strings.Contains(sent, "/Users/me/log") {
+		t.Fatalf("hook file with a machine path published %s", sent)
+	}
+}

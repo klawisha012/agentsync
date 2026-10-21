@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bytes"
 	"encoding/json"
 	"maps"
 	"os"
@@ -28,7 +29,10 @@ func portableFile(file File) (File, bool) {
 	if PrivatePath(file.Path) || !PortablePath(file.Path) {
 		return file, false
 	}
-	if body, ok := portableHooks(file.Body); ok {
+	if body, rest, ok := portableHooks(file.Path, file.Body); ok {
+		if IsHook(file.Path) && AbsolutePath.MatchString(rest) {
+			return file, false
+		}
 		file.Body = body
 	} else if IsHook(file.Path) && AbsolutePath.MatchString(file.Body) {
 		return file, false
@@ -91,10 +95,27 @@ func mcpServers(body string) (map[string]json.RawMessage, map[string]json.RawMes
 }
 
 func encodeMCP(top, servers map[string]json.RawMessage) string {
-	raw, _ := json.Marshal(servers)
-	top["mcpServers"] = raw
-	out, _ := json.MarshalIndent(top, "", "  ")
-	return string(out) + "\n"
+	top["mcpServers"] = marshalPlain(servers)
+	return encodeTop(top)
+}
+
+// marshalPlain encodes JSON without HTML escaping, so "&&" in a command stays as written.
+func marshalPlain(value any) json.RawMessage {
+	var out bytes.Buffer
+	enc := json.NewEncoder(&out)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(value)
+	return bytes.TrimRight(out.Bytes(), "\n")
+}
+
+// encodeTop writes a settings object back as indented JSON.
+func encodeTop(top map[string]json.RawMessage) string {
+	var out bytes.Buffer
+	enc := json.NewEncoder(&out)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(top)
+	return out.String()
 }
 
 // writeHomeFile writes a portable file into an AI agent home. An MCP file keeps the

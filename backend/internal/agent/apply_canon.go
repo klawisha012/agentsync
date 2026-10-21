@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -62,7 +63,7 @@ func applyCanon(root, account string, files []File, broken bool) error {
 	}
 	err = replacePortable(root, canon, files, broken)
 	if err == nil {
-		return nil
+		return reconnect(root, account)
 	}
 	undoErr := replacePortable(root, canon, before, false)
 	// The snapshot holds the previous canon until it is back in place.
@@ -70,6 +71,42 @@ func applyCanon(root, account string, files []File, broken bool) error {
 		undoErr = os.RemoveAll(snapshot)
 	}
 	return errors.Join(err, undoErr)
+}
+
+// reconnect refreshes every AI agent connected to the canon after the canon changed: links,
+// MCP servers, plugins and hooks follow the new canon.
+func reconnect(root, account string) error {
+	var errs []error
+	for _, receiver := range receivers {
+		if !connected(root, receiver) {
+			continue
+		}
+		if _, err := connect(root, account, receiver.Slug, "", ""); err != nil && !errors.Is(err, errEmptyCanon) {
+			errs = append(errs, fmt.Errorf("Канон обновлён, но\u00a0ИИ-агент «%s» не\u00a0подключён заново: %w", receiver.Display, err))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// connected reports an AI agent that holds records on wrote or a link into the canon.
+func connected(root string, receiver Receiver) bool {
+	for _, kind := range recordKinds {
+		if _, ledger, err := loadLedger(kind, receiver.Slug); err == nil && ledger.File != "" {
+			return true
+		}
+	}
+	dir, have := receiver.GlobalDir(root)
+	if !have || insideCanon(root, dir) {
+		return false
+	}
+	entries, _ := os.ReadDir(dir)
+	canon := canonDir(root)
+	for _, entry := range entries {
+		if target, ok := linkTarget(filepath.Join(dir, entry.Name())); ok && within(canon, target) {
+			return true
+		}
+	}
+	return false
 }
 
 func replacePortable(root, dir string, files []File, broken bool) error {
@@ -196,8 +233,7 @@ func splitCard(files []File, places cardPlaces, connectable bool) cardSplit {
 				delete(records, name)
 			}
 		}
-		raw, _ := json.Marshal(records)
-		top[kind.key] = raw
+		top[kind.key] = marshalPlain(records)
 		return len(records)
 	}
 	// takeHooks moves the hook groups that go to the canon out of a settings body, back in Claude form.
@@ -239,7 +275,7 @@ func splitCard(files []File, places cardPlaces, connectable bool) cardSplit {
 				if take(mcpRecords, top) == 0 && IsMCP(file.Path) {
 					continue
 				}
-				file.Body = reencode(top)
+				file.Body = encodeTop(top)
 			}
 		}
 		plugins, hooks := places.plugins != "" && file.Path == places.plugins, places.hooks != "" && file.Path == places.hooks
@@ -251,18 +287,13 @@ func splitCard(files []File, places cardPlaces, connectable bool) cardSplit {
 					changed = true
 				}
 				if changed {
-					file.Body = reencode(top)
+					file.Body = encodeTop(top)
 				}
 			}
 		}
 		split.own = append(split.own, file)
 	}
 	return split
-}
-
-func reencode(top map[string]json.RawMessage) string {
-	out, _ := json.MarshalIndent(top, "", "  ")
-	return string(out) + "\n"
 }
 
 // canonPath maps a card path at a canon place to its canon element and canon path.
@@ -311,6 +342,9 @@ func applyAgent(root, account string, payload publicationPayload, broken bool) e
 	var undo applyUndo
 	err = writeCard(root, home, split, &undo, broken)
 	if err == nil && connectable {
+		err = keepRecords(&undo, root, payload.Agent)
+	}
+	if err == nil && connectable {
 		if _, err = connect(root, account, payload.Agent, dir, home); errors.Is(err, errEmptyCanon) {
 			err = nil
 		}
@@ -324,6 +358,37 @@ func applyAgent(root, account string, payload publicationPayload, broken bool) e
 		return errors.Join(err, undoErr)
 	}
 	return undo.finish(canonDir(root))
+}
+
+// keepRecords remembers the ledgers and settings files connect may write, so a break puts both back together.
+func keepRecords(undo *applyUndo, root, name string) error {
+	receiver, ok := FindReceiver(name)
+	dir, have := receiver.GlobalDir(root)
+	if !ok || !have {
+		return nil
+	}
+	var files []string
+	for _, kind := range recordKinds {
+		ledger, _, err := loadLedger(kind, receiver.Slug)
+		if err != nil {
+			return err
+		}
+		files = append(files, ledger)
+	}
+	if receiver.MCP != "" {
+		files = append(files, receiver.mcpFile(root))
+	}
+	for _, place := range []string{receiver.Plugins, receiver.Hooks} {
+		if place != "" {
+			files = append(files, filepath.Join(filepath.Dir(dir), filepath.FromSlash(place)))
+		}
+	}
+	for _, file := range files {
+		if err := undo.keep(file); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func snapshotTree(root, account, name, dir string) (string, error) {

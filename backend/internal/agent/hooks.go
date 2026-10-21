@@ -8,6 +8,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -21,8 +22,12 @@ var (
 		"PreCompact": "PreCompress", "Notification": "Notification",
 	}
 	geminiHookTools = map[string]string{
-		"Bash": "run_shell_command", "Write": "write_file", "Edit": "replace", "Read": "read_file",
+		"Bash": "run_shell_command", "Write": "write_file", "Edit": "replace", "MultiEdit": "replace",
+		"Read": "read_file", "Glob": "glob", "Grep": "search_file_content", "LS": "list_directory",
+		"WebFetch": "web_fetch", "WebSearch": "google_web_search",
 	}
+	// hookPathVar is a path under a variable such as "$CLAUDE_PROJECT_DIR"/: it travels with the hook.
+	hookPathVar = regexp.MustCompile(`\$\{?[A-Za-z_][A-Za-z0-9_]*\}?(?:\\?")?/`)
 )
 
 // hookSettings sees the hooks object of a JSON settings file as records named
@@ -69,8 +74,17 @@ func compactJSON(raw json.RawMessage) string {
 	return out.String()
 }
 
+// canonicalJSON is the form two equal groups share whatever their key order and escaping.
+func canonicalJSON(raw json.RawMessage) string {
+	var value any
+	if json.Unmarshal(raw, &value) != nil {
+		return compactJSON(raw)
+	}
+	return string(marshalPlain(value))
+}
+
 func hookName(event string, group json.RawMessage) string {
-	return event + " " + compactJSON(group)
+	return event + " " + canonicalJSON(group)
 }
 
 // records lists every hook group by its record name.
@@ -87,7 +101,7 @@ func (s *hookSettings) records() map[string]json.RawMessage {
 func (s *hookSettings) find(name string) (string, int) {
 	event, group, _ := strings.Cut(name, " ")
 	for i, have := range s.events[event] {
-		if compactJSON(have) == group {
+		if canonicalJSON(have) == group {
 			return event, i
 		}
 	}
@@ -123,39 +137,71 @@ func (s *hookSettings) encode() string {
 	if len(s.events) == 0 {
 		delete(s.top, "hooks")
 	} else {
-		raw, _ := json.Marshal(s.events)
-		s.top["hooks"] = raw
+		s.top["hooks"] = marshalPlain(s.events)
 	}
-	out, _ := json.MarshalIndent(s.top, "", "  ")
-	return string(out) + "\n"
+	return encodeTop(s.top)
 }
 
-// machineHooks lists the hook groups bound to this machine by an absolute path.
+// machineHooks lists the hook groups bound to this machine by an absolute path. /dev/null and a
+// path under a variable such as "$CLAUDE_PROJECT_DIR"/ are not bound to one machine.
 func (s *hookSettings) machineHooks() map[string]json.RawMessage {
 	out := map[string]json.RawMessage{}
 	for name, group := range s.records() {
-		if AbsolutePath.Match(group) {
+		text := strings.ReplaceAll(hookPathVar.ReplaceAllString(string(group), ""), "/dev/null", "")
+		if AbsolutePath.MatchString(text) {
 			out[name] = group
 		}
 	}
 	return out
 }
 
-// portableHooks drops machine hook groups from a JSON body with a hooks object. ok is false when
-// the body has no hooks object; then the caller judges the file whole.
-func portableHooks(body string) (string, bool) {
+// hookFile reports a file that may hold hooks: a hook file or an AI agent settings file.
+func hookFile(path string) bool {
+	base := strings.ToLower(filepath.Base(filepath.ToSlash(path)))
+	return IsHook(path) || base == "settings.json" || base == "settings.local.json"
+}
+
+// portableHooks drops machine hook groups from a hook or settings file with a hooks object.
+// rest is the body without the hooks object, for the caller's own machine-path check. ok is
+// false for any other file; then the caller judges it whole.
+func portableHooks(path, body string) (string, string, bool) {
+	if !hookFile(path) {
+		return body, "", false
+	}
 	settings, ok := parseHooks([]byte(body))
 	if !ok || settings.top["hooks"] == nil {
-		return body, false
+		return body, "", false
 	}
+	rest := maps.Clone(settings.top)
+	delete(rest, "hooks")
 	machine := settings.machineHooks()
 	if len(machine) == 0 {
-		return body, true
+		return body, encodeTop(rest), true
 	}
 	for name := range machine {
 		settings.remove(name)
 	}
-	return settings.encode(), true
+	return settings.encode(), encodeTop(rest), true
+}
+
+// onlyMachineHooks is a body with just the machine hook groups; "" when there are none.
+func onlyMachineHooks(path, body string) string {
+	if !hookFile(path) {
+		return ""
+	}
+	settings, ok := parseHooks([]byte(body))
+	if !ok {
+		return ""
+	}
+	machine := settings.machineHooks()
+	if len(machine) == 0 {
+		return ""
+	}
+	kept := &hookSettings{top: map[string]json.RawMessage{}, events: map[string][]json.RawMessage{}}
+	for name, group := range machine {
+		kept.set(name, string(group))
+	}
+	return kept.encode()
 }
 
 // keepMachineHooks adds the machine hook groups of the file on disk to a new body.

@@ -395,10 +395,8 @@ func (s *jsonSettings) remove(name string) {
 }
 
 func (s *jsonSettings) encode() string {
-	raw, _ := json.Marshal(s.servers)
-	s.top[s.key] = raw
-	out, _ := json.MarshalIndent(s.top, "", "  ")
-	return string(out) + "\n"
+	s.top[s.key] = marshalPlain(s.servers)
+	return encodeTop(s.top)
 }
 
 // tomlSettings edits [mcp_servers.<name>] tables as text, so comments and other tables stay.

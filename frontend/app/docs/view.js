@@ -161,7 +161,7 @@ export default function DocsPage() {
             <h2>Применение публикации</h2>
             <p>Передайте имя автора и AI-агента. <code>Author</code> — пример имени автора; замените его реальным.</p>
             <Command code="agentsync apply Author Grok" />
-            <div className="docs-notice"><p><code>apply</code> кладёт элементы канона из публикации в <code>~/.agents</code>, собственные файлы ИИ-агента — в его папку: одноимённые заменяются, остальные остаются. Затем ИИ-агент подключается к канону. Перед заменой канон и настройка ИИ-агента записываются в снимки. Откат: <code>agentsync revert Grok</code> и <code>agentsync revert agents</code>.</p></div>
+            <div className="docs-notice"><p><code>apply</code> кладёт элементы канона из публикации в <code>~/.agents</code>, собственные файлы ИИ-агента — в его папку: одноимённые заменяются, остальные остаются. Затем ИИ-агент подключается к канону. Перед заменой канон и настройка ИИ-агента записываются в снимки. Откат: <code>agentsync revert Grok</code> и <code>agentsync revert agents</code>.</p><p>Публикация канона (<code>agents</code>) применяется иначе: канон становится точной копией публикации, подключённые ИИ-агенты подключаются заново.</p></div>
           </section>
           <section className="docs-section" id="skills">
             <h2>Установка отдельных навыков</h2>
