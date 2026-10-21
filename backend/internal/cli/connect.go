@@ -43,10 +43,18 @@ func runConnect(name string, args []string, stdout io.Writer) error {
 		fmt.Fprintf(stdout, "ИИ-агент %s отключён от канона.\n", args[0])
 		return nil
 	}
-	if err := agent.Connect(root, agent.EnvOrHome("AGENTSYNC_ACCOUNT", "account"), args[0]); err != nil {
+	report, err := agent.Connect(root, agent.EnvOrHome("AGENTSYNC_ACCOUNT", "account"), args[0])
+	if err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "ИИ-агент %s видит навыки канона.\n", args[0])
+	if len(report.Got) == 0 {
+		fmt.Fprintf(stdout, "ИИ-агент %s ничего не получил из канона.\n", args[0])
+	} else {
+		fmt.Fprintf(stdout, "ИИ-агент %s видит из канона: %s.\n", args[0], strings.Join(report.Got, ", "))
+	}
+	if len(report.Skipped) > 0 {
+		fmt.Fprintf(stdout, "Пропущены виды, которых ИИ-агент не понимает: %s.\n", strings.Join(report.Skipped, ", "))
+	}
 	return nil
 }
 

@@ -17,6 +17,11 @@ type Receiver struct {
 	Aliases  []string
 	InConfig bool
 	OpenClaw bool
+	// Places of other canon kinds, relative to the folder above the global skills directory.
+	// An empty place means the AI agent does not understand that kind.
+	Agents       string
+	Commands     string
+	Instructions string
 }
 
 // ReceiverView is the public list the site shows when a person picks a receiver.
@@ -121,14 +126,14 @@ var receivers = []Receiver{
 	{Slug: "autohand-code", Display: "Autohand Code CLI", Project: ".autohand/skills", Global: ".autohand/skills", Env: "AUTOHAND_HOME"},
 	{Slug: "augment", Display: "Augment", Project: ".augment/skills", Global: ".augment/skills"},
 	{Slug: "bob", Display: "IBM Bob", Project: ".bob/skills", Global: ".bob/skills"},
-	{Slug: "claude-code", Aliases: []string{"claude"}, Display: "Claude Code", Project: ".claude/skills", Global: ".claude/skills", Env: "CLAUDE_CONFIG_DIR"},
+	{Slug: "claude-code", Aliases: []string{"claude"}, Display: "Claude Code", Project: ".claude/skills", Global: ".claude/skills", Env: "CLAUDE_CONFIG_DIR", Agents: "agents", Commands: "commands", Instructions: "CLAUDE.md"},
 	{Slug: "openclaw", Display: "OpenClaw", Project: "skills", OpenClaw: true},
 	{Slug: "cline", Display: "Cline", Project: ".agents/skills", Global: ".agents/skills"},
 	{Slug: "codearts-agent", Display: "CodeArts Agent", Project: ".codeartsdoer/skills", Global: ".codeartsdoer/skills"},
 	{Slug: "codebuddy", Display: "CodeBuddy", Project: ".codebuddy/skills", Global: ".codebuddy/skills"},
 	{Slug: "codemaker", Display: "Codemaker", Project: ".codemaker/skills", Global: ".codemaker/skills"},
 	{Slug: "codestudio", Display: "Code Studio", Project: ".codestudio/skills", Global: ".codestudio/skills"},
-	{Slug: "codex", Display: "Codex", Project: ".agents/skills", Global: ".codex/skills", Env: "CODEX_HOME"},
+	{Slug: "codex", Display: "Codex", Project: ".agents/skills", Global: ".codex/skills", Env: "CODEX_HOME", Commands: "prompts", Instructions: "AGENTS.md"},
 	{Slug: "command-code", Display: "Command Code", Project: ".commandcode/skills", Global: ".commandcode/skills"},
 	{Slug: "continue", Display: "Continue", Project: ".continue/skills", Global: ".continue/skills"},
 	{Slug: "cortex", Display: "Cortex Code", Project: ".cortex/skills", Global: ".snowflake/cortex/skills"},
@@ -142,7 +147,7 @@ var receivers = []Receiver{
 	{Slug: "firebender", Display: "Firebender", Project: ".agents/skills", Global: ".firebender/skills"},
 	{Slug: "forgecode", Display: "ForgeCode", Project: ".forge/skills", Global: ".forge/skills"},
 	{Slug: "fx", Display: "fx", Project: ".fx/skills", Global: ".fx/skills"},
-	{Slug: "gemini-cli", Aliases: []string{"gemini"}, Display: "Gemini CLI", Project: ".agents/skills", Global: ".gemini/skills"},
+	{Slug: "gemini-cli", Aliases: []string{"gemini"}, Display: "Gemini CLI", Project: ".agents/skills", Global: ".gemini/skills", Instructions: "GEMINI.md"},
 	{Slug: "github-copilot", Aliases: []string{"copilot"}, Display: "GitHub Copilot", Project: ".agents/skills", Global: ".copilot/skills"},
 	{Slug: "goose", Display: "Goose", Project: ".goose/skills", Global: "goose/skills", InConfig: true},
 	{Slug: "grok", Display: "Grok Build", Project: ".grok/skills", Global: ".grok/skills", Env: "GROK_HOME"},

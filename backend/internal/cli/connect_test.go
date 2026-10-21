@@ -372,3 +372,114 @@ func TestPushReadsALinkedSettingsFile(t *testing.T) {
 		t.Fatalf("linked settings lost: %s", sent)
 	}
 }
+
+func TestOnLinksSubagentsCommandsAndInstructionsForClaude(t *testing.T) {
+	root := connectRoot(t)
+	canon := filepath.Join(root, ".agents")
+	writeRel(t, canon, "skills/note/SKILL.md", "note")
+	writeRel(t, canon, "agents/go-developer.md", "go")
+	writeRel(t, canon, "commands/review.md", "review")
+	writeRel(t, canon, "AGENTS.md", "canon rules")
+	home := filepath.Join(root, ".claude")
+	writeRel(t, home, "CLAUDE.md", "my rules")
+	writeRel(t, home, "agents/mine.md", "mine")
+
+	code, stdout, stderr := runCLI(t, "claude", "on")
+	if code != 0 {
+		t.Fatalf("code %d stderr %s", code, stderr)
+	}
+	for _, kind := range []string{"навыки", "субагенты", "пользовательские команды", "файл инструкций"} {
+		if !strings.Contains(stdout, kind) {
+			t.Fatalf("stdout misses %s: %s", kind, stdout)
+		}
+	}
+	if strings.Contains(stdout, "Пропущены") {
+		t.Fatalf("nothing is skipped: %s", stdout)
+	}
+	for rel, want := range map[string]string{
+		"agents/go-developer.md": "go",
+		"agents/mine.md":         "mine",
+		"commands/review.md":     "review",
+		"CLAUDE.md":              "canon rules",
+	} {
+		if body := readFile(t, filepath.Join(home, filepath.FromSlash(rel))); body != want {
+			t.Fatalf("%s %q", rel, body)
+		}
+	}
+	saved := filepath.Join(root, ".agentsync", "chains", "zwarder", "claude", "0001", "CLAUDE.md")
+	if body := readFile(t, saved); body != "my rules" {
+		t.Fatalf("snapshot %q", body)
+	}
+	writeRel(t, canon, "AGENTS.md", "edited")
+	if body := readFile(t, filepath.Join(home, "CLAUDE.md")); body != "edited" {
+		t.Fatalf("edit in canon not visible: %q", body)
+	}
+
+	if err := os.Remove(filepath.Join(canon, "AGENTS.md")); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, stderr := runCLI(t, "claude", "on"); code != 0 {
+		t.Fatal(stderr)
+	}
+	if _, err := os.Lstat(filepath.Join(home, "CLAUDE.md")); !os.IsNotExist(err) {
+		t.Fatal("link to a removed instructions file stays")
+	}
+}
+
+func TestOnSkipsKindsCodexDoesNotUnderstand(t *testing.T) {
+	root := connectRoot(t)
+	canon := filepath.Join(root, ".agents")
+	writeRel(t, canon, "agents/go-developer.md", "go")
+	writeRel(t, canon, "commands/review.md", "review")
+	writeRel(t, canon, "AGENTS.md", "rules")
+
+	code, stdout, stderr := runCLI(t, "codex", "on")
+	if code != 0 {
+		t.Fatalf("code %d stderr %s", code, stderr)
+	}
+	if !strings.Contains(stdout, "Пропущены") || !strings.Contains(stdout, "субагенты") {
+		t.Fatalf("skip not named: %s", stdout)
+	}
+	home := filepath.Join(root, ".codex")
+	if body := readFile(t, filepath.Join(home, "AGENTS.md")); body != "rules" {
+		t.Fatalf("instructions %q", body)
+	}
+	if body := readFile(t, filepath.Join(home, "prompts", "review.md")); body != "review" {
+		t.Fatalf("command %q", body)
+	}
+	if _, err := os.Lstat(filepath.Join(home, "agents")); !os.IsNotExist(err) {
+		t.Fatal("subagents linked for Codex")
+	}
+}
+
+func TestOffRemovesLinksOfEveryKind(t *testing.T) {
+	root := connectRoot(t)
+	canon := filepath.Join(root, ".agents")
+	writeRel(t, canon, "agents/go-developer.md", "go")
+	writeRel(t, canon, "commands/review.md", "review")
+	writeRel(t, canon, "AGENTS.md", "rules")
+	home := filepath.Join(root, ".claude")
+	writeRel(t, home, "agents/mine.md", "mine")
+	if code, _, stderr := runCLI(t, "claude", "on"); code != 0 {
+		t.Fatal(stderr)
+	}
+
+	if code, _, stderr := runCLI(t, "claude", "off"); code != 0 {
+		t.Fatal(stderr)
+	}
+	entries, err := os.ReadDir(filepath.Join(home, "agents"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(namesOf(entries), ","); got != "mine.md" {
+		t.Fatalf("agents %s", got)
+	}
+	for _, rel := range []string{"commands/review.md", "CLAUDE.md"} {
+		if _, err := os.Lstat(filepath.Join(home, filepath.FromSlash(rel))); !os.IsNotExist(err) {
+			t.Fatalf("%s stays", rel)
+		}
+	}
+	if body := readFile(t, filepath.Join(canon, "AGENTS.md")); body != "rules" {
+		t.Fatalf("canon changed %q", body)
+	}
+}
