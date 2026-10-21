@@ -88,7 +88,7 @@ func connectMCP(root string, receiver Receiver, servers map[string]json.RawMessa
 	}
 	records := map[string]string{}
 	for name, server := range servers {
-		record, err := renderRecord(root, file, name, server)
+		record, err := renderRecord(root, receiver.Slug, file, name, server)
 		if err != nil {
 			return err
 		}
@@ -192,7 +192,7 @@ func readSettings(file string) (mcpSettings, error) {
 	if len(strings.TrimSpace(string(raw))) == 0 {
 		return settings, nil
 	}
-	if json.Unmarshal(raw, &settings.top) != nil {
+	if json.Unmarshal(raw, &settings.top) != nil || settings.top == nil {
 		return nil, fmt.Errorf("Файл %s не разобран как JSON, MCP-серверы не вписаны.", file)
 	}
 	if found := settings.top["mcpServers"]; found != nil && json.Unmarshal(found, &settings.servers) != nil {
@@ -213,9 +213,9 @@ func writeSettings(file string, settings mcpSettings) error {
 
 // renderRecord turns a canon server into the record of the settings format. JSON agents
 // expand ${NAME} themselves; Codex does not, so the value comes from the environment or ~/.agents/.env.
-func renderRecord(root, file, name string, server json.RawMessage) (string, error) {
+func renderRecord(root, slug, file, name string, server json.RawMessage) (string, error) {
 	if !isTOML(file) {
-		return string(server), nil
+		return geminiRecord(slug, server), nil
 	}
 	var canon struct {
 		Command  string            `json:"command"`
@@ -269,6 +269,19 @@ func renderRecord(root, file, name string, server json.RawMessage) (string, erro
 	return strings.Join(lines, "\n") + "\n", nil
 }
 
+// geminiRecord gives Gemini CLI a streamable HTTP server under httpUrl: its url means SSE.
+func geminiRecord(slug string, server json.RawMessage) string {
+	var fields map[string]json.RawMessage
+	if slug != "gemini-cli" || json.Unmarshal(server, &fields) != nil || string(fields["type"]) != `"http"` || fields["url"] == nil {
+		return string(server)
+	}
+	fields["httpUrl"] = fields["url"]
+	delete(fields, "url")
+	delete(fields, "type")
+	raw, _ := json.Marshal(fields)
+	return string(raw)
+}
+
 // secretLookup finds a secret variable in the environment, then in ~/.agents/.env.
 func secretLookup(root string) func(string) (string, bool) {
 	vars := map[string]string{}
@@ -320,14 +333,19 @@ type tomlSettings struct {
 }
 
 // blocks returns the line ranges of the tables that belong to a server: its header up to the next header.
+// A line inside a multi-line array or string is never a header.
 func (s *tomlSettings) blocks(name string) [][2]int {
 	var found [][2]int
 	start := -1
+	depth, multi := 0, ""
 	for i, line := range s.lines {
+		inside := depth > 0 || multi != ""
+		depth, multi = tomlNesting(line, depth, multi)
 		match := tomlHeader.FindStringSubmatch(line)
-		if match == nil {
+		if inside || match == nil {
 			continue
 		}
+		depth = 0
 		if start >= 0 {
 			found = append(found, [2]int{start, i})
 			start = -1
@@ -380,6 +398,37 @@ func splitLines(text string) []string {
 		return nil
 	}
 	return strings.Split(strings.TrimSuffix(text, "\n"), "\n")
+}
+
+// tomlNesting carries the open-bracket depth and an open multi-line string past one line.
+func tomlNesting(line string, depth int, multi string) (int, string) {
+	for i := 0; i < len(line); i++ {
+		if multi != "" {
+			if strings.HasPrefix(line[i:], multi) {
+				i += len(multi) - 1
+				multi = ""
+			}
+			continue
+		}
+		switch c := line[i]; {
+		case strings.HasPrefix(line[i:], `"""`) || strings.HasPrefix(line[i:], "'''"):
+			multi = line[i : i+3]
+			i += 2
+		case c == '"' || c == '\'':
+			end := strings.IndexByte(line[i+1:], c)
+			if end < 0 {
+				return depth, multi
+			}
+			i += end + 1
+		case c == '#':
+			return depth, multi
+		case c == '[':
+			depth++
+		case c == ']' && depth > 0:
+			depth--
+		}
+	}
+	return depth, multi
 }
 
 // tomlKeys splits a dotted TOML key, quoted parts included.

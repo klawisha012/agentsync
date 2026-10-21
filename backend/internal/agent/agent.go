@@ -131,6 +131,9 @@ func Revert(root, account, agentName string) error {
 	}
 	latest := snaps[0]
 	home := agentHome(root, agentName)
+	if name := strings.ToLower(strings.TrimSpace(agentName)); name == canonCard || name == ".agents" {
+		home = canonDir(root)
+	}
 	if err := pathsFit(latest.Files); err != nil {
 		return err
 	}

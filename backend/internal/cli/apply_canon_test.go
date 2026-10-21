@@ -35,6 +35,8 @@ func seedClaudeAndCanon(t *testing.T) string {
 	writeRel(t, home, "settings.json", "mine")
 	writeRel(t, home, "keybindings.json", "keys")
 	writeRel(t, home, ".credentials.json", "secret")
+	writeRel(t, home, "CLAUDE.md", "my rules")
+	writeRel(t, canon, "skills/grill/.env", "KEY=1")
 	return root
 }
 
@@ -67,6 +69,9 @@ func TestPipeApplyClaudeCardGoesThroughTheCanon(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(canon, "skills", "grill", "notes.md")); !os.IsNotExist(err) {
 		t.Fatal("same-name element not replaced whole")
 	}
+	if body := readFile(t, filepath.Join(canon, "skills", "grill", ".env")); body != "KEY=1" {
+		t.Fatalf("private file of a replaced element lost: %q", body)
+	}
 	if !strings.Contains(readFile(t, filepath.Join(canon, "mcp.json")), "local") {
 		t.Fatal("canon MCP lost")
 	}
@@ -90,8 +95,28 @@ func TestPipeApplyClaudeCardGoesThroughTheCanon(t *testing.T) {
 		t.Fatalf("canon snapshot %+v", canonSnaps)
 	}
 	agentSnaps := agent.Chain(root, "zwarder", "claude")
-	if len(agentSnaps) != 1 || !hasBody(agentSnaps[0].Files, "settings.json", "mine") {
+	if len(agentSnaps) != 1 || !hasBody(agentSnaps[0].Files, "settings.json", "mine") || !hasBody(agentSnaps[0].Files, "CLAUDE.md", "my rules") {
 		t.Fatalf("agent snapshot %+v", agentSnaps)
+	}
+
+	if code, _, stderr := runCLI(t, "revert", "claude"); code != 0 {
+		t.Fatalf("revert claude %s", stderr)
+	}
+	for rel, want := range map[string]string{"settings.json": "mine", "CLAUDE.md": "my rules", ".credentials.json": "secret"} {
+		if body := readFile(t, filepath.Join(home, rel)); body != want {
+			t.Fatalf("revert claude %s %q", rel, body)
+		}
+	}
+	if code, _, stderr := runCLI(t, "revert", "agents"); code != 0 {
+		t.Fatalf("revert canon %s", stderr)
+	}
+	for rel, want := range map[string]string{"skills/grill/SKILL.md": "old", "skills/grill/notes.md": "old notes", "AGENTS.md": "old rules", ".env": "TOKEN=x"} {
+		if body := readFile(t, filepath.Join(canon, filepath.FromSlash(rel))); body != want {
+			t.Fatalf("revert canon %s %q", rel, body)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(canon, "skills", "fresh", "SKILL.md")); !os.IsNotExist(err) {
+		t.Fatal("revert canon kept the applied skill")
 	}
 }
 

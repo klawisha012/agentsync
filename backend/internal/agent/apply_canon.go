@@ -179,7 +179,7 @@ func applyAgent(root, account string, payload publicationPayload, broken bool) e
 	var undo applyUndo
 	err = writeCard(root, home, split, &undo, broken)
 	if err == nil && connectable {
-		if _, err = connect(root, account, payload.Agent); errors.Is(err, errEmptyCanon) {
+		if _, err = connect(root, account, payload.Agent, dir, home); errors.Is(err, errEmptyCanon) {
 			err = nil
 		}
 	}
@@ -191,7 +191,7 @@ func applyAgent(root, account string, payload publicationPayload, broken bool) e
 		}
 		return errors.Join(err, undoErr)
 	}
-	return undo.finish()
+	return undo.finish(canonDir(root))
 }
 
 func snapshotTree(root, account, name, dir string) (string, error) {
@@ -337,13 +337,53 @@ func (u *applyUndo) rollback() error {
 			}
 		}
 	}
-	if len(errs) == 0 {
-		return u.finish()
+	if len(errs) == 0 && u.aside != "" {
+		return os.RemoveAll(u.aside)
 	}
 	return errors.Join(errs...)
 }
 
-func (u *applyUndo) finish() error {
+// finish puts the private files of replaced canon elements (.env, node_modules) back into the
+// new elements, then drops the aside folder. On an error the aside folder stays with what is left.
+func (u *applyUndo) finish(canon string) error {
+	for _, moved := range u.moved {
+		if moved.target == "" {
+			continue
+		}
+		err := filepath.WalkDir(moved.target, func(path string, entry os.DirEntry, err error) error {
+			if err != nil || path == moved.target {
+				return err
+			}
+			rel, err := filepath.Rel(moved.target, path)
+			if err != nil {
+				return err
+			}
+			dest := filepath.Join(moved.path, rel)
+			canonRel, err := filepath.Rel(canon, dest)
+			if err != nil || !PrivatePath(filepath.ToSlash(canonRel)) {
+				return err
+			}
+			if _, err := os.Lstat(dest); err == nil {
+				if entry.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+				return err
+			}
+			if err := os.Rename(path, dest); err != nil {
+				return err
+			}
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	}
 	if u.aside == "" {
 		return nil
 	}

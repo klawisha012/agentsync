@@ -483,3 +483,26 @@ func TestOffRemovesLinksOfEveryKind(t *testing.T) {
 		t.Fatalf("canon changed %q", body)
 	}
 }
+
+func TestOnLeavesTheFileACanonLinkPointsTo(t *testing.T) {
+	root := connectRoot(t)
+	home := filepath.Join(root, ".claude")
+	writeRel(t, home, "CLAUDE.md", "mine")
+	writeRel(t, filepath.Join(root, ".agents"), "skills/note/SKILL.md", "note")
+	if err := os.Symlink(filepath.Join(home, "CLAUDE.md"), filepath.Join(root, ".agents", "AGENTS.md")); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, stderr := runCLI(t, "claude", "on"); code != 0 {
+		t.Fatal(stderr)
+	}
+	info, err := os.Lstat(filepath.Join(home, "CLAUDE.md"))
+	if err != nil || info.Mode()&os.ModeSymlink != 0 {
+		t.Fatalf("own file replaced: %v", err)
+	}
+	if body := readFile(t, filepath.Join(home, "CLAUDE.md")); body != "mine" {
+		t.Fatalf("CLAUDE.md %q", body)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".agentsync", "chains")); !os.IsNotExist(err) {
+		t.Fatal("snapshot for a name the canon links to")
+	}
+}

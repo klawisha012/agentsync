@@ -76,12 +76,14 @@ func Connect(root, account, agentName string) (ConnectReport, error) {
 		return ConnectReport{}, err
 	}
 	defer unlock()
-	return connect(root, account, agentName)
+	return connect(root, account, agentName, "", "")
 }
 
 var errEmptyCanon = errors.New("В\u00a0каноне нечего показать.")
 
-func connect(root, account, agentName string) (ConnectReport, error) {
+// connect moves occupied items into snapshot, a snapshot of home already written by the caller;
+// with snapshot "" it writes its own when a name is occupied.
+func connect(root, account, agentName, snapshot, home string) (ConnectReport, error) {
 	canon := canonDir(root)
 	skills, files, err := canonSkills(canon)
 	if err != nil {
@@ -119,11 +121,12 @@ func connect(root, account, agentName string) (ConnectReport, error) {
 	if err != nil {
 		return plan.report, err
 	}
-	snapshot, home := "", ""
-	if len(occupied) > 0 {
+	own := ""
+	if len(occupied) > 0 && snapshot == "" {
 		if snapshot, home, err = snapshotAgent(root, account, cat); err != nil {
 			return plan.report, err
 		}
+		own = snapshot
 	}
 	undo, err := shareCanon(canon, snapshot, home, cat.display, plan, occupied)
 	if err == nil && cat.receiver.MCP != "" {
@@ -132,8 +135,8 @@ func connect(root, account, agentName string) (ConnectReport, error) {
 	if err != nil {
 		undoErr := rollbackCatalog(undo)
 		// The snapshot holds the moved items until every one is back in place.
-		if undoErr == nil && snapshot != "" {
-			_ = os.RemoveAll(snapshot)
+		if undoErr == nil && own != "" {
+			_ = os.RemoveAll(own)
 		}
 		return plan.report, errors.Join(err, undoErr)
 	}
@@ -234,6 +237,11 @@ func planConnect(root string, cat skillCatalog, skills []canonSkill) (connectPla
 			})
 		}
 	}
+	// A canon entry that is a link to the agent's own file is already seen; linking would make a loop.
+	plan.links = slices.DeleteFunc(plan.links, func(link canonLink) bool {
+		info, err := os.Lstat(link.dest)
+		return err == nil && info.Mode()&os.ModeSymlink == 0 && samePlace(realPath(link.abs), realPath(link.dest))
+	})
 	return plan, nil
 }
 

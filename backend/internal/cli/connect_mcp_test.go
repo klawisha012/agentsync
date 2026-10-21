@@ -81,7 +81,7 @@ func TestOnTranslatesCanonMCPIntoCodexTOML(t *testing.T) {
 	writeRel(t, canon, ".env", "# secrets\nexport DOCS_TOKEN=\"fromfile\"\n")
 	t.Setenv("GITHUB_TOKEN", "fromenv")
 	config := filepath.Join(root, ".codex", "config.toml")
-	own := "model = \"o3\"\n\n[mcp_servers.mine]\ncommand = \"mine\"\n\n[mcp_servers.docs]\ncommand = \"old\"\n[mcp_servers.docs.env]\nA = \"b\"\n\n[profiles.x]\nmodel = \"y\"\n"
+	own := "model = \"o3\"\n\n[mcp_servers.mine]\ncommand = \"mine\"\n\n[mcp_servers.docs]\ncommand = \"old\"\nargs = [\n  \"--a\",\n  [\"nested\"]\n]\n[mcp_servers.docs.env]\nA = \"b\"\n\n[profiles.x]\nmodel = \"y\"\n"
 	writeRel(t, root, ".codex/config.toml", own)
 
 	code, stdout, stderr := runCLI(t, "codex", "on")
@@ -96,7 +96,7 @@ func TestOnTranslatesCanonMCPIntoCodexTOML(t *testing.T) {
 			t.Fatalf("missing %s in\n%s", want, body)
 		}
 	}
-	if strings.Contains(body, `command = "old"`) || strings.Contains(body, "${") {
+	if strings.Contains(body, `command = "old"`) || strings.Contains(body, "nested") || strings.Contains(body, "${") {
 		t.Fatalf("body\n%s", body)
 	}
 
@@ -132,5 +132,22 @@ func TestOnSkipsMCPForAnAgentWithoutAFormatter(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, ".cursor", "mcp.json")); !os.IsNotExist(err) {
 		t.Fatal("mcp written for cursor")
+	}
+}
+
+func TestOnGivesGeminiAnHTTPServerUnderHTTPURL(t *testing.T) {
+	root := connectRoot(t)
+	writeRel(t, filepath.Join(root, ".agents"), "mcp.json", canonMCPBody)
+	if code, _, stderr := runCLI(t, "gemini", "on"); code != 0 {
+		t.Fatal(stderr)
+	}
+	var top struct {
+		Servers map[string]map[string]any `json:"mcpServers"`
+	}
+	if err := json.Unmarshal([]byte(readFile(t, filepath.Join(root, ".gemini", "settings.json"))), &top); err != nil {
+		t.Fatal(err)
+	}
+	if docs := top.Servers["docs"]; docs["httpUrl"] != "https://docs.example/mcp" || docs["url"] != nil || docs["type"] != nil {
+		t.Fatalf("docs %v", docs)
 	}
 }
