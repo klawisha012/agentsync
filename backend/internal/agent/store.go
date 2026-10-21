@@ -54,7 +54,7 @@ func recordFiles(ctx context.Context, server, root, agentName, token, cookie str
 		return nil, err
 	}
 	if !missing {
-		files = withMark(portableOnly(files), agentName, agentHome(root, agentName))
+		files = withMark(root, portableOnly(files), agentName, agentHome(root, agentName))
 	}
 	raw, err := postAgent(ctx, server, "/agent/record", agentName, token, cookie, files, missing)
 	if err != nil {

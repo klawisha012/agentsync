@@ -37,11 +37,45 @@ func isCanonCard(name string) bool {
 }
 
 // withMark adds the mark to an AI agent upload. A canon card has none: its apply is an exact copy.
-func withMark(files []File, agentName, home string) []File {
+func withMark(root string, files []File, agentName, home string) []File {
 	if isCanonCard(agentName) {
 		return files
 	}
-	return append(files, markFile(home))
+	user, outside, ok := userMCP(root, agentName, home)
+	if ok {
+		files = append(files, user)
+	}
+	return append(files, markFile(home, outside))
+}
+
+// UserMCPFile carries, in an AI agent upload, its MCP servers from a settings file the snapshot
+// does not hold: Claude Code keeps them in ~/.claude.json beside its own state.
+const UserMCPFile = "user.mcp.json"
+
+// userMCP builds UserMCPFile: only the mcpServers object, without machine servers. outside is the
+// settings file it came from, so the mark can name the records on wrote there.
+func userMCP(root, agentName, home string) (File, string, bool) {
+	receiver, found := FindReceiver(agentName)
+	if !found || receiver.MCP == "" {
+		return File{}, "", false
+	}
+	file := receiver.mcpFile(root)
+	if rel, err := filepath.Rel(home, file); err == nil && filepath.IsLocal(rel) && PortablePath(rel) && !PrivatePath(rel) {
+		return File{}, "", false
+	}
+	raw, err := os.ReadFile(file)
+	if err != nil {
+		return File{}, "", false
+	}
+	_, servers, ok := mcpServers(string(raw))
+	if !ok || len(servers) == 0 {
+		return File{}, "", false
+	}
+	body, ok := PortableMCP(encodeMCP(map[string]json.RawMessage{}, servers))
+	if !ok {
+		return File{}, file, false
+	}
+	return File{Path: UserMCPFile, Body: body}, file, true
 }
 
 // applyCanon makes the canon an exact copy of a canon card. Private files such as .env and
@@ -133,14 +167,14 @@ func replacePortable(root, dir string, files []File, broken bool) error {
 }
 
 // markFile builds the mark for an upload of home: the records on wrote into a settings file inside it.
-func markFile(home string) File {
+func markFile(home, outside string) File {
 	mark := canonMark{MCP: []string{}, Plugins: []string{}, Marketplaces: []string{}, Hooks: []string{}}
 	if dir, err := stateDir(); err == nil {
 		for kind, list := range mark.lists() {
 			ledgers, _ := filepath.Glob(filepath.Join(dir, kind.ledger, "*.json"))
 			for _, file := range ledgers {
 				var ledger recordLedger
-				if raw, err := os.ReadFile(file); err == nil && json.Unmarshal(raw, &ledger) == nil && within(home, ledger.File) {
+				if raw, err := os.ReadFile(file); err == nil && json.Unmarshal(raw, &ledger) == nil && (within(home, ledger.File) || outside != "" && samePlace(outside, ledger.File)) {
 					*list = append(*list, ledger.Own...)
 				}
 			}
@@ -154,6 +188,8 @@ func markFile(home string) File {
 type cardPlaces struct {
 	skills, agents, commands, instructions, mcp, plugins, hooks string
 	hasMCP                                                      bool
+	// userMCP is the settings file outside the snapshot whose servers travel as UserMCPFile.
+	userMCP string
 	hookEvents, hookTools                                       map[string]string
 }
 
@@ -190,6 +226,9 @@ func agentPlaces(root, home, name string) (cardPlaces, bool) {
 	}
 	if places.hasMCP {
 		places.mcp = rel(receiver.mcpFile(root))
+		if places.mcp == "" || !PortablePath(places.mcp) || PrivatePath(places.mcp) {
+			places.mcp, places.userMCP = UserMCPFile, receiver.mcpFile(root)
+		}
 	}
 	places.plugins = beside(receiver.Plugins)
 	places.hooks = beside(receiver.Hooks)
@@ -203,6 +242,9 @@ type cardSplit struct {
 	canon   map[string][]File
 	records map[recordKind]map[string]json.RawMessage
 	own     []File
+	// userMCP are the author's own servers for the settings file outside the home (userMCPFile).
+	userMCP     map[string]json.RawMessage
+	userMCPFile string
 }
 
 // splitCard sorts the card's files by place. Without a mark, the card predates the canon and
@@ -271,7 +313,16 @@ func splitCard(files []File, places cardPlaces, connectable bool) cardSplit {
 			continue
 		}
 		if !connectable {
-			split.own = append(split.own, file)
+			if file.Path != UserMCPFile {
+				split.own = append(split.own, file)
+			}
+			continue
+		}
+		if file.Path == UserMCPFile && places.userMCP != "" {
+			if top, _, ok := mcpServers(file.Body); ok && take(mcpRecords, top) > 0 {
+				_ = json.Unmarshal(top[mcpRecords.key], &split.userMCP)
+				split.userMCPFile = places.userMCP
+			}
 			continue
 		}
 		if element, rel, ok := canonPath(file.Path, places); ok {
@@ -455,6 +506,24 @@ func writeCard(root, home string, split cardSplit, undo *applyUndo, broken bool)
 			settings.set(name, string(record))
 		}
 		if err := writeSettings(file, settings); err != nil {
+			return err
+		}
+		if broken {
+			return errBroken
+		}
+	}
+	if len(split.userMCP) > 0 {
+		if err := undo.keep(split.userMCPFile); err != nil {
+			return err
+		}
+		settings, err := readSettings(split.userMCPFile, mcpRecords.key)
+		if err != nil {
+			return err
+		}
+		for name, record := range split.userMCP {
+			settings.set(name, string(record))
+		}
+		if err := writeSettings(split.userMCPFile, settings); err != nil {
 			return err
 		}
 		if broken {

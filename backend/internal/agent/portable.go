@@ -11,8 +11,9 @@ import (
 	"strings"
 )
 
-// AbsolutePath finds a path bound to one machine in a file body.
-var AbsolutePath = regexp.MustCompile(`(?i)(?:^|[\s"'=])(?:[a-z]:[\\/][^\s"']+|/(?:[a-z0-9._-]+/)*[a-z0-9._-]+)`)
+// AbsolutePath finds a path bound to one machine in a file body. A Unix path needs two segments,
+// so a Windows switch such as "cmd /c npx" is not taken for a path.
+var AbsolutePath = regexp.MustCompile(`(?i)(?:^|[\s"'=])(?:[a-z]:[\\/][^\s"']+|/(?:[a-z0-9._-]+/)+[a-z0-9._-]+)`)
 
 func portableOnly(files []File) []File {
 	kept := make([]File, 0, len(files))

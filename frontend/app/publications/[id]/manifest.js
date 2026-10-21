@@ -124,8 +124,10 @@ export function buildManifest(files, countTokens) {
   return root.children;
 }
 
+// Files come before folders, each group by name.
 function sortNodes(node) {
-  node.children.sort((a, b) => a.name.localeCompare(b.name, "ru", { sensitivity: "base" }));
+  const folder = (item) => (item.children.length > 0 ? 1 : 0);
+  node.children.sort((a, b) => folder(a) - folder(b) || a.name.localeCompare(b.name, "ru", { sensitivity: "base" }));
   for (const child of node.children) {
     sortNodes(child);
   }

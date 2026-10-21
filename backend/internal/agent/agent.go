@@ -52,7 +52,7 @@ func Push(ctx context.Context, server, root, agentName, token, cookie string) er
 		}
 		return err
 	}
-	_, err = postAgent(ctx, server, "/agent/push", agentName, token, cookie, withMark(portableOnly(files), agentName, home), false)
+	_, err = postAgent(ctx, server, "/agent/push", agentName, token, cookie, withMark(root, portableOnly(files), agentName, home), false)
 	return err
 }
 

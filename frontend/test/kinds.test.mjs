@@ -16,3 +16,14 @@ test("kindSummary counts every canon kind a publication carries", () => {
   ]);
   assert.deepEqual(kindSummary([{ path: "settings.json", body: "not json" }]), []);
 });
+
+test("buildManifest lists files before folders", async () => {
+  const { buildManifest } = await import("../app/publications/[id]/manifest.js");
+  const tree = buildManifest([
+    { path: "skills/a/SKILL.md", body: "" },
+    { path: "settings.json", body: "" },
+    { path: "plugins/x.json", body: "" },
+    { path: "AGENTS.md", body: "" },
+  ]);
+  assert.deepEqual(tree.map((node) => node.name), ["AGENTS.md", "settings.json", "plugins", "skills"]);
+});
