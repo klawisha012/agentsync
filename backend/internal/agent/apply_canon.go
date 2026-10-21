@@ -22,6 +22,63 @@ type canonMark struct {
 	MCP []string `json:"mcp"`
 }
 
+func isCanonCard(name string) bool {
+	name = strings.ToLower(strings.TrimSpace(name))
+	return name == canonCard || name == ".agents"
+}
+
+// withMark adds the mark to an AI agent upload. A canon card has none: its apply is an exact copy.
+func withMark(files []File, agentName, home string) []File {
+	if isCanonCard(agentName) {
+		return files
+	}
+	return append(files, markFile(home))
+}
+
+// applyCanon makes the canon an exact copy of a canon card. Private files such as .env and
+// machine MCP servers stay. A break puts the canon back and drops the attempt's snapshot.
+func applyCanon(root, account string, files []File, broken bool) error {
+	files = slices.DeleteFunc(slices.Clone(files), func(file File) bool { return file.Path == MarkFile })
+	if err := pathsFit(files); err != nil {
+		return err
+	}
+	canon := canonDir(root)
+	current, err := readTree(canon)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	before := portableOnly(current)
+	snapshot, err := writeSnapshot(root, account, canonCard, before)
+	if err != nil {
+		return err
+	}
+	err = replacePortable(root, canon, files, broken)
+	if err == nil {
+		return nil
+	}
+	undoErr := replacePortable(root, canon, before, false)
+	// The snapshot holds the previous canon until it is back in place.
+	if undoErr == nil {
+		undoErr = os.RemoveAll(snapshot)
+	}
+	return errors.Join(err, undoErr)
+}
+
+func replacePortable(root, dir string, files []File, broken bool) error {
+	if _, err := clearPortable(root, dir); err != nil {
+		return err
+	}
+	for _, file := range files {
+		if err := writeHomeFile(dir, file); err != nil {
+			return err
+		}
+		if broken {
+			return errors.New("применение не выполнено")
+		}
+	}
+	return nil
+}
+
 // markFile builds the mark for an upload of home: the records on wrote into a settings file inside it.
 func markFile(home string) File {
 	mark := canonMark{MCP: []string{}}

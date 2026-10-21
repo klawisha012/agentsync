@@ -193,3 +193,45 @@ func TestPushMarksTheMCPRecordsOnWrote(t *testing.T) {
 		t.Fatalf("mark %+v", sent.Files)
 	}
 }
+
+func TestPipeApplyCanonCardReplacesTheCanonExactly(t *testing.T) {
+	root := connectRoot(t)
+	canon := filepath.Join(root, ".agents")
+	writeRel(t, canon, "skills/old/SKILL.md", "old")
+	writeRel(t, canon, "AGENTS.md", "old rules")
+	writeRel(t, canon, ".env", "MINE=1")
+	writeRel(t, canon, "mcp.json", `{"mcpServers":{"local":{"command":"/opt/tool/run"}}}`)
+	code, stderr := pipeApply(t, `{"author":"zwarder","agent":"agents","files":[
+		{"path":"skills/note/SKILL.md","body":"note"},
+		{"path":"mcp.json","body":"{\"mcpServers\":{\"docs\":{\"url\":\"https://docs.example/mcp\"}}}"}]}`)
+	if code != 0 {
+		t.Fatalf("apply %d %s", code, stderr)
+	}
+	if body := readFile(t, filepath.Join(canon, "skills", "note", "SKILL.md")); body != "note" {
+		t.Fatalf("note %q", body)
+	}
+	for _, rel := range []string{"skills/old/SKILL.md", "AGENTS.md"} {
+		if _, err := os.Stat(filepath.Join(canon, filepath.FromSlash(rel))); !os.IsNotExist(err) {
+			t.Fatalf("%s stays after an exact replace", rel)
+		}
+	}
+	if body := readFile(t, filepath.Join(canon, ".env")); body != "MINE=1" {
+		t.Fatalf(".env %q", body)
+	}
+	if mcp := readFile(t, filepath.Join(canon, "mcp.json")); !strings.Contains(mcp, "docs") || !strings.Contains(mcp, "/opt/tool/run") {
+		t.Fatalf("mcp %s", mcp)
+	}
+	snaps := agent.Chain(root, "zwarder", "agents")
+	if len(snaps) != 1 || !hasBody(snaps[0].Files, "skills/old/SKILL.md", "old") {
+		t.Fatalf("canon snapshot %+v", snaps)
+	}
+	if code, _, stderr := runCLI(t, "revert", "agents"); code != 0 {
+		t.Fatalf("revert %s", stderr)
+	}
+	if body := readFile(t, filepath.Join(canon, "AGENTS.md")); body != "old rules" {
+		t.Fatalf("revert %q", body)
+	}
+	if _, err := os.Stat(filepath.Join(canon, "skills", "note", "SKILL.md")); !os.IsNotExist(err) {
+		t.Fatal("revert kept the applied skill")
+	}
+}

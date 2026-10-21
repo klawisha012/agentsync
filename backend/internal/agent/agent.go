@@ -52,7 +52,7 @@ func Push(ctx context.Context, server, root, agentName, token, cookie string) er
 		}
 		return err
 	}
-	_, err = postAgent(ctx, server, "/agent/push", agentName, token, cookie, append(portableOnly(files), markFile(home)), false)
+	_, err = postAgent(ctx, server, "/agent/push", agentName, token, cookie, withMark(portableOnly(files), agentName, home), false)
 	return err
 }
 
@@ -99,6 +99,9 @@ func applyOwned(root, account string, payload publicationPayload) error {
 	if owner == "" {
 		owner = payload.Author
 	}
+	if isCanonCard(payload.Agent) {
+		return applyCanon(root, owner, payload.Files, false)
+	}
 	return applyAgent(root, owner, payload, false)
 }
 
@@ -111,6 +114,9 @@ func ApplyBroken(ctx context.Context, server, root, author, agentName, token, co
 	payload, err := fetchPublication(ctx, server, author, agentName, token, cookie, 0)
 	if err != nil {
 		return err
+	}
+	if isCanonCard(agentName) {
+		return applyCanon(root, author, payload.Files, true)
 	}
 	payload.Agent = agentName
 	return applyAgent(root, author, payload, true)
@@ -131,9 +137,6 @@ func Revert(root, account, agentName string) error {
 	}
 	latest := snaps[0]
 	home := agentHome(root, agentName)
-	if name := strings.ToLower(strings.TrimSpace(agentName)); name == canonCard || name == ".agents" {
-		home = canonDir(root)
-	}
 	if err := pathsFit(latest.Files); err != nil {
 		return err
 	}
@@ -377,6 +380,9 @@ func clearPortableFiles(home string) error {
 
 func agentHome(root, name string) string {
 	name = strings.TrimSpace(name)
+	if isCanonCard(name) {
+		return canonDir(root)
+	}
 	literal := filepath.Join(root, name)
 	if info, err := os.Stat(literal); err == nil && info.IsDir() {
 		return literal

@@ -23,6 +23,8 @@ func TestFoundReadsAgentHomes(t *testing.T) {
 	write("Notes/readme.txt", "not an agent")
 	write("proj/src/skills/hidden.md", "nested")
 	write(".agentsync/skills/local.md", "state")
+	write(".agents/agents/go.md", "canon")
+	write(".agents/.env", "TOKEN=1")
 	write(".codex/skills/one.md", "dot")
 	write("Codex/skills/two.md", "plain")
 	if err := os.MkdirAll(filepath.Join(root, "empty-skills", "skills"), 0o755); err != nil {
@@ -36,7 +38,7 @@ func TestFoundReadsAgentHomes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"Claude", "Codex", "grok"}
+	want := []string{"agents", "Claude", "Codex", "grok"}
 	if len(got) != len(want) {
 		t.Fatalf("found %v", got)
 	}

@@ -75,6 +75,7 @@ export default function AgentBoard({ page, owner, onChange, onExplain }) {
             ? shellCommand(["agentsync", "push", agent.name])
             : shellCommand(["agentsync", "apply", page.name, agent.name]);
           const tone = tones[String(agent.name || "").trim().toLowerCase()] || "plain";
+          const canon = String(agent.name || "").trim().toLowerCase() === "agents";
           const canCopy = owner || (page.shareCopy && agent.version != null);
           const canView = owner || (page.shareView && agent.version != null);
           const canVersions = owner || page.shareVersions;
@@ -84,15 +85,19 @@ export default function AgentBoard({ page, owner, onChange, onExplain }) {
                 <div className="house-head">
                   <span>
                     <AgentLogo name={agent.name} tone={tone} />
-                    <strong>{agent.name}</strong>
+                    <strong>{canon ? "Канон" : agent.name}</strong>
                   </span>
                   {agent.version != null ? <em className={`version-chip tone-${tone}`}>v{agent.version}</em> : null}
                 </div>
                 <p className="path-line">
                   <Icon name="folder" />
-                  ~/{agent.name}
+                  {canon ? "~/.agents" : `~/${agent.name}`}
                 </p>
-                <p className="house-copy">Переносимая настройка без учётных данных и машинного MCP.</p>
+                <p className="house-copy">
+                  {canon
+                    ? "Общая настройка всех подключённых ИИ-агентов без .env и машинного MCP."
+                    : "Переносимая настройка без учётных данных и машинного MCP."}
+                </p>
                 <dl className="house-stats">
                   <div>
                     <dt>Файлов</dt>

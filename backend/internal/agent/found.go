@@ -27,7 +27,12 @@ func Found(root string) ([]string, error) {
 			continue
 		}
 		home := filepath.Join(root, dirName)
-		ok, err := agentMarkers(home)
+		// The canon has its own card whatever kinds it holds.
+		ok := strings.EqualFold(dirName, ".agents")
+		var err error
+		if !ok {
+			ok, err = agentMarkers(home)
+		}
 		if err != nil {
 			if errors.Is(err, os.ErrPermission) {
 				continue
@@ -82,7 +87,7 @@ func agentDirName(dir string) string {
 
 func skippedAgentDir(name string) bool {
 	switch strings.ToLower(name) {
-	case ".agentsync", ".git", ".ssh", ".config", ".agents", "node_modules":
+	case ".agentsync", ".git", ".ssh", ".config", "node_modules":
 		return true
 	default:
 		return false
