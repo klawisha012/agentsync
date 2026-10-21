@@ -110,7 +110,7 @@ func canonSkills(home string) ([]canonSkill, []File, error) {
 			continue
 		}
 		dir := path.Dir(file.Path)
-		if dir == "." || privatePath(file.Path) || !portablePath(file.Path) {
+		if dir == "." || PrivatePath(file.Path) || !PortablePath(file.Path) {
 			continue
 		}
 		dirs = append(dirs, dir)
@@ -181,7 +181,7 @@ func skillSecret(skills []canonSkill, files []File) string {
 
 // recordWouldRefuse is true only when запись would stop, not when it would omit the file.
 func recordWouldRefuse(path, body string) bool {
-	if privatePath(path) || !portablePath(path) {
+	if PrivatePath(path) || !PortablePath(path) {
 		return false
 	}
 	if isHook(path) && absolutePath.MatchString(body) {

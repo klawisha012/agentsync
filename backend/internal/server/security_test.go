@@ -74,10 +74,10 @@ func TestTokenHashMatchesPostgres(t *testing.T) {
 }
 
 func TestUnsafePathsAndSecrets(t *testing.T) {
-	if portablePath("rules/../../.bashrc") || portablePath("skills/$(calc)/SKILL.md") {
+	if agent.PortablePath("rules/../../.bashrc") || agent.PortablePath("skills/$(calc)/SKILL.md") {
 		t.Fatal("unsafe path stayed portable")
 	}
-	if !privatePath(".env.local") || !privatePath("rules/.env.production") {
+	if !agent.PrivatePath(".env.local") || !agent.PrivatePath("rules/.env.production") {
 		t.Fatal("env file was not secret")
 	}
 	if _, ok := agent.CleanRel("C:/Users/Public/skills/pwn.txt"); ok {

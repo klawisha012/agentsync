@@ -3,6 +3,7 @@ package agent
 import (
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -19,7 +20,7 @@ func portableOnly(files []File) []File {
 }
 
 func isPortable(path, body string) bool {
-	if privatePath(path) {
+	if PrivatePath(path) {
 		return false
 	}
 	if isHook(path) && absolutePath.MatchString(body) {
@@ -28,10 +29,11 @@ func isPortable(path, body string) bool {
 	if isMCP(path) && (absolutePath.MatchString(body) || strings.Contains(strings.ToLower(body), "authorization")) {
 		return false
 	}
-	return portablePath(path)
+	return PortablePath(path)
 }
 
-func privatePath(path string) bool {
+// PrivatePath reports machine-only files that never leave the computer.
+func PrivatePath(path string) bool {
 	clean := strings.ToLower(filepath.ToSlash(path))
 	base := filepath.Base(clean)
 	switch base {
@@ -44,16 +46,26 @@ func privatePath(path string) bool {
 	if strings.HasSuffix(base, ".lock") || strings.HasSuffix(base, ".log") {
 		return true
 	}
-	for _, seg := range strings.Split(clean, "/") {
+	segs := strings.Split(clean, "/")
+	for _, seg := range segs {
 		switch seg {
 		case "credentials", "sessions", "session", "cache", "caches", "logs", "log", "memory", "history", "conversations", "node_modules", "vendor", "dist", "locks", "bundled", "marketplace-cache":
 			return true
 		}
 	}
+	// Plugin clones and catalogs are re-downloaded by the agent; only the settings entries travel.
+	if slices.Contains(segs, "plugins") {
+		for _, seg := range segs {
+			if strings.Contains(seg, "marketplace") || strings.Contains(seg, "cache") {
+				return true
+			}
+		}
+	}
 	return false
 }
 
-func portablePath(path string) bool {
+// PortablePath reports files that make up the portable settings of an AI agent.
+func PortablePath(path string) bool {
 	clean, ok := CleanRel(path)
 	if !ok {
 		return false
@@ -68,7 +80,7 @@ func portablePath(path string) bool {
 	}
 	for _, seg := range strings.Split(strings.ToLower(clean), "/") {
 		switch seg {
-		case "rules", "skills", "plugins", "theme", "hooks", "mcp", "config":
+		case "rules", "skills", "plugins", "theme", "hooks", "mcp", "config", "agents", "commands":
 			return true
 		}
 	}

@@ -245,7 +245,7 @@ func (p publication) view(author string) publicationView {
 func classify(files []storedFile) ([]storedFile, string) {
 	candidates := make([]storedFile, 0, len(files))
 	for _, file := range files {
-		if privatePath(file.Path) {
+		if agent.PrivatePath(file.Path) {
 			continue
 		}
 		candidates = append(candidates, file)
@@ -273,7 +273,7 @@ func classify(files []storedFile) ([]storedFile, string) {
 		if isMCP(file.Path) && machineMCP(file.Body) {
 			continue
 		}
-		if !portablePath(file.Path) {
+		if !agent.PortablePath(file.Path) {
 			continue
 		}
 		if msg := agent.SecretExplanation(file.Path, file.Body); msg != "" {
@@ -285,50 +285,6 @@ func classify(files []storedFile) ([]storedFile, string) {
 		return nil, "Нет переносимой настройки."
 	}
 	return kept, ""
-}
-
-func privatePath(path string) bool {
-	clean := strings.ToLower(filepath.ToSlash(path))
-	base := filepath.Base(clean)
-	switch base {
-	case "credentials.json", "credentials", "auth.json", "session.json", ".env":
-		return true
-	}
-	if strings.HasPrefix(base, ".env") {
-		return true
-	}
-	if strings.HasSuffix(base, ".lock") || strings.HasSuffix(base, ".log") {
-		return true
-	}
-	for _, seg := range strings.Split(clean, "/") {
-		switch seg {
-		case "credentials", "sessions", "session", "cache", "caches", "logs", "log", "memory", "history", "conversations", "node_modules", "vendor", "dist", "locks", "bundled", "marketplace-cache":
-			return true
-		}
-	}
-	return false
-}
-
-func portablePath(path string) bool {
-	clean, ok := agent.CleanRel(path)
-	if !ok {
-		return false
-	}
-	if isHook(clean) || isMCP(clean) {
-		return true
-	}
-	base := strings.ToLower(filepath.Base(clean))
-	switch base {
-	case "config.json", "settings.json", "agents.md", "claude.md":
-		return true
-	}
-	for _, seg := range strings.Split(strings.ToLower(clean), "/") {
-		switch seg {
-		case "rules", "skills", "plugins", "theme", "hooks", "mcp", "config":
-			return true
-		}
-	}
-	return false
 }
 
 func isHook(path string) bool {
