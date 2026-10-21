@@ -77,13 +77,21 @@ func applyCanon(root, account string, files []File, broken bool) error {
 // MCP servers, plugins and hooks follow the new canon.
 func reconnect(root, account string) error {
 	var errs []error
+	unset := map[string]bool{}
 	for _, receiver := range receivers {
 		if !connected(root, receiver) {
 			continue
 		}
-		if _, err := connect(root, account, receiver.Slug, "", ""); err != nil && !errors.Is(err, errEmptyCanon) {
+		report, err := connect(root, account, receiver.Slug, "", "")
+		if err != nil && !errors.Is(err, errEmptyCanon) {
 			errs = append(errs, fmt.Errorf("Канон обновлён, но\u00a0ИИ-агент «%s» не\u00a0подключён заново: %w", receiver.Display, err))
 		}
+		for _, name := range report.Unset {
+			unset[name] = true
+		}
+	}
+	if len(errs) == 0 && len(unset) > 0 {
+		return UnsetVariables(slices.Sorted(maps.Keys(unset)))
 	}
 	return errors.Join(errs...)
 }
@@ -344,8 +352,9 @@ func applyAgent(root, account string, payload publicationPayload, broken bool) e
 	if err == nil && connectable {
 		err = keepRecords(&undo, root, payload.Agent)
 	}
+	var report ConnectReport
 	if err == nil && connectable {
-		if _, err = connect(root, account, payload.Agent, dir, home); errors.Is(err, errEmptyCanon) {
+		if report, err = connect(root, account, payload.Agent, dir, home); errors.Is(err, errEmptyCanon) {
 			err = nil
 		}
 	}
@@ -357,7 +366,13 @@ func applyAgent(root, account string, payload publicationPayload, broken bool) e
 		}
 		return errors.Join(err, undoErr)
 	}
-	return undo.finish(canonDir(root))
+	if err := undo.finish(canonDir(root)); err != nil {
+		return err
+	}
+	if len(report.Unset) > 0 {
+		return UnsetVariables(report.Unset)
+	}
+	return nil
 }
 
 // keepRecords remembers the ledgers and settings files connect may write, so a break puts both back together.

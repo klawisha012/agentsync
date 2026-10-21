@@ -128,8 +128,9 @@ func connectMCP(root string, receiver Receiver, servers map[string]json.RawMessa
 	file := receiver.mcpFile(root)
 	records := map[string]string{}
 	unset := map[string]bool{}
+	lookup := secretLookup(root)
 	for name, server := range servers {
-		record, missing, err := renderRecord(root, receiver.Slug, file, name, server)
+		record, missing, err := renderRecord(lookup, receiver.Slug, file, name, server)
 		if err != nil {
 			return nil, err
 		}
@@ -280,38 +281,28 @@ func readSettings(file, key string) (mcpSettings, error) {
 	return settings, nil
 }
 
-// writeSettings replaces a settings file atomically through a temporary file. A file that is a
-// link is written at its target, so the link stays.
+// writeSettings writes a settings file in place, not by rename: a link (even to a missing
+// target), a hard link, the owner and the ACL stay, and a file another program holds open
+// on Windows can still be written.
 func writeSettings(file string, settings mcpSettings) error {
-	if real, err := filepath.EvalSymlinks(file); err == nil {
-		file = real
-	}
 	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
 		return err
 	}
-	mode := os.FileMode(0o600)
-	if info, err := os.Stat(file); err == nil {
-		mode = info.Mode().Perm()
-	}
-	tmp, err := os.CreateTemp(filepath.Dir(file), ".agentsync-*")
-	if err != nil {
-		return err
-	}
-	_, err = tmp.WriteString(settings.encode())
-	err = errors.Join(err, tmp.Close(), os.Chmod(tmp.Name(), mode))
-	if err == nil {
-		err = os.Rename(tmp.Name(), file)
-	}
-	if err != nil {
-		_ = os.Remove(tmp.Name())
-	}
-	return err
+	return os.WriteFile(file, []byte(settings.encode()), 0o600)
+}
+
+// UnsetVariables names secret variables written as is: the AI agent does not expand them and
+// the machine has no value for them. The command itself succeeded.
+type UnsetVariables []string
+
+func (u UnsetVariables) Error() string {
+	return "Переменные секрета вписаны как есть, их значения нет в\u00a0окружении и\u00a0~/.agents/.env: " + strings.Join(u, ", ") + "."
 }
 
 // renderRecord turns a canon server into the record of the settings format. JSON agents
 // expand ${NAME} themselves; Codex does not, so the value comes from the environment or ~/.agents/.env.
 // A variable without a value stays as written and comes back in missing.
-func renderRecord(root, slug, file, name string, server json.RawMessage) (string, []string, error) {
+func renderRecord(lookup func(string) (string, bool), slug, file, name string, server json.RawMessage) (string, []string, error) {
 	if !isTOML(file) {
 		return geminiRecord(slug, server), nil, nil
 	}
@@ -326,7 +317,6 @@ func renderRecord(root, slug, file, name string, server json.RawMessage) (string
 	if json.Unmarshal(server, &canon) != nil {
 		return "", nil, fmt.Errorf("Сервер %s в ~/.agents/mcp.json не разобран.", name)
 	}
-	lookup := secretLookup(root)
 	var missing []string
 	expand := func(value string) string {
 		return secretVariable.ReplaceAllStringFunc(value, func(match string) string {

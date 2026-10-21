@@ -17,7 +17,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	if len(args) == 0 {
 		if piped(stdin) {
-			return applyStream(stdin, stderr)
+			return applyStream(stdin, stdout, stderr)
 		}
 		fmt.Fprint(stdout, rootHelp())
 		return 0
@@ -50,6 +50,10 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprintln(stderr, usage.Error())
 			fmt.Fprint(stderr, item.help())
 			return 2
+		}
+		if unsetOnly(err) {
+			fmt.Fprintln(stdout, err.Error())
+			return 0
 		}
 		fmt.Fprintln(stderr, err.Error())
 		return 1
@@ -194,7 +198,7 @@ func (item spec) execute(args []string, stdout io.Writer) error {
 	}
 }
 
-func applyStream(stdin io.Reader, stderr io.Writer) int {
+func applyStream(stdin io.Reader, stdout, stderr io.Writer) int {
 	raw, err := io.ReadAll(stdin)
 	if err != nil {
 		fmt.Fprintln(stderr, err.Error())
@@ -210,6 +214,10 @@ func applyStream(stdin io.Reader, stderr io.Writer) int {
 		return 1
 	}
 	if err := agent.ApplyBody(context.Background(), server, root, account, token, cookie, raw); err != nil {
+		if unsetOnly(err) {
+			fmt.Fprintln(stdout, err.Error())
+			return 0
+		}
 		fmt.Fprintln(stderr, err.Error())
 		return 1
 	}
@@ -238,4 +246,10 @@ func clientSession() (string, string, string, string, string, error) {
 		server = "https://zwarder.ru/api"
 	}
 	return root, server, agent.EnvOrHome("AGENTSYNC_TOKEN", "token"), agent.EnvOrHome("AGENTSYNC_ACCOUNT", "account"), agent.SessionCookie(), nil
+}
+
+// unsetOnly is a command that succeeded with secret variables written as is: a note, not a failure.
+func unsetOnly(err error) bool {
+	var unset agent.UnsetVariables
+	return errors.As(err, &unset) && err.Error() == unset.Error()
 }

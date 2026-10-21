@@ -581,10 +581,10 @@ func staleLinks(canon string, dirs, files []string, wanted map[string]bool) ([]s
 // symlink is os.Symlink; a test replaces it to play a system that forbids links.
 var symlink = os.Symlink
 
-// linkForbidden is a missing right to make links: ERROR_PRIVILEGE_NOT_HELD on Windows.
+// linkForbidden is ERROR_PRIVILEGE_NOT_HELD: Windows without developer mode or admin rights.
 func linkForbidden(err error) bool {
 	var errno syscall.Errno
-	return errors.Is(err, os.ErrPermission) || (errors.As(err, &errno) && errno == 1314)
+	return errors.As(err, &errno) && errno == 1314
 }
 
 func ensureCatalog(dir string) ([]string, error) {

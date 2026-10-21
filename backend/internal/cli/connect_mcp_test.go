@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -182,5 +183,18 @@ func TestOnKeepsALinkedSettingsFileALink(t *testing.T) {
 	}
 	if body := readFile(t, filepath.Join(dotfiles, "claude.json")); !strings.Contains(body, "docs") || !strings.Contains(body, "numStartups") {
 		t.Fatalf("target %s", body)
+	}
+}
+
+func TestCanonApplyNamesAnUnsetVariableOfAReconnectedAgent(t *testing.T) {
+	root := connectRoot(t)
+	writeRel(t, filepath.Join(root, ".agents"), "mcp.json", `{"mcpServers":{"x":{"command":"x"}}}`)
+	if code, _, stderr := runCLI(t, "codex", "on"); code != 0 {
+		t.Fatal(stderr)
+	}
+	var out, errOut bytes.Buffer
+	payload := `{"author":"zwarder","agent":"agents","files":[{"path":"mcp.json","body":"{\"mcpServers\":{\"x\":{\"command\":\"x\",\"env\":{\"K\":\"${NOPE_UNSET_2}\"}}}}"}]}`
+	if code := Run(nil, strings.NewReader(payload), &out, &errOut); code != 0 || !strings.Contains(out.String(), "NOPE_UNSET_2") {
+		t.Fatalf("code %d stdout %s stderr %s", code, out.String(), errOut.String())
 	}
 }
