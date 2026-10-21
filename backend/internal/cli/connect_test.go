@@ -304,3 +304,71 @@ func TestPushOfAConnectedAgentCarriesCanonCopies(t *testing.T) {
 		t.Fatalf("link outside the canon followed: %s", sent)
 	}
 }
+
+func TestOnLeavesTheCanonAloneForAnAgentThatReadsIt(t *testing.T) {
+	root := connectRoot(t)
+	canon := filepath.Join(root, ".agents")
+	writeRel(t, canon, "skills/keep/SKILL.md", "keep")
+	if code, _, stderr := runCLI(t, "cline", "on"); code != 0 {
+		t.Fatalf("on %s", stderr)
+	}
+	if code, _, _ := runCLI(t, "cline", "off"); code != 1 {
+		t.Fatal("off inside the canon succeeded")
+	}
+	info, err := os.Lstat(filepath.Join(canon, "skills", "keep"))
+	if err != nil || info.Mode()&os.ModeSymlink != 0 || readFile(t, filepath.Join(canon, "skills", "keep", "SKILL.md")) != "keep" {
+		t.Fatalf("canon skill changed: %v", err)
+	}
+}
+
+func TestRevertAfterOnBringsTheOwnFolderBack(t *testing.T) {
+	root := connectRoot(t)
+	writeRel(t, filepath.Join(root, ".agents"), "skills/grill-me/SKILL.md", "canon")
+	agentSkills := filepath.Join(root, ".cursor", "skills")
+	writeRel(t, agentSkills, "grill-me/SKILL.md", "mine")
+	writeRel(t, agentSkills, "grill-me/node_modules/dep.js", "dep")
+	if code, _, stderr := runCLI(t, "cursor", "on"); code != 0 {
+		t.Fatal(stderr)
+	}
+	if code, _, stderr := runCLI(t, "revert", "cursor"); code != 0 {
+		t.Fatalf("revert %s", stderr)
+	}
+	info, err := os.Lstat(filepath.Join(agentSkills, "grill-me"))
+	if err != nil || info.Mode()&os.ModeSymlink != 0 {
+		t.Fatalf("grill-me is still a link: %v", err)
+	}
+	if body := readFile(t, filepath.Join(agentSkills, "grill-me", "SKILL.md")); body != "mine" {
+		t.Fatalf("own skill %q", body)
+	}
+	if body := readFile(t, filepath.Join(agentSkills, "grill-me", "node_modules", "dep.js")); body != "dep" {
+		t.Fatalf("private file lost %q", body)
+	}
+	if body := readFile(t, filepath.Join(root, ".agents", "skills", "grill-me", "SKILL.md")); body != "canon" {
+		t.Fatalf("canon changed %q", body)
+	}
+}
+
+func TestPushReadsALinkedSettingsFile(t *testing.T) {
+	var sent string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		sent = string(raw)
+		w.WriteHeader(http.StatusCreated)
+	}))
+	t.Cleanup(srv.Close)
+	root := connectRoot(t)
+	dotfiles := t.TempDir()
+	writeRel(t, dotfiles, "settings.json", `{"theme":"dark"}`)
+	writeRel(t, filepath.Join(root, ".cursor"), "rules/own.md", "own")
+	if err := os.Symlink(filepath.Join(dotfiles, "settings.json"), filepath.Join(root, ".cursor", "settings.json")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AGENTSYNC_SERVER", srv.URL)
+	t.Setenv("AGENTSYNC_TOKEN", "machine")
+	if code, _, stderr := runCLI(t, "push", "cursor"); code != 0 {
+		t.Fatalf("push %s", stderr)
+	}
+	if !strings.Contains(sent, `"settings.json"`) || !strings.Contains(sent, "dark") {
+		t.Fatalf("linked settings lost: %s", sent)
+	}
+}

@@ -10,7 +10,8 @@ import (
 	"strings"
 )
 
-var absolutePath = regexp.MustCompile(`(?i)(?:^|[\s"'=])(?:[a-z]:[\\/][^\s"']+|/(?:[a-z0-9._-]+/)*[a-z0-9._-]+)`)
+// AbsolutePath finds a path bound to one machine in a file body.
+var AbsolutePath = regexp.MustCompile(`(?i)(?:^|[\s"'=])(?:[a-z]:[\\/][^\s"']+|/(?:[a-z0-9._-]+/)*[a-z0-9._-]+)`)
 
 func portableOnly(files []File) []File {
 	kept := make([]File, 0, len(files))
@@ -27,10 +28,10 @@ func portableFile(file File) (File, bool) {
 	if PrivatePath(file.Path) || !PortablePath(file.Path) {
 		return file, false
 	}
-	if isHook(file.Path) && absolutePath.MatchString(file.Body) {
+	if IsHook(file.Path) && AbsolutePath.MatchString(file.Body) {
 		return file, false
 	}
-	if isMCP(file.Path) {
+	if IsMCP(file.Path) {
 		body, ok := PortableMCP(file.Body)
 		file.Body = body
 		return file, ok
@@ -43,11 +44,11 @@ func portableFile(file File) (File, bool) {
 func PortableMCP(body string) (string, bool) {
 	top, servers, ok := mcpServers(body)
 	if !ok {
-		return body, !absolutePath.MatchString(body)
+		return body, !AbsolutePath.MatchString(body)
 	}
 	kept := map[string]json.RawMessage{}
 	for name, server := range servers {
-		if !absolutePath.Match(server) {
+		if !AbsolutePath.Match(server) {
 			kept[name] = server
 		}
 	}
@@ -68,7 +69,7 @@ func machineServers(body string) map[string]json.RawMessage {
 	}
 	machine := map[string]json.RawMessage{}
 	for name, server := range servers {
-		if absolutePath.Match(server) {
+		if AbsolutePath.Match(server) {
 			machine[name] = server
 		}
 	}
@@ -97,7 +98,7 @@ func encodeMCP(top, servers map[string]json.RawMessage) string {
 // writeHomeFile writes a portable file into an AI agent home. An MCP file keeps the
 // machine servers already on disk; on a name clash the machine server wins.
 func writeHomeFile(home string, file File) error {
-	if isMCP(file.Path) {
+	if IsMCP(file.Path) {
 		if raw, err := os.ReadFile(filepath.Join(home, filepath.FromSlash(file.Path))); err == nil {
 			if machine := machineServers(string(raw)); len(machine) > 0 {
 				if top, servers, ok := mcpServers(file.Body); ok {
@@ -148,7 +149,7 @@ func PortablePath(path string) bool {
 	if !ok {
 		return false
 	}
-	if isHook(clean) || isMCP(clean) {
+	if IsHook(clean) || IsMCP(clean) {
 		return true
 	}
 	base := strings.ToLower(filepath.Base(clean))
@@ -165,12 +166,14 @@ func PortablePath(path string) bool {
 	return false
 }
 
-func isHook(path string) bool {
+// IsHook reports a hook file.
+func IsHook(path string) bool {
 	base := strings.ToLower(filepath.Base(filepath.ToSlash(path)))
 	return base == "hooks.json" || base == "hook.json" || pathSegment(path, "hooks")
 }
 
-func isMCP(path string) bool {
+// IsMCP reports an MCP settings file.
+func IsMCP(path string) bool {
 	base := strings.ToLower(filepath.Base(filepath.ToSlash(path)))
 	return base == "mcp.json" || strings.HasSuffix(base, ".mcp.json") || pathSegment(path, "mcp")
 }

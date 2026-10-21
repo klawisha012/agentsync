@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -53,8 +52,6 @@ type publicationView struct {
 	Files    []storedFile   `json:"files"`
 	Excluded []excludedNote `json:"excluded"`
 }
-
-var absolutePath = regexp.MustCompile(`(?i)(?:^|[\s"'=])(?:[a-z]:[\\/][^\s"']+|/(?:[a-z0-9._-]+/)*[a-z0-9._-]+)`)
 
 func (s *store) push(sessionID, agentToken, agent string, missing bool, files []storedFile) (publicationView, int, string) {
 	agent = strings.TrimSpace(agent)
@@ -253,11 +250,11 @@ func classify(files []storedFile) ([]storedFile, string) {
 	hooks := map[string]struct{}{}
 	scripts := map[string]struct{}{}
 	for _, file := range candidates {
-		if !isHook(file.Path) || !absolutePath.MatchString(file.Body) {
+		if !agent.IsHook(file.Path) || !agent.AbsolutePath.MatchString(file.Body) {
 			continue
 		}
 		hooks[file.Path] = struct{}{}
-		for _, match := range absolutePath.FindAllString(file.Body, -1) {
+		for _, match := range agent.AbsolutePath.FindAllString(file.Body, -1) {
 			cleaned := strings.Trim(match, " \t\"'=")
 			scripts[strings.ToLower(filepath.Base(filepath.ToSlash(cleaned)))] = struct{}{}
 		}
@@ -270,7 +267,7 @@ func classify(files []storedFile) ([]storedFile, string) {
 		if _, drop := scripts[strings.ToLower(filepath.Base(file.Path))]; drop {
 			continue
 		}
-		if isMCP(file.Path) {
+		if agent.IsMCP(file.Path) {
 			body, ok := agent.PortableMCP(file.Body)
 			if !ok {
 				continue
@@ -289,31 +286,6 @@ func classify(files []storedFile) ([]storedFile, string) {
 		return nil, "Нет переносимой настройки."
 	}
 	return kept, ""
-}
-
-func isHook(path string) bool {
-	base := strings.ToLower(filepath.Base(filepath.ToSlash(path)))
-	if base == "hooks.json" || base == "hook.json" {
-		return true
-	}
-	return pathSegment(path, "hooks")
-}
-
-func isMCP(path string) bool {
-	base := strings.ToLower(filepath.Base(filepath.ToSlash(path)))
-	if base == "mcp.json" || strings.HasSuffix(base, ".mcp.json") {
-		return true
-	}
-	return pathSegment(path, "mcp")
-}
-
-func pathSegment(path, want string) bool {
-	for _, seg := range strings.Split(strings.ToLower(filepath.ToSlash(path)), "/") {
-		if seg == want {
-			return true
-		}
-	}
-	return false
 }
 
 func packFiles(files []storedFile) ([]byte, error) {

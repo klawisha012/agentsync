@@ -323,4 +323,9 @@ func TestPushDropsOnlyMachineMCPServers(t *testing.T) {
 	if leaked.Code == http.StatusCreated || !strings.Contains(leaked.Body.String(), "mcp.json") || strings.Contains(leaked.Body.String(), "lin_api_REALVALUE123") {
 		t.Fatalf("bearer %d %s", leaked.Code, leaked.Body.String())
 	}
+	basic := postAuth(t, e, "/agent/push", "", pushBody("Grok", false, pushFile{"mcp.json",
+		`{"mcpServers":{"api":{"url":"https://api.example.com/mcp","headers":{"Authorization":"Basic dXNlcjpwYXNzd29yZA=="}}}}`}), author)
+	if basic.Code == http.StatusCreated || strings.Contains(basic.Body.String(), "dXNlcjpwYXNzd29yZA") {
+		t.Fatalf("basic %d %s", basic.Code, basic.Body.String())
+	}
 }

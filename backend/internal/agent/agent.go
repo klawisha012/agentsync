@@ -132,7 +132,7 @@ func Revert(root, account, agentName string) error {
 	if err := pathsFit(latest.Files); err != nil {
 		return err
 	}
-	if err := clearPortable(home); err != nil {
+	if _, err := clearPortable(root, home); err != nil {
 		return err
 	}
 	for _, file := range latest.Files {
@@ -254,11 +254,17 @@ func applyFiles(root, account, agentName string, next []File, broken bool) error
 				return err
 			}
 		}
-		if err := clearPortable(home); err != nil {
+		links, err := clearPortable(root, home)
+		if err != nil {
 			return err
 		}
 		for _, file := range portable {
 			if err := writeHomeFile(home, file); err != nil {
+				return err
+			}
+		}
+		for _, link := range links {
+			if err := os.Symlink(link.target, link.path); err != nil {
 				return err
 			}
 		}
@@ -267,7 +273,7 @@ func applyFiles(root, account, agentName string, next []File, broken bool) error
 	if _, err := writeSnapshot(root, account, agentName, portable); err != nil {
 		return err
 	}
-	if err := clearPortable(home); err != nil {
+	if _, err := clearPortable(root, home); err != nil {
 		return err
 	}
 	for _, file := range next {
@@ -343,7 +349,47 @@ func itoa(n int) string {
 	return string(buf[i:])
 }
 
-func clearPortable(home string) error {
+// clearPortable removes the portable files of a home. It first removes the directory links
+// into the canon and returns them, so later writes land in the home itself.
+func clearPortable(root, home string) ([]savedLink, error) {
+	links, err := unlinkCanonDirs(root, home)
+	if err != nil {
+		return links, err
+	}
+	return links, clearPortableFiles(home)
+}
+
+func unlinkCanonDirs(root, home string) ([]savedLink, error) {
+	canon := realPath(canonDir(root))
+	var links []savedLink
+	err := filepath.WalkDir(home, func(path string, entry os.DirEntry, err error) error {
+		if errors.Is(err, os.ErrNotExist) {
+			return filepath.SkipAll
+		}
+		if err != nil || entry.Type()&os.ModeSymlink == 0 {
+			return err
+		}
+		target, err := filepath.EvalSymlinks(path)
+		if err != nil || !within(canon, target) {
+			return nil
+		}
+		if info, err := os.Stat(target); err != nil || !info.IsDir() {
+			return nil
+		}
+		raw, err := os.Readlink(path)
+		if err != nil {
+			return err
+		}
+		if err := os.Remove(path); err != nil {
+			return err
+		}
+		links = append(links, savedLink{path: path, target: raw})
+		return nil
+	})
+	return links, err
+}
+
+func clearPortableFiles(home string) error {
 	files, err := readTree(home)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -473,8 +519,8 @@ func stateDir() (string, error) {
 	return filepath.Join(home, ".agentsync"), nil
 }
 
-// readSnapshot reads an AI agent home for a snapshot. A link into the canon or inside the
-// home is read as a copy under the link's path; a link elsewhere is left out.
+// readSnapshot reads an AI agent home for a snapshot. A directory link into the canon or inside
+// the home is read as a copy under the link's path; a directory link elsewhere is left out.
 func readSnapshot(root, home string) ([]File, error) {
 	files, err := readTree(home)
 	if err != nil {
@@ -494,17 +540,8 @@ func readSnapshot(root, home string) ([]File, error) {
 			return err
 		}
 		rel = filepath.ToSlash(rel)
-		info, err := os.Stat(target)
-		if err != nil {
+		if info, err := os.Stat(target); err != nil || !info.IsDir() {
 			return err
-		}
-		if !info.IsDir() {
-			raw, err := os.ReadFile(target)
-			if err != nil {
-				return err
-			}
-			files = append(files, File{Path: rel, Body: string(raw)})
-			return nil
 		}
 		inner, err := readTree(target)
 		if err != nil {
@@ -531,9 +568,14 @@ func readTree(root string) ([]File, error) {
 		if err != nil {
 			return err
 		}
-		// Links are skipped: clearing a home must not reach into the canon. readSnapshot follows them.
-		if entry.IsDir() || entry.Type()&os.ModeSymlink != 0 {
+		if entry.IsDir() {
 			return nil
+		}
+		// A link to a directory is skipped: clearing a home must not reach into the canon. readSnapshot follows it.
+		if entry.Type()&os.ModeSymlink != 0 {
+			if info, err := os.Stat(path); err != nil || info.IsDir() {
+				return nil
+			}
 		}
 		rel, err := filepath.Rel(root, path)
 		if err != nil {
