@@ -15,6 +15,7 @@
   display: block;
   background: transparent;
   pointer-events: none;
+  transform: rotate(-4deg);
 }
 
 :global(.hero) .cast {
@@ -26,6 +27,7 @@
   display: block;
   background: transparent;
   pointer-events: none;
+  transform: rotate(3deg);
 }
 
 :global(.hero) .title {

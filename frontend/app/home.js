@@ -24,7 +24,6 @@ const localOnly = [
 ];
 
 export default function Home() {
-  const [variant, setVariant] = useState("d");
   const [origin, setOrigin] = useState("");
   const [tab, setTab] = useState("ps");
   const [copied, setCopied] = useState(false);
@@ -32,7 +31,6 @@ export default function Home() {
 
   useEffect(() => {
     setOrigin(window.location.origin);
-    setVariant(new URLSearchParams(window.location.search).get("hero") ?? "d");
   }, []);
 
   const command = tabs.find((item) => item.id === tab).text(origin);
@@ -55,7 +53,7 @@ export default function Home() {
     <div className="home">
       <section className="hero" id="install">
         <div className={`hero-intro ${styles.intro}`}>
-          <HeroArt variant={variant} slot="left" className={`hero-muse ${styles.muse}`} />
+          <HeroArt slot="left" className={`hero-muse ${styles.muse}`} />
           <h1 className={styles.title}>
             Синхронизация
             <br className="hero-break" />
@@ -65,7 +63,7 @@ export default function Home() {
             {" "}
             на вашем компьютере.
           </h1>
-          <HeroArt variant={variant} slot="right" className={styles.cast} />
+          <HeroArt slot="right" className={styles.cast} />
         </div>
         <p className="lede hero-lede">
           Однократный перенос переносимой конфигурации ИИ-агента без риска утечки учётных данных и{"\u00a0"}машинных зависимостей MCP.

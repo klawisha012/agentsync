@@ -1,111 +1,6 @@
-/* Каждый цикл: кадр 0% равен кадру 100%. Периоды делят 12 с. */
-.float,
-.sway,
-.fly,
-.jitter,
-.beat,
-.swing,
-.astro,
-.hop,
-.orbit,
-.counterOrbit,
-.flame,
-.twinkle,
-.noteUp,
-.letter,
-.spin,
-.counter {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
-}
-
-.float { animation-name: float; animation-duration: 3s; }
-.sway { animation-name: sway; animation-duration: 6s; }
-.fly { animation-name: fly; animation-duration: 6s; }
-.jitter { animation-name: jitter; animation-duration: 1.5s; }
-.beat { animation-name: beat; animation-duration: 1.5s; }
-.swing { animation-name: swing; animation-duration: 1.5s; transform-origin: 50% 70%; }
-.astro { animation-name: astro; animation-duration: 3s; transform-origin: 50% 100%; }
-.hop { animation-name: hop; animation-duration: 1.5s; transform-origin: 50% 100%; }
-.orbit { animation-name: orbit; animation-duration: 12s; animation-timing-function: linear; }
-.counterOrbit { animation-name: orbitBack; animation-duration: 12s; animation-timing-function: linear; }
-.flame { animation-name: flame; animation-duration: 0.3s; transform-origin: 100% 50%; animation-timing-function: linear; }
-.twinkle { animation-name: twinkle; animation-duration: 1.5s; }
-.noteUp { animation-name: noteUp; animation-duration: 3s; animation-timing-function: linear; }
-.letter { animation-name: letter; animation-duration: 1.5s; transform-box: fill-box; }
-.spin { animation-name: spin; animation-duration: 12s; animation-timing-function: linear; }
-.counter { animation-name: spinBack; animation-duration: 6s; animation-timing-function: linear; }
-
-.trail {
-  animation: trail 0.6s linear infinite;
-}
-
-.scroll {
-  animation: scroll 6s linear infinite;
-}
-
-@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
-@keyframes sway { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
-@keyframes fly {
-  0%, 100% { transform: translate(0, 0) rotate(0deg); }
-  25% { transform: translate(8px, -9px) rotate(2deg); }
-  50% { transform: translate(0, -14px) rotate(-1deg); }
-  75% { transform: translate(-8px, -6px) rotate(-3deg); }
-}
-@keyframes jitter {
-  0%, 100% { transform: translate(0, 0); }
-  50% { transform: translate(3px, -5px) rotate(1.5deg); }
-}
-@keyframes beat {
-  0%, 100% { transform: scale(1) rotate(0deg); }
-  15% { transform: scale(1.1) rotate(2deg); }
-  45% { transform: scale(0.97) rotate(-1deg); }
-}
-@keyframes swing { 0%, 100% { transform: rotate(-9deg); } 50% { transform: rotate(9deg); } }
-@keyframes astro { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
-@keyframes hop {
-  0%, 100% { transform: translateY(0) scale(1, 1); }
-  12% { transform: translateY(0) scale(1.1, 0.88); }
-  40% { transform: translateY(-14px) scale(0.94, 1.08); }
-  68% { transform: translateY(0) scale(1.08, 0.92); }
-  82% { transform: translateY(0) scale(1, 1); }
-}
-@keyframes orbit { to { transform: rotate(120deg); } }
-@keyframes orbitBack { to { transform: rotate(-120deg); } }
-@keyframes flame { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.3, 0.8); } }
-@keyframes twinkle {
-  0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
-  50% { transform: scale(0.6) rotate(45deg); }
-}
-@keyframes noteUp {
-  0% { transform: translate(0, 10px) rotate(-8deg); opacity: 0; }
-  15% { opacity: 1; }
-  80% { opacity: 1; }
-  100% { transform: translate(-26px, -64px) rotate(10deg); opacity: 0; }
-}
-@keyframes letter {
-  0%, 100% { transform: translateY(0) scale(1); }
-  20% { transform: translateY(-9px) scale(1.15); }
-  50% { transform: translateY(0) scale(1); }
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-@keyframes spinBack { to { transform: rotate(-360deg); } }
-@keyframes trail { to { stroke-dashoffset: -44; } }
-@keyframes scroll { to { transform: translateX(calc(var(--w) * -1)); } }
-
-/* Комикс: периоды 6 с и 3 с. Момент события задаёт animation-delay из at() в hero-sticker.js. */
+/* Каждый цикл: кадр 0% равен кадру 100%. Момент события задаёт animation-delay из at() в hero-sticker.js. */
 .drift,
-.windup,
-.launch,
-.relay,
-.react,
 .pop,
-.punch,
-.dial,
-.bonk,
-.lane,
 .flash,
 .slam,
 .press,
@@ -119,15 +14,7 @@
 }
 
 .drift { animation-name: drift; }
-.windup { animation-name: windup; animation-duration: 3s; transform-origin: 50% 100%; }
-.launch { animation-name: launch; animation-duration: 3s; }
-.relay { animation-name: relay; animation-timing-function: linear; }
-.react { animation-name: react; transform-origin: 50% 100%; }
 .pop { animation-name: pop; }
-.punch { animation-name: punch; }
-.dial { animation-name: dial; animation-duration: 3s; }
-.bonk { animation-name: bonk; }
-.lane { animation-name: lane; animation-timing-function: linear; }
 .flash { animation-name: flash; animation-timing-function: linear; }
 .slam { animation-name: slam; animation-duration: 3s; transform-origin: 50% 100%; }
 .press { animation-name: press; animation-duration: 3s; transform-origin: 50% 100%; }
@@ -144,76 +31,12 @@
   50% { transform: translate(0, -3px) rotate(0deg) scale(1.035); }
   75% { transform: translate(-3px, -1px) rotate(-0.7deg) scale(1.02); }
 }
-@keyframes windup {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  40% { transform: translateY(2px) rotate(-10deg); }
-  58% { transform: translateY(3px) rotate(-14deg); }
-  64% { transform: translateY(-6px) rotate(12deg); }
-  80% { transform: translateY(0) rotate(0deg); }
-}
-@keyframes launch {
-  0%, 100% { transform: translate(0, 0) rotate(-20deg) scale(1); opacity: 1; }
-  40% { transform: translate(-6px, 4px) rotate(-28deg) scale(1); opacity: 1; }
-  58% { transform: translate(-12px, 6px) rotate(-35deg) scale(1); opacity: 1; }
-  62% { transform: translate(4px, -6px) rotate(-38deg) scale(1); opacity: 1; animation-timing-function: ease-out; }
-  85% { transform: translate(120px, -150px) rotate(-40deg) scale(1.2); opacity: 1; }
-  86% { transform: translate(0, 0) rotate(-20deg) scale(0); opacity: 0; }
-  88% { transform: translate(0, 0) rotate(-20deg) scale(0); opacity: 1; }
-  96% { transform: translate(0, 0) rotate(-20deg) scale(1.15); opacity: 1; }
-}
-/* Самолётик пролетает три кадра: 16% — пас первого бота, 50% — SYNC!, 80% — Dot ловит. */
-@keyframes relay {
-  0%, 100% { transform: translate(-30px, 140px) rotate(-10deg) scale(1); opacity: 1; }
-  16% { transform: translate(42px, 150px) rotate(8deg) scale(1); opacity: 1; }
-  28% { transform: translate(86px, 118px) rotate(-28deg) scale(1); opacity: 1; }
-  50% { transform: translate(170px, 90px) rotate(0deg) scale(1); opacity: 1; }
-  66% { transform: translate(240px, 108px) rotate(18deg) scale(1); opacity: 1; }
-  80% { transform: translate(300px, 168px) rotate(30deg) scale(1); opacity: 1; }
-  84% { transform: translate(302px, 176px) rotate(30deg) scale(0); opacity: 1; }
-  85% { transform: translate(-30px, 140px) rotate(-10deg) scale(1); opacity: 0; }
-  86% { transform: translate(-30px, 140px) rotate(-10deg) scale(1); opacity: 1; }
-}
-/* Пик прыжка — 10% периода. */
-@keyframes react {
-  0%, 22%, 100% { transform: translateY(0) scale(1, 1); }
-  4% { transform: translateY(0) scale(1.12, 0.86); }
-  10% { transform: translateY(-20px) scale(0.92, 1.1); }
-  17% { transform: translateY(0) scale(1.1, 0.9); }
-}
 @keyframes pop {
   0% { transform: scale(0) rotate(-20deg); }
   4% { transform: scale(1.25) rotate(4deg); }
   8%, 26% { transform: scale(1) rotate(0deg); }
   30%, 100% { transform: scale(0) rotate(0deg); }
 }
-@keyframes punch {
-  0%, 20%, 100% { transform: scale(1) rotate(0deg); }
-  4% { transform: scale(1.3) rotate(-6deg); }
-  9% { transform: scale(0.94) rotate(2deg); }
-  14% { transform: scale(1.03) rotate(0deg); }
-  60% { transform: scale(1.04) rotate(1deg); }
-}
-@keyframes dial {
-  0%, 70%, 100% { transform: rotate(0deg); }
-  30% { transform: rotate(-150deg); }
-  55% { transform: rotate(80deg); }
-}
-/* Бот с ключом: удар о стену на 33% (2 с), отлёт с полным оборотом, головокружение. -360° и 0° дают один кадр. */
-@keyframes bonk {
-  0% { transform: translate(0, 0) rotate(0deg) scale(1, 1); }
-  10% { transform: translate(18px, -5px) rotate(4deg) scale(1, 1); }
-  20% { transform: translate(36px, 0) rotate(-4deg) scale(1, 1); }
-  30% { transform: translate(52px, -4px) rotate(4deg) scale(1, 1); }
-  33% { transform: translate(56px, 0) rotate(0deg) scale(0.8, 1.1); }
-  36% { transform: translate(52px, -4px) rotate(0deg) scale(1.1, 0.9); }
-  46% { transform: translate(22px, -44px) rotate(-200deg) scale(1, 1); }
-  54% { transform: translate(0, 0) rotate(-360deg) scale(1.15, 0.85); }
-  58% { transform: translate(0, 0) rotate(-360deg) scale(1, 1); }
-  72% { transform: translate(0, 0) rotate(-367deg) scale(1, 1); }
-  80% { transform: translate(0, 0) rotate(-353deg) scale(1, 1); }
-  88%, 100% { transform: translate(0, 0) rotate(-360deg) scale(1, 1); }
-}
-@keyframes lane { to { transform: translateX(380px); } }
 @keyframes flash {
   0% { opacity: 0.9; }
   20%, 100% { opacity: 0; }
@@ -247,10 +70,12 @@
 @keyframes dash { to { stroke-dashoffset: -40; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .float, .sway, .fly, .jitter, .beat, .swing, .astro, .hop, .orbit, .counterOrbit, .flame,
-  .twinkle, .noteUp, .letter, .spin, .counter, .trail, .scroll,
-  .drift, .windup, .launch, .relay, .react, .pop, .punch, .dial, .bonk, .lane, .flash,
-  .slam, .press, .arcX, .arcY, .dash {
+  .drift, .pop, .flash, .slam, .press, .arcX, .arcY, .dash {
     animation: none;
+  }
+
+  /* Без движения агенты в полёте и вспышка экрана скрыты. */
+  .flash, .arcX {
+    opacity: 0;
   }
 }
