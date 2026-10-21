@@ -2,6 +2,9 @@ package cli
 
 import (
 	"bytes"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -260,5 +263,44 @@ func writeRel(t *testing.T, root, rel, body string) {
 	}
 	if err := os.WriteFile(target, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestPushOfAConnectedAgentCarriesCanonCopies(t *testing.T) {
+	var sent string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		sent = string(raw)
+		w.WriteHeader(http.StatusCreated)
+	}))
+	t.Cleanup(srv.Close)
+	root := connectRoot(t)
+	writeRel(t, filepath.Join(root, ".agents"), "skills/note/SKILL.md", "from-canon")
+	writeRel(t, filepath.Join(root, ".agents"), "AGENTS.md", "rules")
+	writeRel(t, filepath.Join(root, ".cursor"), "rules/own.md", "own")
+	outside := t.TempDir()
+	writeRel(t, outside, "SKILL.md", "elsewhere")
+	if err := os.Symlink(outside, filepath.Join(root, ".cursor", "skills-outside")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(filepath.Join(root, ".agents", "AGENTS.md"), filepath.Join(root, ".cursor", "AGENTS.md")); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, stderr := runCLI(t, "cursor", "on"); code != 0 {
+		t.Fatal(stderr)
+	}
+	t.Setenv("AGENTSYNC_SERVER", srv.URL)
+	t.Setenv("AGENTSYNC_TOKEN", "machine")
+
+	if code, _, stderr := runCLI(t, "push", "cursor"); code != 0 {
+		t.Fatalf("push %s", stderr)
+	}
+	for _, want := range []string{`"skills/note/SKILL.md"`, "from-canon", `"AGENTS.md"`, `"rules/own.md"`} {
+		if !strings.Contains(sent, want) {
+			t.Fatalf("snapshot lacks %s: %s", want, sent)
+		}
+	}
+	if strings.Contains(sent, "elsewhere") {
+		t.Fatalf("link outside the canon followed: %s", sent)
 	}
 }

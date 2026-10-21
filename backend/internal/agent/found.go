@@ -37,7 +37,7 @@ func Found(root string) ([]string, error) {
 		if !ok {
 			continue
 		}
-		files, err := readTree(home)
+		files, err := readSnapshot(root, home)
 		if err != nil {
 			if errors.Is(err, os.ErrPermission) {
 				continue

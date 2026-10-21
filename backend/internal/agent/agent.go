@@ -44,7 +44,7 @@ func Push(ctx context.Context, server, root, agentName, token, cookie string) er
 		return err
 	}
 	defer unlock()
-	files, err := readTree(agentHome(root, agentName))
+	files, err := readSnapshot(root, agentHome(root, agentName))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return errors.New("на компьютере нет этого ИИ-агента")
@@ -473,13 +473,65 @@ func stateDir() (string, error) {
 	return filepath.Join(home, ".agentsync"), nil
 }
 
+// readSnapshot reads an AI agent home for a snapshot. A link into the canon or inside the
+// home is read as a copy under the link's path; a link elsewhere is left out.
+func readSnapshot(root, home string) ([]File, error) {
+	files, err := readTree(home)
+	if err != nil {
+		return nil, err
+	}
+	allowed := []string{realPath(canonDir(root)), realPath(home)}
+	err = filepath.WalkDir(home, func(path string, entry os.DirEntry, err error) error {
+		if err != nil || entry.Type()&os.ModeSymlink == 0 {
+			return err
+		}
+		target, err := filepath.EvalSymlinks(path)
+		if err != nil || !slices.ContainsFunc(allowed, func(dir string) bool { return within(dir, target) }) {
+			return nil
+		}
+		rel, err := filepath.Rel(home, path)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		info, err := os.Stat(target)
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			raw, err := os.ReadFile(target)
+			if err != nil {
+				return err
+			}
+			files = append(files, File{Path: rel, Body: string(raw)})
+			return nil
+		}
+		inner, err := readTree(target)
+		if err != nil {
+			return err
+		}
+		for _, file := range inner {
+			files = append(files, File{Path: rel + "/" + file.Path, Body: file.Body})
+		}
+		return nil
+	})
+	return files, err
+}
+
+func realPath(dir string) string {
+	if real, err := filepath.EvalSymlinks(dir); err == nil {
+		return real
+	}
+	return filepath.Clean(dir)
+}
+
 func readTree(root string) ([]File, error) {
 	var files []File
 	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		// shortcut: a link to the canon is skipped, so a connected agent's snapshot lacks canon copies until #32.
+		// Links are skipped: clearing a home must not reach into the canon. readSnapshot follows them.
 		if entry.IsDir() || entry.Type()&os.ModeSymlink != 0 {
 			return nil
 		}

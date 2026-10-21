@@ -113,7 +113,7 @@ func ReadStore(ctx context.Context, server, root, agentName, number, token, cook
 }
 
 func readHome(root, agentName string) ([]File, bool, error) {
-	files, err := readTree(agentHome(root, agentName))
+	files, err := readSnapshot(root, agentHome(root, agentName))
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, true, nil
 	}

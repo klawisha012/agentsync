@@ -272,7 +272,7 @@ func snapshotAgent(root, account string, cat skillCatalog) (string, error) {
 	if !within(home, cat.dir) {
 		home = filepath.Dir(cat.dir)
 	}
-	files, err := readTree(home)
+	files, err := readSnapshot(root, home)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return "", err
 	}
