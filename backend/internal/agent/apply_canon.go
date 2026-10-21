@@ -84,7 +84,7 @@ func reconnect(root, account string) error {
 		}
 		report, err := connect(root, account, receiver.Slug, "", "")
 		if err != nil && !errors.Is(err, errEmptyCanon) {
-			errs = append(errs, fmt.Errorf("Канон обновлён, но\u00a0ИИ-агент «%s» не\u00a0подключён заново: %w", receiver.Display, err))
+			errs = append(errs, fmt.Errorf("agents обновлён, но\u00a0ИИ-агент «%s» не\u00a0подключён заново: %w", receiver.Display, err))
 		}
 		for _, name := range report.Unset {
 			unset[name] = true

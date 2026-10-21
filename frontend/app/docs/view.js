@@ -11,7 +11,7 @@ const NAV = [
   ] },
   { group: "Конфигурации", items: [
     { id: "publish", label: "Публикация" },
-    { id: "canon", label: "Канон и подключение" },
+    { id: "agents", label: "agents и подключение" },
     { id: "snapshots", label: "Локальные снимки" },
     { id: "apply", label: "Применение" },
     { id: "skills", label: "Навыки" },
@@ -134,14 +134,14 @@ export default function DocsPage() {
             <p><code>agentsync all</code> публикует каждый найденный ИИ-агент. Папка подходит, если в ней сразу лежат навыки, правила, конфиг или <code>AGENTS.md</code>.</p>
             <Command code="agentsync all" />
           </section>
-          <section className="docs-section" id="canon">
-            <h2>Канон и подключение</h2>
-            <p>Канон <code>~/.agents</code> — общая настройка всех ИИ-агентов машины: навыки (<code>skills/</code>), субагенты (<code>agents/</code>), пользовательские команды (<code>commands/</code>), файл инструкций <code>AGENTS.md</code>, MCP-серверы (<code>mcp.json</code>), плагины (<code>plugins.json</code>) и хуки (<code>hooks.json</code>) в формате Claude Code.</p>
-            <p><code>on</code> подключает ИИ-агента к канону. Навыки, субагенты, команды и файл инструкций появляются у него ссылками: правка в каноне сразу видна. MCP-серверы, плагины и хуки вписываются в его файл настроек в его формате. Вид, который ИИ-агент не понимает, пропускается, и вывод его называет.</p>
+          <section className="docs-section" id="agents">
+            <h2>agents и подключение</h2>
+            <p><code>~/.agents</code> — общая настройка всех ИИ-агентов машины: навыки (<code>skills/</code>), субагенты (<code>agents/</code>), пользовательские команды (<code>commands/</code>), файл инструкций <code>AGENTS.md</code>, MCP-серверы (<code>mcp.json</code>), плагины (<code>plugins.json</code>) и хуки (<code>hooks.json</code>) в формате Claude Code.</p>
+            <p><code>on</code> подключает ИИ-агента к agents. Навыки, субагенты, команды и файл инструкций появляются у него ссылками: правка в agents сразу видна. MCP-серверы, плагины и хуки вписываются в его файл настроек в его формате. Вид, который ИИ-агент не понимает, пропускается, и вывод его называет.</p>
             <Command code="agentsync claude on" />
-            <p><code>off</code> убирает ссылки на канон и только те записи, которые вписала команда <code>on</code>. Канон и собственные файлы ИИ-агента остаются.</p>
+            <p><code>off</code> убирает ссылки на agents и только те записи, которые вписала команда <code>on</code>. agents и собственные файлы ИИ-агента остаются.</p>
             <Command code="agentsync claude off" />
-            <p>У канона своя карточка. Публикация: <code>agentsync push agents</code>, откат: <code>agentsync revert agents</code>. Файл <code>~/.agents/.env</code> с значениями секретов в снимок не входит.</p>
+            <p>У agents своя карточка. Публикация: <code>agentsync push agents</code>, откат: <code>agentsync revert agents</code>. Файл <code>~/.agents/.env</code> с значениями секретов в снимок не входит.</p>
             <Command code="agentsync push agents" />
           </section>
           <section className="docs-section" id="snapshots">
@@ -161,7 +161,7 @@ export default function DocsPage() {
             <h2>Применение публикации</h2>
             <p>Передайте имя автора и AI-агента. <code>Author</code> — пример имени автора; замените его реальным.</p>
             <Command code="agentsync apply Author Grok" />
-            <div className="docs-notice"><p><code>apply</code> кладёт элементы канона из публикации в <code>~/.agents</code>, собственные файлы ИИ-агента — в его папку: одноимённые заменяются, остальные остаются. Затем ИИ-агент подключается к канону. Перед заменой канон и настройка ИИ-агента записываются в снимки. Откат: <code>agentsync revert Grok</code> и <code>agentsync revert agents</code>.</p><p>Публикация канона (<code>agents</code>) применяется иначе: канон становится точной копией публикации, подключённые ИИ-агенты подключаются заново.</p></div>
+            <div className="docs-notice"><p><code>apply</code> кладёт элементы agents из публикации в <code>~/.agents</code>, собственные файлы ИИ-агента — в его папку: одноимённые заменяются, остальные остаются. Затем ИИ-агент подключается к agents. Перед заменой agents и настройка ИИ-агента записываются в снимки. Откат: <code>agentsync revert Grok</code> и <code>agentsync revert agents</code>.</p><p>Публикация agents (<code>agents</code>) применяется иначе: agents становится точной копией публикации, подключённые ИИ-агенты подключаются заново.</p></div>
           </section>
           <section className="docs-section" id="skills">
             <h2>Установка отдельных навыков</h2>

@@ -82,7 +82,7 @@ func Connect(root, account, agentName string) (ConnectReport, error) {
 	return connect(root, account, agentName, "", "")
 }
 
-var errEmptyCanon = errors.New("В\u00a0каноне нечего показать.")
+var errEmptyCanon = errors.New("В\u00a0agents нечего показать.")
 
 // connect moves occupied items into snapshot, a snapshot of home already written by the caller;
 // with snapshot "" it writes its own when a name is occupied.
@@ -200,7 +200,7 @@ func Disconnect(root, agentName string) error {
 		return nil
 	}
 	if insideCanon(root, dir) {
-		return fmt.Errorf("ИИ-агент «%s» читает навыки прямо из\u00a0канона, отключить их нельзя.", receiver.Display)
+		return fmt.Errorf("ИИ-агент «%s» читает навыки прямо из\u00a0agents, отключить их нельзя.", receiver.Display)
 	}
 	cat := skillCatalog{dir: dir, display: receiver.Display, slug: receiver.Slug, receiver: receiver}
 	plan, err := planConnect(root, cat, nil)
@@ -496,7 +496,7 @@ func snapshotAgent(root, account string, cat skillCatalog) (string, string, erro
 func shareCanon(canon, snapshot, home, display string, plan connectPlan, occupied map[string]bool) (catalogUndo, error) {
 	var undo catalogUndo
 	failed := func() error {
-		return fmt.Errorf("Не удалось показать канон ИИ-агенту «%s».", display)
+		return fmt.Errorf("Не удалось показать agents ИИ-агенту «%s».", display)
 	}
 	wanted := map[string]bool{}
 	for _, link := range plan.links {
@@ -515,7 +515,7 @@ func shareCanon(canon, snapshot, home, display string, plan connectPlan, occupie
 	}
 	for _, link := range plan.links {
 		if !within(canon, link.abs) || !oneSegment(filepath.Base(link.abs)) {
-			return undo, errors.New("Элемент лежит вне канона.")
+			return undo, errors.New("Элемент лежит вне agents.")
 		}
 		created, err := ensureCatalog(filepath.Dir(link.dest))
 		undo.createdDirs = append(undo.createdDirs, created...)

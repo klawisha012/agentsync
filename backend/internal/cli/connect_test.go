@@ -165,7 +165,7 @@ func TestOnRefusalsLeaveTheAgentUntouched(t *testing.T) {
 	}
 
 	code, _, stderr := runCLI(t, "cursor", "on")
-	if code != 1 || !strings.Contains(stderr, "каноне нечего показать.") {
+	if code != 1 || !strings.Contains(stderr, "agents нечего показать.") {
 		t.Fatalf("empty %d %s", code, stderr)
 	}
 	untouched("empty")

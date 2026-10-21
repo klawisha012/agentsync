@@ -40,7 +40,7 @@ func runConnect(name string, args []string, stdout io.Writer) error {
 		if err := agent.Disconnect(root, args[0]); err != nil {
 			return err
 		}
-		fmt.Fprintf(stdout, "ИИ-агент %s отключён от канона.\n", args[0])
+		fmt.Fprintf(stdout, "ИИ-агент %s отключён от agents.\n", args[0])
 		return nil
 	}
 	report, err := agent.Connect(root, agent.EnvOrHome("AGENTSYNC_ACCOUNT", "account"), args[0])
@@ -48,9 +48,9 @@ func runConnect(name string, args []string, stdout io.Writer) error {
 		return err
 	}
 	if len(report.Got) == 0 {
-		fmt.Fprintf(stdout, "ИИ-агент %s ничего не получил из канона.\n", args[0])
+		fmt.Fprintf(stdout, "ИИ-агент %s ничего не получил из agents.\n", args[0])
 	} else {
-		fmt.Fprintf(stdout, "ИИ-агент %s видит из канона: %s.\n", args[0], strings.Join(report.Got, ", "))
+		fmt.Fprintf(stdout, "ИИ-агент %s видит из agents: %s.\n", args[0], strings.Join(report.Got, ", "))
 	}
 	if len(report.Unset) > 0 {
 		fmt.Fprintf(stdout, "Переменные секрета вписаны как есть, их значения нет в\u00a0окружении и\u00a0~/.agents/.env: %s.\n", strings.Join(report.Unset, ", "))

@@ -85,7 +85,7 @@ export default function AgentBoard({ page, owner, onChange, onExplain }) {
                 <div className="house-head">
                   <span>
                     <AgentLogo name={agent.name} tone={tone} />
-                    <strong>{canon ? "Канон" : agent.name}</strong>
+                    <strong>{canon ? "agents" : agent.name}</strong>
                   </span>
                   {agent.version != null ? <em className={`version-chip tone-${tone}`}>v{agent.version}</em> : null}
                 </div>
