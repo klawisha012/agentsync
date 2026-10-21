@@ -479,7 +479,8 @@ func readTree(root string) ([]File, error) {
 		if err != nil {
 			return err
 		}
-		if entry.IsDir() {
+		// shortcut: a link to the canon is skipped, so a connected agent's snapshot lacks canon copies until #32.
+		if entry.IsDir() || entry.Type()&os.ModeSymlink != 0 {
 			return nil
 		}
 		rel, err := filepath.Rel(root, path)

@@ -29,6 +29,7 @@ type canonSkill struct {
 type skillCatalog struct {
 	dir     string
 	display string
+	slug    string
 }
 
 type savedLink struct {
@@ -39,27 +40,30 @@ type savedLink struct {
 type catalogUndo struct {
 	added       []string
 	removed     []savedLink
+	moved       []savedLink
 	createdDirs []string
+	aside       string
 }
 
-// Fanout shows every outermost skill from one agent's home in each named
-// receiver's global catalog. The receiver name and the canon folder are one record.
-func Fanout(root, agentName string, targets []string) error {
+// Connect shows every outermost canon skill in the named AI agent's global skills
+// directory by a link. A name the agent already holds goes to its snapshot first.
+func Connect(root, account, agentName string) error {
 	unlock, err := lockRoot(root)
 	if err != nil {
 		return err
 	}
 	defer unlock()
-	home := agentHome(root, agentName)
-	skills, files, err := canonSkills(home)
+	canon := canonDir(root)
+	skills, files, err := canonSkills(canon)
 	if err != nil {
 		return err
 	}
 	if len(skills) == 0 {
-		return errors.New("Нет навыков.")
+		return errors.New("В\u00a0каноне нечего показать.")
 	}
-	if len(compactNames(targets)) == 0 {
-		return errors.New("Назовите приёмника.")
+	cat, err := agentCatalog(root, agentName)
+	if err != nil {
+		return err
 	}
 	if msg := sameNameExplanation(skills); msg != "" {
 		return errors.New(msg)
@@ -67,35 +71,50 @@ func Fanout(root, agentName string, targets []string) error {
 	if msg := skillSecret(skills, files); msg != "" {
 		return errors.New(msg)
 	}
-	catalogs, err := globalCatalogs(root, targets)
+	occupied, err := occupiedNames(canon, cat.dir, skills)
 	if err != nil {
 		return err
 	}
-	if err := occupiedName(catalogs, skills); err != nil {
-		return err
+	snapshot := ""
+	if len(occupied) > 0 {
+		if snapshot, err = snapshotAgent(root, account, cat); err != nil {
+			return err
+		}
 	}
-	return shareAll(home, catalogs, skills)
+	undo, err := shareCatalog(root, canon, cat, skills, occupied)
+	if err != nil {
+		if snapshot != "" {
+			_ = os.RemoveAll(snapshot)
+		}
+		return errors.Join(err, rollbackCatalog(undo))
+	}
+	if undo.aside != "" {
+		return os.RemoveAll(undo.aside)
+	}
+	return nil
 }
 
-// Unfanout removes receiver names whose record belongs to this agent's home.
-// The home itself stays. A copied folder that is not that record stays.
-func Unfanout(root, agentName string, targets []string) error {
+// Disconnect removes the links to the canon from the AI agent's global skills directory.
+// The canon stays. A folder that is not a link to the canon stays.
+func Disconnect(root, agentName string) error {
 	unlock, err := lockRoot(root)
 	if err != nil {
 		return err
 	}
 	defer unlock()
-	home := agentHome(root, agentName)
-	catalogs, err := unfanoutCatalogs(root, targets)
-	if err != nil {
-		return err
+	receiver, ok := FindReceiver(agentName)
+	if !ok {
+		return fmt.Errorf("ИИ-агента «%s» нет в\u00a0каталоге ИИ-агентов.", strings.TrimSpace(agentName))
 	}
-	for _, cat := range catalogs {
-		if err := unfanoutCatalog(home, cat.dir); err != nil {
-			return err
-		}
+	dir, have := receiver.GlobalDir(root)
+	if !have {
+		return nil
 	}
-	return nil
+	return unlinkCanon(canonDir(root), dir)
+}
+
+func canonDir(root string) string {
+	return filepath.Join(root, ".agents")
 }
 
 func canonSkills(home string) ([]canonSkill, []File, error) {
@@ -112,7 +131,7 @@ func canonSkills(home string) ([]canonSkill, []File, error) {
 			continue
 		}
 		dir := path.Dir(file.Path)
-		if dir == "." || PrivatePath(file.Path) || !PortablePath(file.Path) {
+		if !strings.HasPrefix(dir, "skills/") || PrivatePath(file.Path) || !PortablePath(file.Path) {
 			continue
 		}
 		dirs = append(dirs, dir)
@@ -181,25 +200,10 @@ func skillSecret(skills []canonSkill, files []File) string {
 	return ""
 }
 
-// recordWouldRefuse is true only when запись would stop, not when it would omit the file.
+// recordWouldRefuse is true only when a snapshot would stop, not when it would omit the file.
 func recordWouldRefuse(path, body string) bool {
-	if PrivatePath(path) || !PortablePath(path) {
-		return false
-	}
-	if isHook(path) && absolutePath.MatchString(body) {
-		return false
-	}
-	if isMCP(path) && machineLike(body) {
-		return false
-	}
-	return HasSecret(body)
-}
-
-func machineLike(body string) bool {
-	if absolutePath.MatchString(body) || strings.Contains(strings.ToLower(body), "authorization") {
-		return true
-	}
-	return HasAssignedSecret(body)
+	file, ok := portableFile(File{Path: path, Body: body})
+	return ok && SecretExplanation(file.Path, file.Body) != ""
 }
 
 // HasAssignedSecret matches a named secret assignment. It does not match a bare key such as sk-.
@@ -229,84 +233,57 @@ func insideShownSkill(rel string, skills []canonSkill) bool {
 	return false
 }
 
-func unfanoutCatalogs(root string, targets []string) ([]skillCatalog, error) {
-	return receiverCatalogs(root, targets, false)
-}
-
-func globalCatalogs(root string, targets []string) ([]skillCatalog, error) {
-	return receiverCatalogs(root, targets, true)
-}
-
-func receiverCatalogs(root string, targets []string, requireGlobal bool) ([]skillCatalog, error) {
-	targets = compactNames(targets)
-	if len(targets) == 0 {
-		return nil, errors.New("Назовите приёмника.")
+func agentCatalog(root, agentName string) (skillCatalog, error) {
+	name := strings.TrimSpace(agentName)
+	receiver, ok := FindReceiver(name)
+	if !ok {
+		return skillCatalog{}, fmt.Errorf("ИИ-агента «%s» нет в\u00a0каталоге ИИ-агентов.", name)
 	}
-	seen := map[string]struct{}{}
-	out := make([]skillCatalog, 0, len(targets))
-	for _, target := range targets {
-		receiver, ok := FindReceiver(target)
-		if !ok {
-			return nil, fmt.Errorf("Приёмник «%s» не найден.", target)
-		}
-		dir, have := receiver.GlobalDir(root)
-		if !have {
-			if requireGlobal {
-				return nil, fmt.Errorf("У приёмника «%s» нет глобального каталога.", receiver.Display)
-			}
+	dir, have := receiver.GlobalDir(root)
+	if !have {
+		return skillCatalog{}, fmt.Errorf("У\u00a0ИИ-агента «%s» нет глобального каталога.", receiver.Display)
+	}
+	return skillCatalog{dir: dir, display: receiver.Display, slug: receiver.Slug}, nil
+}
+
+// occupiedNames lists canon skill names the agent holds as its own folder, file or foreign link.
+func occupiedNames(canon, dir string, skills []canonSkill) (map[string]bool, error) {
+	occupied := map[string]bool{}
+	for _, skill := range skills {
+		dest := filepath.Join(dir, skill.name)
+		_, err := os.Lstat(dest)
+		if errors.Is(err, os.ErrNotExist) {
 			continue
 		}
-		key := catalogKey(dir)
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		out = append(out, skillCatalog{dir: dir, display: receiver.Display})
-	}
-	return out, nil
-}
-
-func occupiedName(catalogs []skillCatalog, skills []canonSkill) error {
-	for _, cat := range catalogs {
-		for _, skill := range skills {
-			dest := filepath.Join(cat.dir, skill.name)
-			_, err := os.Lstat(dest)
-			if errors.Is(err, os.ErrNotExist) {
-				continue
-			}
-			if err != nil {
-				return err
-			}
-			target, linked := linkTarget(dest)
-			if linked && samePlace(target, skill.abs) {
-				continue
-			}
-			return fmt.Errorf("У приёмника «%s» навык «%s» уже занят.", cat.display, skill.name)
-		}
-	}
-	return nil
-}
-
-func shareAll(home string, catalogs []skillCatalog, skills []canonSkill) error {
-	undos := make([]catalogUndo, 0, len(catalogs))
-	for _, cat := range catalogs {
-		undo, err := shareCatalog(home, cat, skills)
-		undos = append(undos, undo)
 		if err != nil {
-			if undoErr := rollbackCatalogs(undos); undoErr != nil {
-				return errors.Join(err, undoErr)
-			}
-			return err
+			return nil, err
 		}
+		if target, linked := linkTarget(dest); linked && samePlace(target, skill.abs) {
+			continue
+		}
+		occupied[nameKey(skill.name)] = true
 	}
-	return nil
+	return occupied, nil
 }
 
-func shareCatalog(home string, cat skillCatalog, skills []canonSkill) (catalogUndo, error) {
+// snapshotAgent saves the agent's portable settings before a canon link takes an occupied name.
+func snapshotAgent(root, account string, cat skillCatalog) (string, error) {
+	home := agentHome(root, cat.slug)
+	if !within(home, cat.dir) {
+		home = filepath.Dir(cat.dir)
+	}
+	files, err := readTree(home)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+	return writeSnapshot(root, account, agentDirName(filepath.Base(home)), portableOnly(files))
+}
+
+func shareCatalog(root, home string, cat skillCatalog, skills []canonSkill, occupied map[string]bool) (catalogUndo, error) {
 	var undo catalogUndo
 	dir := cat.dir
 	failed := func() error {
-		return fmt.Errorf("Не удалось показать навыки приёмнику «%s».", cat.display)
+		return fmt.Errorf("Не удалось показать навыки канона ИИ-агенту «%s».", cat.display)
 	}
 	created, err := ensureCatalog(dir)
 	undo.createdDirs = created
@@ -337,9 +314,26 @@ func shareCatalog(home string, cat skillCatalog, skills []canonSkill) (catalogUn
 	}
 	for _, skill := range skills {
 		if !within(home, skill.abs) || !oneSegment(skill.name) {
-			return undo, errors.New("Навык лежит вне домашней папки.")
+			return undo, errors.New("Навык лежит вне канона.")
 		}
 		dest := filepath.Join(dir, skill.name)
+		if occupied[nameKey(skill.name)] {
+			if undo.aside == "" {
+				if err := os.MkdirAll(filepath.Join(root, ".agentsync"), 0o755); err != nil {
+					return undo, failed()
+				}
+				aside, err := os.MkdirTemp(filepath.Join(root, ".agentsync"), "aside-")
+				if err != nil {
+					return undo, failed()
+				}
+				undo.aside = aside
+			}
+			kept := filepath.Join(undo.aside, skill.name)
+			if err := os.Rename(dest, kept); err != nil {
+				return undo, failed()
+			}
+			undo.moved = append(undo.moved, savedLink{path: dest, target: kept})
+		}
 		if target, ok := linkTarget(dest); ok && samePlace(target, skill.abs) {
 			continue
 		}
@@ -369,7 +363,7 @@ func ensureCatalog(dir string) ([]string, error) {
 	return created, nil
 }
 
-func unfanoutCatalog(home, dir string) error {
+func unlinkCanon(home, dir string) error {
 	info, err := os.Stat(dir)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
@@ -397,25 +391,30 @@ func unfanoutCatalog(home, dir string) error {
 	return nil
 }
 
-func rollbackCatalogs(undos []catalogUndo) error {
+func rollbackCatalog(undo catalogUndo) error {
 	var errs []error
-	for i := len(undos) - 1; i >= 0; i-- {
-		undo := undos[i]
-		for _, link := range undo.added {
-			if err := os.Remove(link); err != nil && !errors.Is(err, os.ErrNotExist) {
-				errs = append(errs, err)
-			}
+	for _, link := range undo.added {
+		if err := os.Remove(link); err != nil && !errors.Is(err, os.ErrNotExist) {
+			errs = append(errs, err)
 		}
-		for _, link := range undo.removed {
-			if err := os.Symlink(link.target, link.path); err != nil && !os.IsExist(err) {
-				errs = append(errs, err)
-			}
+	}
+	for _, item := range undo.moved {
+		if err := os.Rename(item.target, item.path); err != nil {
+			errs = append(errs, err)
 		}
-		for _, dir := range undo.createdDirs {
-			if err := os.Remove(dir); err != nil && !errors.Is(err, os.ErrNotExist) {
-				break
-			}
+	}
+	for _, link := range undo.removed {
+		if err := os.Symlink(link.target, link.path); err != nil && !os.IsExist(err) {
+			errs = append(errs, err)
 		}
+	}
+	for _, dir := range undo.createdDirs {
+		if err := os.Remove(dir); err != nil && !errors.Is(err, os.ErrNotExist) {
+			break
+		}
+	}
+	if undo.aside != "" {
+		_ = os.RemoveAll(undo.aside)
 	}
 	return errors.Join(errs...)
 }

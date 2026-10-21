@@ -29,6 +29,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if args[0] == "help" {
 		return runHelp(args[1:], stdout, stderr)
 	}
+	args = connectArgs(args)
 	item, ok := commandByName(args[0])
 	if !ok {
 		fmt.Fprintf(stderr, "Неизвестная команда «%s».\nСправка: agentsync help\n", args[0])
@@ -85,8 +86,8 @@ func hasHelpFlag(args []string) bool {
 
 func (item spec) execute(args []string, stdout io.Writer) error {
 	switch item.name {
-	case "fanout", "unfanout":
-		return runShare(item.name, args)
+	case "on", "off":
+		return runConnect(item.name, args, stdout)
 	case "version":
 		if len(args) > 0 {
 			return usageError{text: "Неизвестный аргумент «" + args[0] + "»."}

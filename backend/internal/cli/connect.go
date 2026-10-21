@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -16,53 +17,37 @@ func (e usageError) Error() string {
 	return e.text
 }
 
-type fanoutCall struct {
-	agent   string
-	targets []string
+// connectArgs turns "agentsync <ии-агент> on|off" into "agentsync on|off <ии-агент>".
+func connectArgs(args []string) []string {
+	if len(args) != 2 || (args[1] != "on" && args[1] != "off") {
+		return args
+	}
+	if _, known := commandByName(args[0]); known {
+		return args
+	}
+	return []string{args[1], args[0]}
 }
 
-func runShare(name string, args []string) error {
-	call, err := parseFanoutArgs(args)
-	if err != nil {
-		return err
+func runConnect(name string, args []string, stdout io.Writer) error {
+	if len(args) > 1 {
+		return usageError{text: fmt.Sprintf("Неизвестный аргумент «%s».", args[1])}
 	}
 	root, err := agentRoot()
 	if err != nil {
 		return err
 	}
-	if name == "unfanout" {
-		return agent.Unfanout(root, call.agent, call.targets)
-	}
-	return agent.Fanout(root, call.agent, call.targets)
-}
-
-func parseFanoutArgs(args []string) (fanoutCall, error) {
-	var call fanoutCall
-	var positional []string
-	for i := 0; i < len(args); i++ {
-		arg := args[i]
-		switch {
-		case arg == "--into" || strings.HasPrefix(arg, "--into="):
-			value, next, err := flagValue(args, i, "--into")
-			if err != nil {
-				return fanoutCall{}, err
-			}
-			call.targets = append(call.targets, value)
-			i = next
-		case strings.HasPrefix(arg, "-"):
-			return fanoutCall{}, fmt.Errorf("Неизвестный аргумент «%s».", arg)
-		default:
-			positional = append(positional, arg)
+	if name == "off" {
+		if err := agent.Disconnect(root, args[0]); err != nil {
+			return err
 		}
+		fmt.Fprintf(stdout, "ИИ-агент %s отключён от канона.\n", args[0])
+		return nil
 	}
-	if len(positional) == 0 {
-		return fanoutCall{}, usageError{text: "Назовите ИИ-агента."}
+	if err := agent.Connect(root, agent.EnvOrHome("AGENTSYNC_ACCOUNT", "account"), args[0]); err != nil {
+		return err
 	}
-	if len(positional) > 1 {
-		return fanoutCall{}, fmt.Errorf("Неизвестный аргумент «%s».", positional[1])
-	}
-	call.agent = positional[0]
-	return call, nil
+	fmt.Fprintf(stdout, "ИИ-агент %s видит навыки канона.\n", args[0])
+	return nil
 }
 
 func agentRoot() (string, error) {
