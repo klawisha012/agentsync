@@ -42,9 +42,10 @@ func commands() []spec {
 			usage:   "agentsync push <ии-агент>",
 			about: "На сервер уходят только переносимые файлы. Учётные данные в\u00a0запрос не входят.\n" +
 				"Нужен вход в\u00a0аккаунт. Подтверждение почты для публикации не нужно.\n" +
+				"Канон ~/.agents публикуется под именем agents, ~/.agents/.env в\u00a0снимок не входит.\n" +
 				"Пароль в\u00a0команду не входит.",
 			envs:     []envLine{root, server, token, cookie},
-			examples: []string{"agentsync push Grok"},
+			examples: []string{"agentsync push Grok", "agentsync push agents"},
 			minArgs:  1,
 			missing:  "Назовите ИИ-агента.",
 		},
