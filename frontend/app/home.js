@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import HeroArt from "./hero-sticker";
 import styles from "./hero-videos.module.css";
 
 const tabs = [
@@ -23,8 +24,7 @@ const localOnly = [
 ];
 
 export default function Home() {
-  const muse = useRef(null);
-  const cast = useRef(null);
+  const [variant, setVariant] = useState("a");
   const [origin, setOrigin] = useState("");
   const [tab, setTab] = useState("ps");
   const [copied, setCopied] = useState(false);
@@ -32,26 +32,7 @@ export default function Home() {
 
   useEffect(() => {
     setOrigin(window.location.origin);
-  }, []);
-
-  useEffect(() => {
-    const videos = [muse.current, cast.current].filter(Boolean);
-    if (videos.length === 0) {
-      return;
-    }
-    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const apply = () => {
-      for (const video of videos) {
-        if (motion.matches) {
-          video.pause();
-          continue;
-        }
-        video.play().catch(() => {});
-      }
-    };
-    apply();
-    motion.addEventListener("change", apply);
-    return () => motion.removeEventListener("change", apply);
+    setVariant(new URLSearchParams(window.location.search).get("hero") ?? "a");
   }, []);
 
   const command = tabs.find((item) => item.id === tab).text(origin);
@@ -74,18 +55,7 @@ export default function Home() {
     <div className="home">
       <section className="hero" id="install">
         <div className={`hero-intro ${styles.intro}`}>
-          <video
-            className={`hero-muse ${styles.muse}`}
-            ref={muse}
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            aria-hidden="true"
-          >
-            <source src="/hero-muse.webm" type="video/webm" />
-          </video>
+          <HeroArt variant={variant} slot="left" className={`hero-muse ${styles.muse}`} />
           <h1 className={styles.title}>
             Синхронизация
             <br className="hero-break" />
@@ -95,18 +65,7 @@ export default function Home() {
             {" "}
             на вашем компьютере.
           </h1>
-          <video
-            className={styles.cast}
-            ref={cast}
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            aria-hidden="true"
-          >
-            <source src="/hero-cast.webm" type="video/webm" />
-          </video>
+          <HeroArt variant={variant} slot="right" className={styles.cast} />
         </div>
         <p className="lede hero-lede">
           Однократный перенос переносимой конфигурации ИИ-агента без риска утечки учётных данных и{"\u00a0"}машинных зависимостей MCP.
