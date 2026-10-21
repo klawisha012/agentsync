@@ -2667,6 +2667,15 @@ input:focus-visible {
   font-size: 1.05rem;
 }
 
+.kind-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
 .count-pill,
 .version-chip {
   font-family: var(--font-mono), ui-monospace, monospace;

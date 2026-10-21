@@ -36,7 +36,7 @@ export default function SnapshotListPage() {
       <nav className="crumbs" aria-label="Путь">
         <Link href={`/${name}`}>{name}</Link>
         <span>/</span>
-        <b>{agent}</b>
+        <b>{agent.toLowerCase() === "agents" ? "Канон" : agent}</b>
       </nav>
       <div className="section-title">
         <div className="section-title-main">

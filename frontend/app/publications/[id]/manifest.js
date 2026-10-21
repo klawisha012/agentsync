@@ -57,6 +57,47 @@ export function skillDescription(markdown) {
   return readDescription(text.slice(text.indexOf("\n") + 1, end).split(/\r?\n/));
 }
 
+// MARK_FILE is the service mark of an AI agent upload; the preview never shows it.
+export const MARK_FILE = "agentsync.json";
+
+const KINDS = [["skills", "Навыки"], ["agents", "Субагенты"], ["commands", "Команды"], ["mcp", "MCP-серверы"], ["plugins", "Плагины"], ["hooks", "Хуки"]];
+
+// kindSummary counts the canon kinds a publication carries: skills, subagents, commands,
+// MCP servers, plugin records and hook groups. Kinds with no element are left out.
+export function kindSummary(files) {
+  const counts = { skills: 0, agents: 0, commands: 0, mcp: 0, plugins: 0, hooks: 0 };
+  const size = (value) => (value && typeof value === "object" ? Object.keys(value).length : 0);
+  for (const file of files) {
+    const parts = String(file.path || "").replaceAll("\\", "/").split("/");
+    const base = parts[parts.length - 1].toLowerCase();
+    if (base === "skill.md") {
+      counts.skills++;
+    } else if (parts.length === 2 && base.endsWith(".md") && parts[0] === "agents") {
+      counts.agents++;
+    } else if (parts.length === 2 && base.endsWith(".md") && (parts[0] === "commands" || parts[0] === "prompts")) {
+      counts.commands++;
+    }
+    if (!base.endsWith(".json") || file.path === MARK_FILE) {
+      continue;
+    }
+    let body;
+    try {
+      body = JSON.parse(file.body || "");
+    } catch {
+      continue;
+    }
+    if (!body || typeof body !== "object") {
+      continue;
+    }
+    counts.mcp += size(body.mcpServers);
+    counts.plugins += size(body.enabledPlugins);
+    for (const groups of Object.values(body.hooks || {})) {
+      counts.hooks += Array.isArray(groups) ? groups.length : 0;
+    }
+  }
+  return KINDS.map(([key, label]) => [label, counts[key]]).filter(([, count]) => count > 0);
+}
+
 export function buildManifest(files, countTokens) {
   const root = { name: "", path: "", file: null, children: [] };
   const index = new Map([["", root]]);

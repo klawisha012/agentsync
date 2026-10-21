@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "../../../../api";
 import FileTree from "../../../../file-tree";
-import { buildManifest, loadTokenCounter, ruTokens, skillTokenTotal } from "../../../../publications/[id]/manifest";
+import { MARK_FILE, buildManifest, kindSummary, loadTokenCounter, ruTokens, skillTokenTotal } from "../../../../publications/[id]/manifest";
 import CodeStage from "./stage";
 import SkillCommand, { listSkillChoices, skillParentPaths } from "./skills";
 
@@ -46,7 +46,7 @@ export default function VersionPage() {
       }
       setState(res);
       if (res.ok) {
-        setOpen(skillParentPaths(buildManifest(res.body.files || [])));
+        setOpen(skillParentPaths(buildManifest(shownFiles(res.body))));
       }
     });
     return () => {
@@ -54,7 +54,7 @@ export default function VersionPage() {
     };
   }, [name, agent, number]);
 
-  const tree = state?.ok ? buildManifest(state.body.files || [], countTokens) : [];
+  const tree = state?.ok ? buildManifest(shownFiles(state.body), countTokens) : [];
   const skills = listSkillChoices(tree);
 
   if (!state) {
@@ -65,7 +65,8 @@ export default function VersionPage() {
   }
 
   const shot = state.body;
-  const files = shot.files || [];
+  const files = shownFiles(shot);
+  const kinds = kindSummary(files);
   const current = files.find((file) => file.path === selected)
     || (selected === "" ? files.find((file) => !String(file.path).includes("/")) : null)
     || null;
@@ -144,6 +145,13 @@ export default function VersionPage() {
             </div>
             <span className="count-pill">{countTokens ? ruTokens(skillTokenTotal(tree)) : "…"}</span>
           </div>
+          {kinds.length > 0 ? (
+            <ul className="kind-pills" aria-label="Состав версии">
+              {kinds.map(([label, count]) => (
+                <li className="count-pill" key={label}>{label}: {count}</li>
+              ))}
+            </ul>
+          ) : null}
           <div className="file-tree" role="tree" aria-label="Файлы версии">
             <FileTree
               nodes={tree}
@@ -179,6 +187,10 @@ function SelectionSwitch({ checked, onChange }) {
       <span className="skill-switch-thumb" />
     </button>
   );
+}
+
+function shownFiles(shot) {
+  return (shot?.files || []).filter((file) => file.path !== MARK_FILE);
 }
 
 function stamp(value) {

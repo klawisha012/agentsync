@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "../../api";
 import FileTree from "../../file-tree";
-import { buildManifest, loadTokenCounter, ruTokens, skillTokenTotal } from "./manifest";
+import { MARK_FILE, buildManifest, loadTokenCounter, ruTokens, skillTokenTotal } from "./manifest";
 import { shellCommand } from "../../shell-arg";
 
 const commandTabs = [
@@ -58,7 +58,7 @@ export default function PublicationPage() {
   }
 
   const page = state.body;
-  const files = page.files || [];
+  const files = (page.files || []).filter((file) => file.path !== MARK_FILE);
   const tree = buildManifest(files, countTokens);
   const current = files.find((file) => file.path === selected)
     || (selected === "" ? files.find((file) => !String(file.path).includes("/")) : null)
