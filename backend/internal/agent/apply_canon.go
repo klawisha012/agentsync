@@ -19,7 +19,14 @@ const MarkFile = "agentsync.json"
 const canonCard = "agents"
 
 type canonMark struct {
-	MCP []string `json:"mcp"`
+	MCP          []string `json:"mcp"`
+	Plugins      []string `json:"plugins"`
+	Marketplaces []string `json:"marketplaces"`
+}
+
+// markLists names the mark list of each record kind.
+func (m *canonMark) lists() map[recordKind]*[]string {
+	return map[recordKind]*[]string{mcpRecords: &m.MCP, pluginRecords: &m.Plugins, marketRecords: &m.Marketplaces}
 }
 
 func isCanonCard(name string) bool {
@@ -81,13 +88,15 @@ func replacePortable(root, dir string, files []File, broken bool) error {
 
 // markFile builds the mark for an upload of home: the records on wrote into a settings file inside it.
 func markFile(home string) File {
-	mark := canonMark{MCP: []string{}}
+	mark := canonMark{MCP: []string{}, Plugins: []string{}, Marketplaces: []string{}}
 	if dir, err := stateDir(); err == nil {
-		ledgers, _ := filepath.Glob(filepath.Join(dir, "mcp", "*.json"))
-		for _, file := range ledgers {
-			var ledger mcpLedger
-			if raw, err := os.ReadFile(file); err == nil && json.Unmarshal(raw, &ledger) == nil && within(home, ledger.File) {
-				mark.MCP = append(mark.MCP, ledger.Own...)
+		for kind, list := range mark.lists() {
+			ledgers, _ := filepath.Glob(filepath.Join(dir, kind.ledger, "*.json"))
+			for _, file := range ledgers {
+				var ledger recordLedger
+				if raw, err := os.ReadFile(file); err == nil && json.Unmarshal(raw, &ledger) == nil && within(home, ledger.File) {
+					*list = append(*list, ledger.Own...)
+				}
 			}
 		}
 	}
@@ -97,8 +106,8 @@ func markFile(home string) File {
 
 // cardPlaces are the canon places of an AI agent, relative to its home; "" when it has none.
 type cardPlaces struct {
-	skills, agents, commands, instructions, mcp string
-	hasMCP                                      bool
+	skills, agents, commands, instructions, mcp, plugins string
+	hasMCP                                               bool
 }
 
 // agentPlaces finds the canon places of the card's AI agent. ok is false when the home is not
@@ -135,22 +144,26 @@ func agentPlaces(root, home, name string) (cardPlaces, bool) {
 	if places.hasMCP {
 		places.mcp = rel(receiver.mcpFile(root))
 	}
+	places.plugins = beside(receiver.Plugins)
 	return places, true
 }
 
 // cardSplit is a card taken apart: canon elements with canon paths, MCP records for the
 // canon, and the agent's own files.
 type cardSplit struct {
-	canon map[string][]File
-	mcp   map[string]json.RawMessage
-	own   []File
+	canon   map[string][]File
+	records map[recordKind]map[string]json.RawMessage
+	own     []File
 }
 
 // splitCard sorts the card's files by place. Without a mark, the card predates the canon and
-// every MCP record goes to the canon; with one, only the records on wrote do.
+// every MCP and plugin record goes to the canon; with one, only the records on wrote do.
 func splitCard(files []File, places cardPlaces, connectable bool) cardSplit {
-	split := cardSplit{canon: map[string][]File{}, mcp: map[string]json.RawMessage{}}
-	marked, ours := false, map[string]bool{}
+	split := cardSplit{canon: map[string][]File{}, records: map[recordKind]map[string]json.RawMessage{}}
+	for _, kind := range recordKinds {
+		split.records[kind] = map[string]json.RawMessage{}
+	}
+	marked, ours := false, map[recordKind]map[string]bool{}
 	for _, file := range files {
 		if file.Path != MarkFile {
 			continue
@@ -158,10 +171,30 @@ func splitCard(files []File, places cardPlaces, connectable bool) cardSplit {
 		var mark canonMark
 		if json.Unmarshal([]byte(file.Body), &mark) == nil {
 			marked = true
-			for _, name := range mark.MCP {
-				ours[name] = true
+			for kind, list := range mark.lists() {
+				ours[kind] = map[string]bool{}
+				for _, name := range *list {
+					ours[kind][name] = true
+				}
 			}
 		}
+	}
+	// take moves the records of one kind that go to the canon out of a settings body and
+	// returns how many stay; -1 when the body has none of that kind.
+	take := func(kind recordKind, top map[string]json.RawMessage) int {
+		var records map[string]json.RawMessage
+		if json.Unmarshal(top[kind.key], &records) != nil || records == nil {
+			return -1
+		}
+		for name, record := range records {
+			if !marked || ours[kind][name] {
+				split.records[kind][name] = record
+				delete(records, name)
+			}
+		}
+		raw, _ := json.Marshal(records)
+		top[kind.key] = raw
+		return len(records)
 	}
 	for _, file := range files {
 		if file.Path == MarkFile {
@@ -176,22 +209,29 @@ func splitCard(files []File, places cardPlaces, connectable bool) cardSplit {
 			continue
 		}
 		if places.hasMCP && (IsMCP(file.Path) || file.Path == places.mcp) {
-			if top, servers, ok := mcpServers(file.Body); ok {
-				for name, server := range servers {
-					if !marked || ours[name] {
-						split.mcp[name] = server
-						delete(servers, name)
-					}
-				}
-				if len(servers) == 0 && IsMCP(file.Path) {
+			if top, _, ok := mcpServers(file.Body); ok {
+				if take(mcpRecords, top) == 0 && IsMCP(file.Path) {
 					continue
 				}
-				file.Body = encodeMCP(top, servers)
+				file.Body = reencode(top)
+			}
+		}
+		if places.plugins != "" && file.Path == places.plugins {
+			var top map[string]json.RawMessage
+			if json.Unmarshal([]byte(file.Body), &top) == nil && top != nil {
+				if take(pluginRecords, top)+take(marketRecords, top) > -2 {
+					file.Body = reencode(top)
+				}
 			}
 		}
 		split.own = append(split.own, file)
 	}
 	return split
+}
+
+func reencode(top map[string]json.RawMessage) string {
+	out, _ := json.MarshalIndent(top, "", "  ")
+	return string(out) + "\n"
 }
 
 // canonPath maps a card path at a canon place to its canon element and canon path.
@@ -221,7 +261,7 @@ func applyAgent(root, account string, payload publicationPayload, broken bool) e
 	places, connectable := agentPlaces(root, home, payload.Agent)
 	split := splitCard(payload.Files, places, connectable)
 	var snapshots []string
-	if len(split.canon)+len(split.mcp) > 0 {
+	if len(split.canon)+len(split.records[mcpRecords])+len(split.records[pluginRecords])+len(split.records[marketRecords]) > 0 {
 		dir, err := snapshotTree(root, account, canonCard, canonDir(root))
 		if err != nil {
 			return err
@@ -283,17 +323,24 @@ func writeCard(root, home string, split cardSplit, undo *applyUndo, broken bool)
 			return errBroken
 		}
 	}
-	if len(split.mcp) > 0 {
-		file := filepath.Join(canon, "mcp.json")
+	for _, kind := range recordKinds {
+		records := split.records[kind]
+		if len(records) == 0 {
+			continue
+		}
+		file := filepath.Join(canon, "plugins.json")
+		if kind == mcpRecords {
+			file = filepath.Join(canon, "mcp.json")
+		}
 		if err := undo.keep(file); err != nil {
 			return err
 		}
-		settings, err := readSettings(file)
+		settings, err := readSettings(file, kind.key)
 		if err != nil {
 			return err
 		}
-		for name, server := range split.mcp {
-			settings.set(name, string(server))
+		for name, record := range records {
+			settings.set(name, string(record))
 		}
 		if err := writeSettings(file, settings); err != nil {
 			return err

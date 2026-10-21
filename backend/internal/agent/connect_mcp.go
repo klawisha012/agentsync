@@ -19,9 +19,22 @@ var (
 	bareTOMLKey    = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 )
 
-// mcpLedger is the machine's record of the MCP servers on wrote into one AI agent settings file.
+// recordKind is one kind of named records on writes into a shared AI agent settings file.
+type recordKind struct {
+	ledger string // folder of the machine's ledgers in the state dir
+	key    string // JSON object that holds the records
+}
+
+var (
+	mcpRecords    = recordKind{ledger: "mcp", key: "mcpServers"}
+	pluginRecords = recordKind{ledger: "plugins", key: "enabledPlugins"}
+	marketRecords = recordKind{ledger: "marketplaces", key: "extraKnownMarketplaces"}
+	recordKinds   = []recordKind{mcpRecords, pluginRecords, marketRecords}
+)
+
+// recordLedger is the machine's record of the records of one kind on wrote into one settings file.
 // Replaced holds a foreign record on overwrote, so off can put it back.
-type mcpLedger struct {
+type recordLedger struct {
 	File     string            `json:"file"`
 	Own      []string          `json:"own"`
 	Replaced map[string]string `json:"replaced,omitempty"`
@@ -46,6 +59,32 @@ func (r Receiver) mcpFile(root string) string {
 	return filepath.Join(root, filepath.FromSlash(r.MCP))
 }
 
+// canonPlugins reads ~/.agents/plugins.json: enabledPlugins and extraKnownMarketplaces in the
+// Claude Code form. A plugin is a record only; the AI agent downloads it itself.
+func canonPlugins(root string) (map[string]json.RawMessage, map[string]json.RawMessage, bool, error) {
+	file := filepath.Join(canonDir(root), "plugins.json")
+	if _, err := os.Stat(file); errors.Is(err, os.ErrNotExist) {
+		return nil, nil, false, nil
+	}
+	plugins, err := readSettings(file, pluginRecords.key)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	markets, err := readSettings(file, marketRecords.key)
+	if err != nil {
+		return nil, nil, false, err
+	}
+	return plugins.(*jsonSettings).servers, markets.(*jsonSettings).servers, true, nil
+}
+
+func recordBodies(records map[string]json.RawMessage) map[string]string {
+	out := make(map[string]string, len(records))
+	for name, record := range records {
+		out[name] = string(record)
+	}
+	return out
+}
+
 // canonMCP reads the servers of ~/.agents/mcp.json. ok is false when the canon has no MCP file.
 func canonMCP(root string) (map[string]json.RawMessage, bool, error) {
 	raw, err := os.ReadFile(filepath.Join(canonDir(root), "mcp.json"))
@@ -65,27 +104,9 @@ func canonMCP(root string) (map[string]json.RawMessage, bool, error) {
 	return servers, true, nil
 }
 
-// connectMCP writes the canon servers into the agent settings file and removes its own
-// records the canon no longer has. Foreign records with other names and other keys stay.
+// connectMCP writes the canon servers into the agent settings file in its format.
 func connectMCP(root string, receiver Receiver, servers map[string]json.RawMessage) error {
-	ledgerPath, ledger, err := loadLedger(receiver.Slug)
-	if err != nil {
-		return err
-	}
-	if len(servers) == 0 && len(ledger.Own) == 0 {
-		return nil
-	}
 	file := receiver.mcpFile(root)
-	if ledger.File != "" && !samePlace(ledger.File, file) {
-		if err := releaseMCP(ledger); err != nil {
-			return err
-		}
-		ledger = mcpLedger{}
-	}
-	settings, err := readSettings(file)
-	if err != nil {
-		return err
-	}
 	records := map[string]string{}
 	for name, server := range servers {
 		record, err := renderRecord(root, receiver.Slug, file, name, server)
@@ -93,6 +114,29 @@ func connectMCP(root string, receiver Receiver, servers map[string]json.RawMessa
 			return err
 		}
 		records[name] = record
+	}
+	return writeRecords(mcpRecords, receiver.Slug, file, records)
+}
+
+// writeRecords writes records into a settings file and removes its own records that are no
+// longer asked for. Foreign records with other names and other keys stay.
+func writeRecords(kind recordKind, slug, file string, records map[string]string) error {
+	ledgerPath, ledger, err := loadLedger(kind, slug)
+	if err != nil {
+		return err
+	}
+	if len(records) == 0 && len(ledger.Own) == 0 {
+		return nil
+	}
+	if ledger.File != "" && !samePlace(ledger.File, file) {
+		if err := releaseRecords(kind, ledger); err != nil {
+			return err
+		}
+		ledger = recordLedger{}
+	}
+	settings, err := readSettings(file, kind.key)
+	if err != nil {
+		return err
 	}
 	if ledger.Replaced == nil {
 		ledger.Replaced = map[string]string{}
@@ -117,20 +161,28 @@ func connectMCP(root string, receiver Receiver, servers map[string]json.RawMessa
 	return writeSettings(file, settings)
 }
 
-// disconnectMCP removes only the records on wrote and puts replaced foreign records back.
-func disconnectMCP(slug string) error {
-	ledgerPath, ledger, err := loadLedger(slug)
-	if err != nil || ledger.File == "" {
-		return err
+// disconnectRecords removes only the records on wrote and puts replaced foreign records back.
+func disconnectRecords(slug string) error {
+	for _, kind := range recordKinds {
+		ledgerPath, ledger, err := loadLedger(kind, slug)
+		if err != nil {
+			return err
+		}
+		if ledger.File == "" {
+			continue
+		}
+		if err := releaseRecords(kind, ledger); err != nil {
+			return err
+		}
+		if err := os.Remove(ledgerPath); err != nil {
+			return err
+		}
 	}
-	if err := releaseMCP(ledger); err != nil {
-		return err
-	}
-	return os.Remove(ledgerPath)
+	return nil
 }
 
-func releaseMCP(ledger mcpLedger) error {
-	settings, err := readSettings(ledger.File)
+func releaseRecords(kind recordKind, ledger recordLedger) error {
+	settings, err := readSettings(ledger.File, kind.key)
 	if err != nil {
 		return err
 	}
@@ -140,7 +192,7 @@ func releaseMCP(ledger mcpLedger) error {
 	return writeSettings(ledger.File, settings)
 }
 
-func restore(settings mcpSettings, ledger mcpLedger, name string) {
+func restore(settings mcpSettings, ledger recordLedger, name string) {
 	settings.remove(name)
 	if old, ok := ledger.Replaced[name]; ok {
 		settings.set(name, old)
@@ -148,13 +200,13 @@ func restore(settings mcpSettings, ledger mcpLedger, name string) {
 	}
 }
 
-func loadLedger(slug string) (string, mcpLedger, error) {
+func loadLedger(kind recordKind, slug string) (string, recordLedger, error) {
 	dir, err := stateDir()
 	if err != nil {
-		return "", mcpLedger{}, err
+		return "", recordLedger{}, err
 	}
-	file := filepath.Join(dir, "mcp", slug+".json")
-	var ledger mcpLedger
+	file := filepath.Join(dir, kind.ledger, slug+".json")
+	var ledger recordLedger
 	raw, err := os.ReadFile(file)
 	if errors.Is(err, os.ErrNotExist) {
 		return file, ledger, nil
@@ -163,12 +215,12 @@ func loadLedger(slug string) (string, mcpLedger, error) {
 		return file, ledger, err
 	}
 	if err := json.Unmarshal(raw, &ledger); err != nil {
-		return file, ledger, fmt.Errorf("Учёт записей MCP %s не разобран.", file)
+		return file, ledger, fmt.Errorf("Учёт записей %s не\u00a0разобран.", file)
 	}
 	return file, ledger, nil
 }
 
-func saveLedger(file string, ledger mcpLedger) error {
+func saveLedger(file string, ledger recordLedger) error {
 	if err := os.MkdirAll(filepath.Dir(file), 0o700); err != nil {
 		return err
 	}
@@ -180,7 +232,8 @@ func isTOML(file string) bool {
 	return strings.EqualFold(filepath.Ext(file), ".toml")
 }
 
-func readSettings(file string) (mcpSettings, error) {
+// readSettings reads the records under key of a JSON settings file, or the MCP tables of a TOML one.
+func readSettings(file, key string) (mcpSettings, error) {
 	raw, err := os.ReadFile(file)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
@@ -188,15 +241,15 @@ func readSettings(file string) (mcpSettings, error) {
 	if isTOML(file) {
 		return &tomlSettings{lines: splitLines(string(raw))}, nil
 	}
-	settings := &jsonSettings{top: map[string]json.RawMessage{}, servers: map[string]json.RawMessage{}}
+	settings := &jsonSettings{top: map[string]json.RawMessage{}, key: key, servers: map[string]json.RawMessage{}}
 	if len(strings.TrimSpace(string(raw))) == 0 {
 		return settings, nil
 	}
 	if json.Unmarshal(raw, &settings.top) != nil || settings.top == nil {
-		return nil, fmt.Errorf("Файл %s не разобран как JSON, MCP-серверы не вписаны.", file)
+		return nil, fmt.Errorf("Файл %s не\u00a0разобран как JSON, записи не\u00a0вписаны.", file)
 	}
-	if found := settings.top["mcpServers"]; found != nil && json.Unmarshal(found, &settings.servers) != nil {
-		return nil, fmt.Errorf("Ключ mcpServers в файле %s не разобран.", file)
+	if found := settings.top[key]; found != nil && json.Unmarshal(found, &settings.servers) != nil {
+		return nil, fmt.Errorf("Ключ %s в\u00a0файле %s не\u00a0разобран.", key, file)
 	}
 	if settings.servers == nil {
 		settings.servers = map[string]json.RawMessage{}
@@ -306,6 +359,7 @@ func secretLookup(root string) func(string) (string, bool) {
 
 type jsonSettings struct {
 	top     map[string]json.RawMessage
+	key     string
 	servers map[string]json.RawMessage
 }
 
@@ -323,7 +377,10 @@ func (s *jsonSettings) remove(name string) {
 }
 
 func (s *jsonSettings) encode() string {
-	return encodeMCP(s.top, s.servers)
+	raw, _ := json.Marshal(s.servers)
+	s.top[s.key] = raw
+	out, _ := json.MarshalIndent(s.top, "", "  ")
+	return string(out) + "\n"
 }
 
 // tomlSettings edits [mcp_servers.<name>] tables as text, so comments and other tables stay.

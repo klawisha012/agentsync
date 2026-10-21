@@ -25,6 +25,8 @@ type Receiver struct {
 	// MCP is the settings file with user MCP servers, relative to the home directory; the format
 	// follows the extension. The Env directory, when set, holds the file instead.
 	MCP string
+	// Plugins is the settings file with enabled plugins and marketplaces, beside the skills directory.
+	Plugins string
 }
 
 // ReceiverView is the public list the site shows when a person picks a receiver.
@@ -129,7 +131,7 @@ var receivers = []Receiver{
 	{Slug: "autohand-code", Display: "Autohand Code CLI", Project: ".autohand/skills", Global: ".autohand/skills", Env: "AUTOHAND_HOME"},
 	{Slug: "augment", Display: "Augment", Project: ".augment/skills", Global: ".augment/skills"},
 	{Slug: "bob", Display: "IBM Bob", Project: ".bob/skills", Global: ".bob/skills"},
-	{Slug: "claude-code", Aliases: []string{"claude"}, Display: "Claude Code", Project: ".claude/skills", Global: ".claude/skills", Env: "CLAUDE_CONFIG_DIR", Agents: "agents", Commands: "commands", Instructions: "CLAUDE.md", MCP: ".claude.json"},
+	{Slug: "claude-code", Aliases: []string{"claude"}, Display: "Claude Code", Project: ".claude/skills", Global: ".claude/skills", Env: "CLAUDE_CONFIG_DIR", Agents: "agents", Commands: "commands", Instructions: "CLAUDE.md", MCP: ".claude.json", Plugins: "settings.json"},
 	{Slug: "openclaw", Display: "OpenClaw", Project: "skills", OpenClaw: true},
 	{Slug: "cline", Display: "Cline", Project: ".agents/skills", Global: ".agents/skills"},
 	{Slug: "codearts-agent", Display: "CodeArts Agent", Project: ".codeartsdoer/skills", Global: ".codeartsdoer/skills"},

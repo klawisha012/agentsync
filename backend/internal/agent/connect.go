@@ -106,6 +106,15 @@ func connect(root, account, agentName, snapshot, home string) (ConnectReport, er
 	} else if haveMCP {
 		plan.report.Skipped = append(plan.report.Skipped, "MCP-серверы")
 	}
+	plugins, markets, havePlugins, err := canonPlugins(root)
+	if err != nil {
+		return plan.report, err
+	}
+	if havePlugins && cat.receiver.Plugins != "" {
+		plan.report.Got = append(plan.report.Got, "плагины")
+	} else if havePlugins {
+		plan.report.Skipped = append(plan.report.Skipped, "плагины")
+	}
 	if len(plan.report.Got)+len(plan.report.Skipped) == 0 {
 		return plan.report, errEmptyCanon
 	}
@@ -131,6 +140,13 @@ func connect(root, account, agentName, snapshot, home string) (ConnectReport, er
 	undo, err := shareCanon(canon, snapshot, home, cat.display, plan, occupied)
 	if err == nil && cat.receiver.MCP != "" {
 		err = connectMCP(root, cat.receiver, servers)
+	}
+	if err == nil && cat.receiver.Plugins != "" {
+		file := filepath.Join(filepath.Dir(cat.dir), filepath.FromSlash(cat.receiver.Plugins))
+		err = writeRecords(pluginRecords, cat.slug, file, recordBodies(plugins))
+		if err == nil {
+			err = writeRecords(marketRecords, cat.slug, file, recordBodies(markets))
+		}
 	}
 	if err != nil {
 		undoErr := rollbackCatalog(undo)
@@ -176,7 +192,7 @@ func Disconnect(root, agentName string) error {
 			return err
 		}
 	}
-	return disconnectMCP(receiver.Slug)
+	return disconnectRecords(receiver.Slug)
 }
 
 // planConnect lays out the links. A place inside the canon is left alone: the agent reads the canon there.

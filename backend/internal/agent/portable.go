@@ -154,7 +154,7 @@ func PortablePath(path string) bool {
 	}
 	base := strings.ToLower(filepath.Base(clean))
 	switch base {
-	case "config.json", "settings.json", "agents.md", "claude.md", "gemini.md":
+	case "config.json", "settings.json", "agents.md", "claude.md", "gemini.md", "plugins.json":
 		return true
 	}
 	for _, seg := range strings.Split(strings.ToLower(clean), "/") {
