@@ -37,6 +37,10 @@ func TestPushCarriesSubagentsAndCommandsWithoutMarketplaceClones(t *testing.T) {
 	writeAgentFile(t, root, ".claude/plugins/marketplaces/ponytail/README.md", "clone")
 	writeAgentFile(t, root, ".claude/plugins/plugin-catalog-cache.json", "{}")
 	writeAgentFile(t, root, ".claude/plugins/known_marketplaces.json", "{}")
+	// Skills Claude Code syncs from claude.ai: program files, and their docs hold example passwords.
+	writeAgentFile(t, root, ".claude/skills/synced/bucket/pdf/REFERENCE.md", "qpdf --password=secret123 --decrypt in.pdf out.pdf")
+	writeAgentFile(t, root, ".claude/skills/synced/bucket/manifest.json", "{}")
+	writeAgentFile(t, root, ".claude/skills/mine/SKILL.md", "own skill")
 	t.Setenv("AGENTSYNC_ROOT", root)
 	t.Setenv("AGENTSYNC_SERVER", srv.URL)
 	t.Setenv("AGENTSYNC_TOKEN", "machine")
@@ -54,12 +58,12 @@ func TestPushCarriesSubagentsAndCommandsWithoutMarketplaceClones(t *testing.T) {
 		}
 		return false
 	}
-	for _, want := range []string{"agents/go-developer.md", "commands/review.md", "settings.json"} {
+	for _, want := range []string{"agents/go-developer.md", "commands/review.md", "settings.json", "skills/mine/SKILL.md"} {
 		if !has(want) {
 			t.Fatalf("snapshot lacks %s: %v", want, sent)
 		}
 	}
-	for _, skip := range []string{"plugins/marketplaces/ponytail/README.md", "plugins/plugin-catalog-cache.json", "plugins/known_marketplaces.json"} {
+	for _, skip := range []string{"plugins/marketplaces/ponytail/README.md", "plugins/plugin-catalog-cache.json", "plugins/known_marketplaces.json", "skills/synced/bucket/pdf/REFERENCE.md", "skills/synced/bucket/manifest.json"} {
 		if has(skip) {
 			t.Fatalf("snapshot carries %s: %v", skip, sent)
 		}

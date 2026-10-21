@@ -152,9 +152,13 @@ func PrivatePath(path string) bool {
 		return true
 	}
 	segs := strings.Split(clean, "/")
-	for _, seg := range segs {
+	for i, seg := range segs {
 		switch seg {
 		case "credentials", "sessions", "session", "cache", "caches", "logs", "log", "memory", "history", "conversations", "node_modules", "vendor", "dist", "locks", "bundled", "marketplace-cache":
+			return true
+		}
+		// Claude Code downloads skills synced from claude.ai into skills/synced itself.
+		if seg == "synced" && i > 0 && segs[i-1] == "skills" {
 			return true
 		}
 	}
