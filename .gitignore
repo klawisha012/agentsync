@@ -10,3 +10,5 @@ frontend/.next/
 credentials.json
 auth.json
 session.json
+frontend/public/docs/
+frontend/docs/.vitepress/cache/
