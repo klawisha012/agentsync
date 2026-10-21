@@ -24,7 +24,7 @@ const localOnly = [
 ];
 
 export default function Home() {
-  const [variant, setVariant] = useState("a");
+  const [variant, setVariant] = useState("d");
   const [origin, setOrigin] = useState("");
   const [tab, setTab] = useState("ps");
   const [copied, setCopied] = useState(false);
@@ -32,7 +32,7 @@ export default function Home() {
 
   useEffect(() => {
     setOrigin(window.location.origin);
-    setVariant(new URLSearchParams(window.location.search).get("hero") ?? "a");
+    setVariant(new URLSearchParams(window.location.search).get("hero") ?? "d");
   }, []);
 
   const command = tabs.find((item) => item.id === tab).text(origin);
