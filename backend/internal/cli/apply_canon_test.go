@@ -189,7 +189,7 @@ func TestPushMarksTheMCPRecordsOnWrote(t *testing.T) {
 	if code, _, stderr := runCLI(t, "push", "gemini"); code != 0 {
 		t.Fatalf("push %s", stderr)
 	}
-	if !hasBody(sent.Files, "agentsync.json", `{"mcp":["docs"],"plugins":[],"marketplaces":[]}`) {
+	if !hasBody(sent.Files, "agentsync.json", `{"mcp":["docs"],"plugins":[],"marketplaces":[],"hooks":[]}`) {
 		t.Fatalf("mark %+v", sent.Files)
 	}
 }

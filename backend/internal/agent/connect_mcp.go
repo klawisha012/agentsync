@@ -29,8 +29,26 @@ var (
 	mcpRecords    = recordKind{ledger: "mcp", key: "mcpServers"}
 	pluginRecords = recordKind{ledger: "plugins", key: "enabledPlugins"}
 	marketRecords = recordKind{ledger: "marketplaces", key: "extraKnownMarketplaces"}
-	recordKinds   = []recordKind{mcpRecords, pluginRecords, marketRecords}
+	hookRecords   = recordKind{ledger: "hooks", key: "hooks"}
+	recordKinds   = []recordKind{mcpRecords, pluginRecords, marketRecords, hookRecords}
 )
+
+// canonRecordFile is the canon file that holds the records of a kind.
+var canonRecordFile = map[recordKind]string{
+	mcpRecords: "mcp.json", pluginRecords: "plugins.json", marketRecords: "plugins.json", hookRecords: "hooks.json",
+}
+
+// openSettings reads a settings file as the records of one kind.
+func openSettings(kind recordKind, file string) (mcpSettings, error) {
+	if kind == hookRecords {
+		settings, err := readHookSettings(file)
+		if err != nil {
+			return nil, err
+		}
+		return settings, nil
+	}
+	return readSettings(file, kind.key)
+}
 
 // recordLedger is the machine's record of the records of one kind on wrote into one settings file.
 // Replaced holds a foreign record on overwrote, so off can put it back.
@@ -134,7 +152,7 @@ func writeRecords(kind recordKind, slug, file string, records map[string]string)
 		}
 		ledger = recordLedger{}
 	}
-	settings, err := readSettings(file, kind.key)
+	settings, err := openSettings(kind, file)
 	if err != nil {
 		return err
 	}
@@ -182,7 +200,7 @@ func disconnectRecords(slug string) error {
 }
 
 func releaseRecords(kind recordKind, ledger recordLedger) error {
-	settings, err := readSettings(ledger.File, kind.key)
+	settings, err := openSettings(kind, ledger.File)
 	if err != nil {
 		return err
 	}

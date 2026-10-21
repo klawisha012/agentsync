@@ -28,7 +28,9 @@ func portableFile(file File) (File, bool) {
 	if PrivatePath(file.Path) || !PortablePath(file.Path) {
 		return file, false
 	}
-	if IsHook(file.Path) && AbsolutePath.MatchString(file.Body) {
+	if body, ok := portableHooks(file.Body); ok {
+		file.Body = body
+	} else if IsHook(file.Path) && AbsolutePath.MatchString(file.Body) {
 		return file, false
 	}
 	if IsMCP(file.Path) {
@@ -107,6 +109,9 @@ func writeHomeFile(home string, file File) error {
 				}
 			}
 		}
+	}
+	if raw, err := os.ReadFile(filepath.Join(home, filepath.FromSlash(file.Path))); err == nil {
+		file.Body = keepMachineHooks(raw, file.Body)
 	}
 	return writeFile(home, file)
 }

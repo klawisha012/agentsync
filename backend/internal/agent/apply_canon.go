@@ -22,11 +22,12 @@ type canonMark struct {
 	MCP          []string `json:"mcp"`
 	Plugins      []string `json:"plugins"`
 	Marketplaces []string `json:"marketplaces"`
+	Hooks        []string `json:"hooks"`
 }
 
 // markLists names the mark list of each record kind.
 func (m *canonMark) lists() map[recordKind]*[]string {
-	return map[recordKind]*[]string{mcpRecords: &m.MCP, pluginRecords: &m.Plugins, marketRecords: &m.Marketplaces}
+	return map[recordKind]*[]string{mcpRecords: &m.MCP, pluginRecords: &m.Plugins, marketRecords: &m.Marketplaces, hookRecords: &m.Hooks}
 }
 
 func isCanonCard(name string) bool {
@@ -88,7 +89,7 @@ func replacePortable(root, dir string, files []File, broken bool) error {
 
 // markFile builds the mark for an upload of home: the records on wrote into a settings file inside it.
 func markFile(home string) File {
-	mark := canonMark{MCP: []string{}, Plugins: []string{}, Marketplaces: []string{}}
+	mark := canonMark{MCP: []string{}, Plugins: []string{}, Marketplaces: []string{}, Hooks: []string{}}
 	if dir, err := stateDir(); err == nil {
 		for kind, list := range mark.lists() {
 			ledgers, _ := filepath.Glob(filepath.Join(dir, kind.ledger, "*.json"))
@@ -106,8 +107,9 @@ func markFile(home string) File {
 
 // cardPlaces are the canon places of an AI agent, relative to its home; "" when it has none.
 type cardPlaces struct {
-	skills, agents, commands, instructions, mcp, plugins string
-	hasMCP                                               bool
+	skills, agents, commands, instructions, mcp, plugins, hooks string
+	hasMCP                                                      bool
+	hookEvents, hookTools                                       map[string]string
 }
 
 // agentPlaces finds the canon places of the card's AI agent. ok is false when the home is not
@@ -145,6 +147,8 @@ func agentPlaces(root, home, name string) (cardPlaces, bool) {
 		places.mcp = rel(receiver.mcpFile(root))
 	}
 	places.plugins = beside(receiver.Plugins)
+	places.hooks = beside(receiver.Hooks)
+	places.hookEvents, places.hookTools = receiver.HookEvents, receiver.HookTools
 	return places, true
 }
 
@@ -196,6 +200,28 @@ func splitCard(files []File, places cardPlaces, connectable bool) cardSplit {
 		top[kind.key] = raw
 		return len(records)
 	}
+	// takeHooks moves the hook groups that go to the canon out of a settings body, back in Claude form.
+	takeHooks := func(top map[string]json.RawMessage) bool {
+		settings := &hookSettings{top: top}
+		if json.Unmarshal(top["hooks"], &settings.events) != nil || settings.events == nil {
+			return false
+		}
+		events, tools := invert(places.hookEvents), invert(places.hookTools)
+		for name, group := range settings.records() {
+			if marked && !ours[hookRecords][name] {
+				continue
+			}
+			event, _, _ := strings.Cut(name, " ")
+			canonEvent, record, ok := translateHook(event, group, events, tools)
+			if !ok {
+				continue
+			}
+			split.records[hookRecords][hookName(canonEvent, json.RawMessage(record))] = json.RawMessage(record)
+			settings.remove(name)
+		}
+		settings.encode()
+		return true
+	}
 	for _, file := range files {
 		if file.Path == MarkFile {
 			continue
@@ -216,10 +242,15 @@ func splitCard(files []File, places cardPlaces, connectable bool) cardSplit {
 				file.Body = reencode(top)
 			}
 		}
-		if places.plugins != "" && file.Path == places.plugins {
+		plugins, hooks := places.plugins != "" && file.Path == places.plugins, places.hooks != "" && file.Path == places.hooks
+		if plugins || hooks {
 			var top map[string]json.RawMessage
 			if json.Unmarshal([]byte(file.Body), &top) == nil && top != nil {
-				if take(pluginRecords, top)+take(marketRecords, top) > -2 {
+				changed := plugins && take(pluginRecords, top)+take(marketRecords, top) > -2
+				if hooks && takeHooks(top) {
+					changed = true
+				}
+				if changed {
 					file.Body = reencode(top)
 				}
 			}
@@ -261,7 +292,11 @@ func applyAgent(root, account string, payload publicationPayload, broken bool) e
 	places, connectable := agentPlaces(root, home, payload.Agent)
 	split := splitCard(payload.Files, places, connectable)
 	var snapshots []string
-	if len(split.canon)+len(split.records[mcpRecords])+len(split.records[pluginRecords])+len(split.records[marketRecords]) > 0 {
+	changesCanon := len(split.canon) > 0
+	for _, records := range split.records {
+		changesCanon = changesCanon || len(records) > 0
+	}
+	if changesCanon {
 		dir, err := snapshotTree(root, account, canonCard, canonDir(root))
 		if err != nil {
 			return err
@@ -328,14 +363,11 @@ func writeCard(root, home string, split cardSplit, undo *applyUndo, broken bool)
 		if len(records) == 0 {
 			continue
 		}
-		file := filepath.Join(canon, "plugins.json")
-		if kind == mcpRecords {
-			file = filepath.Join(canon, "mcp.json")
-		}
+		file := filepath.Join(canon, canonRecordFile[kind])
 		if err := undo.keep(file); err != nil {
 			return err
 		}
-		settings, err := readSettings(file, kind.key)
+		settings, err := openSettings(kind, file)
 		if err != nil {
 			return err
 		}

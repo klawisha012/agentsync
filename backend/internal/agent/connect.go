@@ -115,6 +115,23 @@ func connect(root, account, agentName, snapshot, home string) (ConnectReport, er
 	} else if havePlugins {
 		plan.report.Skipped = append(plan.report.Skipped, "плагины")
 	}
+	hooks, haveHooks, err := canonHooks(root)
+	if err != nil {
+		return plan.report, err
+	}
+	var hookBodies map[string]string
+	if haveHooks && cat.receiver.Hooks != "" {
+		var missing []string
+		hookBodies, missing = agentHooks(hooks, cat.receiver)
+		if len(hookBodies) > 0 {
+			plan.report.Got = append(plan.report.Got, "хуки")
+		}
+		if len(missing) > 0 {
+			plan.report.Skipped = append(plan.report.Skipped, "хуки событий "+strings.Join(missing, ", "))
+		}
+	} else if haveHooks {
+		plan.report.Skipped = append(plan.report.Skipped, "хуки")
+	}
 	if len(plan.report.Got)+len(plan.report.Skipped) == 0 {
 		return plan.report, errEmptyCanon
 	}
@@ -147,6 +164,10 @@ func connect(root, account, agentName, snapshot, home string) (ConnectReport, er
 		if err == nil {
 			err = writeRecords(marketRecords, cat.slug, file, recordBodies(markets))
 		}
+	}
+	if err == nil && cat.receiver.Hooks != "" {
+		file := filepath.Join(filepath.Dir(cat.dir), filepath.FromSlash(cat.receiver.Hooks))
+		err = writeRecords(hookRecords, cat.slug, file, hookBodies)
 	}
 	if err != nil {
 		undoErr := rollbackCatalog(undo)
