@@ -14,6 +14,7 @@ type Receiver struct {
 	Project  string
 	Global   string
 	Env      string
+	Aliases  []string
 	InConfig bool
 	OpenClaw bool
 }
@@ -50,11 +51,11 @@ func ReceiverViews() []ReceiverView {
 	return out
 }
 
-// FindReceiver looks up a command name. Matching ignores letter case.
+// FindReceiver looks up a command name or its synonym. Matching ignores letter case.
 func FindReceiver(slug string) (Receiver, bool) {
 	key := strings.ToLower(strings.TrimSpace(slug))
 	for _, item := range receivers {
-		if item.Slug == key {
+		if item.Slug == key || slices.Contains(item.Aliases, key) {
 			return item, true
 		}
 	}
@@ -120,7 +121,7 @@ var receivers = []Receiver{
 	{Slug: "autohand-code", Display: "Autohand Code CLI", Project: ".autohand/skills", Global: ".autohand/skills", Env: "AUTOHAND_HOME"},
 	{Slug: "augment", Display: "Augment", Project: ".augment/skills", Global: ".augment/skills"},
 	{Slug: "bob", Display: "IBM Bob", Project: ".bob/skills", Global: ".bob/skills"},
-	{Slug: "claude-code", Display: "Claude Code", Project: ".claude/skills", Global: ".claude/skills", Env: "CLAUDE_CONFIG_DIR"},
+	{Slug: "claude-code", Aliases: []string{"claude"}, Display: "Claude Code", Project: ".claude/skills", Global: ".claude/skills", Env: "CLAUDE_CONFIG_DIR"},
 	{Slug: "openclaw", Display: "OpenClaw", Project: "skills", OpenClaw: true},
 	{Slug: "cline", Display: "Cline", Project: ".agents/skills", Global: ".agents/skills"},
 	{Slug: "codearts-agent", Display: "CodeArts Agent", Project: ".codeartsdoer/skills", Global: ".codeartsdoer/skills"},
@@ -141,8 +142,8 @@ var receivers = []Receiver{
 	{Slug: "firebender", Display: "Firebender", Project: ".agents/skills", Global: ".firebender/skills"},
 	{Slug: "forgecode", Display: "ForgeCode", Project: ".forge/skills", Global: ".forge/skills"},
 	{Slug: "fx", Display: "fx", Project: ".fx/skills", Global: ".fx/skills"},
-	{Slug: "gemini-cli", Display: "Gemini CLI", Project: ".agents/skills", Global: ".gemini/skills"},
-	{Slug: "github-copilot", Display: "GitHub Copilot", Project: ".agents/skills", Global: ".copilot/skills"},
+	{Slug: "gemini-cli", Aliases: []string{"gemini"}, Display: "Gemini CLI", Project: ".agents/skills", Global: ".gemini/skills"},
+	{Slug: "github-copilot", Aliases: []string{"copilot"}, Display: "GitHub Copilot", Project: ".agents/skills", Global: ".copilot/skills"},
 	{Slug: "goose", Display: "Goose", Project: ".goose/skills", Global: "goose/skills", InConfig: true},
 	{Slug: "grok", Display: "Grok Build", Project: ".grok/skills", Global: ".grok/skills", Env: "GROK_HOME"},
 	{Slug: "hermes-agent", Display: "Hermes Agent", Project: ".hermes/skills", Global: ".hermes/skills", Env: "HERMES_HOME"},

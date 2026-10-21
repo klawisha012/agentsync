@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -379,7 +380,7 @@ func agentHome(root, name string) string {
 
 func catalogDotHome(name string) string {
 	for _, item := range receivers {
-		if !strings.EqualFold(item.Slug, name) && !strings.EqualFold(item.Display, name) {
+		if !strings.EqualFold(item.Slug, name) && !strings.EqualFold(item.Display, name) && !slices.Contains(item.Aliases, strings.ToLower(name)) {
 			continue
 		}
 		if item.OpenClaw {

@@ -41,7 +41,7 @@ func TestPushCarriesSubagentsAndCommandsWithoutMarketplaceClones(t *testing.T) {
 	t.Setenv("AGENTSYNC_STATE", t.TempDir())
 
 	var out, errOut bytes.Buffer
-	if code := Run([]string{"push", "claude-code"}, nil, &out, &errOut); code != 0 {
+	if code := Run([]string{"push", "claude"}, nil, &out, &errOut); code != 0 {
 		t.Fatalf("push %d %s %s", code, out.String(), errOut.String())
 	}
 	has := func(path string) bool {

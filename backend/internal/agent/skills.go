@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// SkillCopy names a publication version and the skill folders to place into receivers.
+// SkillCopy names a publication version and the skill folders to place into AI agents from the catalog.
 type SkillCopy struct {
 	Author  string
 	Source  string
@@ -42,7 +42,7 @@ func CopySkills(ctx context.Context, server, root, account, token, cookie string
 	}
 	targets := compactNames(copy.Targets)
 	if len(targets) == 0 {
-		return errors.New("Назовите приёмника, куда положить навыки.")
+		return errors.New("Назовите ИИ-агента, куда положить навыки.")
 	}
 	dirs, err := receiverDirs(root, place, targets)
 	if err != nil {
@@ -177,7 +177,7 @@ func receiverDirs(root, place string, targets []string) ([]string, error) {
 	for _, target := range targets {
 		receiver, ok := FindReceiver(target)
 		if !ok {
-			return nil, fmt.Errorf("Приёмник «%s» не найден.", target)
+			return nil, fmt.Errorf("ИИ-агент «%s» не найден в каталоге.", target)
 		}
 		var dir string
 		var have bool
@@ -188,9 +188,9 @@ func receiverDirs(root, place string, targets []string) ([]string, error) {
 		}
 		if !have {
 			if place == "project" {
-				return nil, fmt.Errorf("У приёмника «%s» нет каталога проекта.", receiver.Display)
+				return nil, fmt.Errorf("У ИИ-агента «%s» нет каталога проекта.", receiver.Display)
 			}
-			return nil, fmt.Errorf("У приёмника «%s» нет глобального каталога.", receiver.Display)
+			return nil, fmt.Errorf("У ИИ-агента «%s» нет глобального каталога.", receiver.Display)
 		}
 		key := filepath.Clean(dir)
 		if _, ok := seen[key]; ok {

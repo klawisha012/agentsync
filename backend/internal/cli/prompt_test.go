@@ -17,7 +17,7 @@ func TestFillSkillChoiceNeedsATerminal(t *testing.T) {
 		t.Fatalf("place %v", err)
 	}
 	_, err = fillSkillChoice(skillCall{author: "Author", source: "Grok", version: 4, place: "global", skills: []string{"ru-text"}})
-	if err == nil || !strings.Contains(err.Error(), "приёмника") {
+	if err == nil || !strings.Contains(err.Error(), "ИИ-агента") {
 		t.Fatalf("targets %v", err)
 	}
 }

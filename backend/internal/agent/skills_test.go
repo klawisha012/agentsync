@@ -206,12 +206,23 @@ func TestCopySkillsUsesReceiverCatalog(t *testing.T) {
 		t.Fatal("windsurf used the short home")
 	}
 
+	for _, name := range []string{"Claude", "claude-code"} {
+		if err := CopySkills(t.Context(), srv.URL, root, "zwarder", "", "", SkillCopy{
+			Author: "zwarder", Source: "Grok", Version: 4, Place: "global",
+			Skills: []string{"child"}, Targets: []string{name},
+		}); err != nil {
+			t.Fatalf("%s %v", name, err)
+		}
+		if body := mustRead(t, filepath.Join(root, ".claude", "skills", "child", "SKILL.md")); body != "child" {
+			t.Fatalf("%s %s", name, body)
+		}
+	}
 	unknown := CopySkills(t.Context(), srv.URL, root, "zwarder", "", "", SkillCopy{
 		Author: "zwarder", Source: "Grok", Version: 4, Place: "global",
-		Skills: []string{"child"}, Targets: []string{"Claude"},
+		Skills: []string{"child"}, Targets: []string{"nope"},
 	})
 	if unknown == nil || !strings.Contains(unknown.Error(), "не найден") {
-		t.Fatalf("claude %v", unknown)
+		t.Fatalf("unknown %v", unknown)
 	}
 	eve := CopySkills(t.Context(), srv.URL, root, "zwarder", "", "", SkillCopy{
 		Author: "zwarder", Source: "Grok", Version: 4, Place: "global",

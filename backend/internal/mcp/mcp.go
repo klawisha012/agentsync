@@ -129,7 +129,7 @@ func toolList() []map[string]any {
 		tool("store", "Читает снимок ИИ-агента из\u00a0хранилища.", objectSchema([]string{"agent"})),
 		tool("revert", "Возвращает последний снимок на\u00a0этой машине.", agentSchema),
 		tool("apply", "Применяет публикацию автора к\u00a0ИИ-агенту.", objectSchema([]string{"author", "agent"})),
-		tool("skills", "Кладёт выбранные навыки публикации в\u00a0каталоги приёмников.", skillsSchema()),
+		tool("skills", "Кладёт выбранные навыки публикации в\u00a0каталоги ИИ-агентов.", skillsSchema()),
 	}
 }
 

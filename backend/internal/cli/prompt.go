@@ -21,7 +21,7 @@ func fillSkillChoice(call skillCall) (skillCall, error) {
 		if call.place == "" {
 			return call, errors.New("Выберите глобальный каталог или проект.")
 		}
-		return call, errors.New("Назовите приёмника, куда положить навыки.")
+		return call, errors.New("Назовите ИИ-агента, куда положить навыки.")
 	}
 	state, err := term.MakeRaw(fd)
 	if err != nil {
@@ -78,7 +78,7 @@ func placeChoicesFor(slugs []string) []placeChoice {
 func promptPlace(in *os.File, out io.Writer, slugs []string) (string, error) {
 	choices := placeChoicesFor(slugs)
 	if len(choices) == 0 {
-		return "", errors.New("У выбранных приёмников нет общего места установки.")
+		return "", errors.New("У выбранных ИИ-агентов нет общего места установки.")
 	}
 	cursor := 0
 	height := 0
@@ -227,11 +227,11 @@ func promptReceivers(in *os.File, out io.Writer, place string) ([]string, error)
 			picker.typeText(text)
 		case "enter":
 			if len(picker.order) == 0 {
-				warn = "Выберите хотя бы один приёмник."
+				warn = "Выберите хотя бы одного ИИ-агента."
 				continue
 			}
 			clearFrame(out, height)
-			fmt.Fprintf(out, "Приёмники: %s\r\n", strings.Join(picker.order, ", "))
+			fmt.Fprintf(out, "ИИ-агенты: %s\r\n", strings.Join(picker.order, ", "))
 			return picker.order, nil
 		case "cancel":
 			clearFrame(out, height)
@@ -255,7 +255,7 @@ func drawPlace(out io.Writer, choices []placeChoice, cursor, previous int) int {
 func drawReceivers(out io.Writer, picker receiverPicker, warn string, previous int) int {
 	shown := picker.visible()
 	lines := []string{
-		"Приёмники",
+		"ИИ-агенты",
 		"Поиск: " + picker.query + "█",
 		"↑↓ ход, пробел выбор, Enter подтвердить",
 		"",
