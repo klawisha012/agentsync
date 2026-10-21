@@ -13,10 +13,11 @@ export default defineConfig({
   head: [["meta", { name: "theme-color", content: "#000000" }]],
   themeConfig: {
     siteTitle: "AgentSync",
+    // The title leaves the docs for the site's account list; an absolute path skips the /docs/ base.
+    logoLink: { link: "/accounts", target: "_self" },
     nav: [
       { text: "Руководство", link: "/start/quick-start" },
       { text: "Справочник", link: "/reference/cli" },
-      { text: "Сайт", link: "https://zwarder.ru/", target: "_self" },
     ],
     sidebar: [
       {
