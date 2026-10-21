@@ -63,8 +63,9 @@ func TestApplyChainWithdrawRenameDelete(t *testing.T) {
 	if body := readHome(t, dir, "rules/ok.md"); body != "one" {
 		t.Fatalf("applied body %q", body)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "Grok", "rules", "mine.md")); !os.IsNotExist(err) {
-		t.Fatal("file absent from the publication stayed in the agent")
+	// ADR 0037: an own file absent from the card stays.
+	if readHome(t, dir, "rules/mine.md") != "local" {
+		t.Fatal("file absent from the publication was removed")
 	}
 	if readHome(t, dir, "credentials.json") != "secret" || readHome(t, dir, "vendor/app") != "bin" {
 		t.Fatal("private files were replaced")

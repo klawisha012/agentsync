@@ -44,14 +44,15 @@ func Push(ctx context.Context, server, root, agentName, token, cookie string) er
 		return err
 	}
 	defer unlock()
-	files, err := readSnapshot(root, agentHome(root, agentName))
+	home := agentHome(root, agentName)
+	files, err := readSnapshot(root, home)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return errors.New("на компьютере нет этого ИИ-агента")
 		}
 		return err
 	}
-	_, err = postAgent(ctx, server, "/agent/push", agentName, token, cookie, portableOnly(files), false)
+	_, err = postAgent(ctx, server, "/agent/push", agentName, token, cookie, append(portableOnly(files), markFile(home)), false)
 	return err
 }
 
@@ -98,7 +99,7 @@ func applyOwned(root, account string, payload publicationPayload) error {
 	if owner == "" {
 		owner = payload.Author
 	}
-	return applyFiles(root, owner, payload.Agent, payload.Files, false)
+	return applyAgent(root, owner, payload, false)
 }
 
 func ApplyBroken(ctx context.Context, server, root, author, agentName, token, cookie string) error {
@@ -111,7 +112,8 @@ func ApplyBroken(ctx context.Context, server, root, author, agentName, token, co
 	if err != nil {
 		return err
 	}
-	return applyFiles(root, author, agentName, payload.Files, true)
+	payload.Agent = agentName
+	return applyAgent(root, author, payload, true)
 }
 
 func Revert(root, account, agentName string) error {
@@ -236,52 +238,6 @@ func getPublication(ctx context.Context, target, token, cookie string) (publicat
 		return publicationPayload{}, err
 	}
 	return payload, nil
-}
-
-func applyFiles(root, account, agentName string, next []File, broken bool) error {
-	if err := pathsFit(next); err != nil {
-		return err
-	}
-	home := agentHome(root, agentName)
-	current, err := readTree(home)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	portable := portableOnly(current)
-	if broken {
-		for _, file := range next[:min(1, len(next))] {
-			if err := writeHomeFile(home, file); err != nil {
-				return err
-			}
-		}
-		links, err := clearPortable(root, home)
-		if err != nil {
-			return err
-		}
-		for _, file := range portable {
-			if err := writeHomeFile(home, file); err != nil {
-				return err
-			}
-		}
-		for _, link := range links {
-			if err := os.Symlink(link.target, link.path); err != nil {
-				return err
-			}
-		}
-		return errors.New("применение не выполнено")
-	}
-	if _, err := writeSnapshot(root, account, agentName, portable); err != nil {
-		return err
-	}
-	if _, err := clearPortable(root, home); err != nil {
-		return err
-	}
-	for _, file := range next {
-		if err := writeHomeFile(home, file); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func writeSnapshot(root, account, agentName string, files []File) (string, error) {
@@ -630,11 +586,4 @@ func writeFile(root string, file File) error {
 	defer out.Close()
 	_, err = out.Write([]byte(file.Body))
 	return err
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

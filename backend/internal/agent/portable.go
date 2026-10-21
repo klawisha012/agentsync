@@ -149,7 +149,7 @@ func PortablePath(path string) bool {
 	if !ok {
 		return false
 	}
-	if IsHook(clean) || IsMCP(clean) {
+	if clean == MarkFile || IsHook(clean) || IsMCP(clean) {
 		return true
 	}
 	base := strings.ToLower(filepath.Base(clean))

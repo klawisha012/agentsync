@@ -76,6 +76,12 @@ func Connect(root, account, agentName string) (ConnectReport, error) {
 		return ConnectReport{}, err
 	}
 	defer unlock()
+	return connect(root, account, agentName)
+}
+
+var errEmptyCanon = errors.New("В\u00a0каноне нечего показать.")
+
+func connect(root, account, agentName string) (ConnectReport, error) {
 	canon := canonDir(root)
 	skills, files, err := canonSkills(canon)
 	if err != nil {
@@ -99,7 +105,7 @@ func Connect(root, account, agentName string) (ConnectReport, error) {
 		plan.report.Skipped = append(plan.report.Skipped, "MCP-серверы")
 	}
 	if len(plan.report.Got)+len(plan.report.Skipped) == 0 {
-		return plan.report, errors.New("В\u00a0каноне нечего показать.")
+		return plan.report, errEmptyCanon
 	}
 	if !insideCanon(root, cat.dir) {
 		if msg := sameNameExplanation(skills); msg != "" {
