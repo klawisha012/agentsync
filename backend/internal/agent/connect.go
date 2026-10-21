@@ -67,8 +67,9 @@ type catalogUndo struct {
 }
 
 // Connect shows the canon to the named AI agent by links: outermost skills, subagents, user
-// commands and the instructions file, each at the place the catalog names. A kind without a
-// place is skipped. A name the agent already holds goes to its snapshot first.
+// commands and the instructions file, each at the place the catalog names. MCP servers are
+// translated into the agent settings file. A kind without a place is skipped. A name the
+// agent already holds goes to its snapshot first.
 func Connect(root, account, agentName string) (ConnectReport, error) {
 	unlock, err := lockRoot(root)
 	if err != nil {
@@ -87,6 +88,15 @@ func Connect(root, account, agentName string) (ConnectReport, error) {
 	plan, err := planConnect(root, cat, skills)
 	if err != nil {
 		return ConnectReport{}, err
+	}
+	servers, haveMCP, err := canonMCP(root)
+	if err != nil {
+		return plan.report, err
+	}
+	if haveMCP && cat.receiver.MCP != "" {
+		plan.report.Got = append(plan.report.Got, "MCP-серверы")
+	} else if haveMCP {
+		plan.report.Skipped = append(plan.report.Skipped, "MCP-серверы")
 	}
 	if len(plan.report.Got)+len(plan.report.Skipped) == 0 {
 		return plan.report, errors.New("В\u00a0каноне нечего показать.")
@@ -110,6 +120,9 @@ func Connect(root, account, agentName string) (ConnectReport, error) {
 		}
 	}
 	undo, err := shareCanon(canon, snapshot, home, cat.display, plan, occupied)
+	if err == nil && cat.receiver.MCP != "" {
+		err = connectMCP(root, cat.receiver, servers)
+	}
 	if err != nil {
 		undoErr := rollbackCatalog(undo)
 		// The snapshot holds the moved items until every one is back in place.
@@ -154,7 +167,7 @@ func Disconnect(root, agentName string) error {
 			return err
 		}
 	}
-	return nil
+	return disconnectMCP(receiver.Slug)
 }
 
 // planConnect lays out the links. A place inside the canon is left alone: the agent reads the canon there.
