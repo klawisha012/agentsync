@@ -270,8 +270,12 @@ func classify(files []storedFile) ([]storedFile, string) {
 		if _, drop := scripts[strings.ToLower(filepath.Base(file.Path))]; drop {
 			continue
 		}
-		if isMCP(file.Path) && machineMCP(file.Body) {
-			continue
+		if isMCP(file.Path) {
+			body, ok := agent.PortableMCP(file.Body)
+			if !ok {
+				continue
+			}
+			file.Body = body
 		}
 		if !agent.PortablePath(file.Path) {
 			continue
@@ -310,16 +314,6 @@ func pathSegment(path, want string) bool {
 		}
 	}
 	return false
-}
-
-func machineMCP(body string) bool {
-	if absolutePath.MatchString(body) {
-		return true
-	}
-	if strings.Contains(strings.ToLower(body), "authorization") {
-		return true
-	}
-	return agent.HasAssignedSecret(body)
 }
 
 func packFiles(files []storedFile) ([]byte, error) {

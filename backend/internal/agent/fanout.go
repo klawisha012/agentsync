@@ -16,6 +16,8 @@ import (
 var (
 	secretValue = regexp.MustCompile(`(?i)"?(?:api[_-]?key|secret|token|password|authorization)"?\s*[:=]\s*"?[A-Za-z0-9_+\-/]{8,}`)
 	knownSecret = regexp.MustCompile(`(?:sk-[A-Za-z0-9]{10,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)`)
+	// bearerValue is a literal header value; Bearer ${NAME} is a secret variable and passes.
+	bearerValue = regexp.MustCompile(`(?i)bearer\s+[A-Za-z0-9._~+/\-]{8,}`)
 )
 
 type canonSkill struct {
@@ -212,7 +214,7 @@ func HasSecret(body string) bool {
 
 // SecretExplanation is the пояснение запись shows for a secret in a named file.
 func SecretExplanation(path, body string) string {
-	if !HasSecret(body) {
+	if !HasSecret(body) && !(isMCP(path) && bearerValue.MatchString(body)) {
 		return ""
 	}
 	return "Секрет в\u00a0файле " + path + "."

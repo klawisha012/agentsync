@@ -87,6 +87,11 @@ func TestPushKeepsPortableFiles(t *testing.T) {
 		t.Fatalf("json secret %d %s", leakedJSON.Code, leakedJSON.Body.String())
 	}
 
+	envToken := postAuth(t, e, "/agent/push", token, pushBody("Grok", false, pushFile{"mcp/env.json", `{"env":{"GITHUB_TOKEN":"ghp_abcdefghijklmnopqrst"}}`}), author)
+	if envToken.Code == http.StatusCreated || !strings.Contains(envToken.Body.String(), "mcp/env.json") || strings.Contains(envToken.Body.String(), "ghp_abcdefghijklmnopqrst") {
+		t.Fatalf("mcp secret %d %s", envToken.Code, envToken.Body.String())
+	}
+
 	first := postAuth(t, e, "/agent/push", token, pushBody("Grok", false,
 		pushFile{"rules/ok.md", "hello"},
 		pushFile{"credentials.json", `{"token":"abc"}`},
@@ -98,7 +103,6 @@ func TestPushKeepsPortableFiles(t *testing.T) {
 		pushFile{"hooks.json", "bash scripts/ok.sh"},
 		pushFile{"hooks/unix.json", "bash /bin/run.sh"},
 		pushFile{"bin/run.sh", "echo unix"},
-		pushFile{"mcp/env.json", `{"env":{"GITHUB_TOKEN":"ghp_abcdefghijklmnopqrst"}}`},
 		pushFile{"bundled/skills/pdf/SKILL.md", "token=EXAMPLEKEY99"},
 		pushFile{"marketplace-cache/plug/skills/SKILL.md", "token=EXAMPLEKEY99"},
 	), author)
@@ -289,4 +293,34 @@ func postAuth(t *testing.T, h http.Handler, path, token string, body any, cookie
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	return rec
+}
+
+func TestPushDropsOnlyMachineMCPServers(t *testing.T) {
+	e := newServer(t)
+	author := mustAccount(t, e, "mcp@example.com", "secret-pass", "McpAuthor")
+	mcp := `{"mcpServers":{` +
+		`"shared":{"command":"npx","args":["-y","@upstash/context7-mcp"]},` +
+		`"local":{"command":"node","args":["/Users/alex/mcp.js"]},` +
+		`"github":{"command":"npx","env":{"GITHUB_TOKEN":"${GITHUB_TOKEN}"}},` +
+		`"linear":{"type":"http","url":"https://mcp.linear.app/mcp","headers":{"Authorization":"Bearer ${LINEAR_KEY}"}}}}`
+	pushed := postAuth(t, e, "/agent/push", "", pushBody("Grok", false, pushFile{"mcp.json", mcp}), author)
+	if pushed.Code != http.StatusCreated {
+		t.Fatalf("push %d %s", pushed.Code, pushed.Body.String())
+	}
+	body := pushed.Body.String()
+	for _, want := range []string{"shared", "github", "linear", "${GITHUB_TOKEN}", "${LINEAR_KEY}"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("publication lost %s: %s", want, body)
+		}
+	}
+	if strings.Contains(body, "local") || strings.Contains(body, "/Users/alex") {
+		t.Fatalf("publication kept the machine server: %s", body)
+	}
+
+	bearer := "Bearer lin_api_REALVALUE123"
+	leaked := postAuth(t, e, "/agent/push", "", pushBody("Grok", false, pushFile{"mcp.json",
+		`{"mcpServers":{"linear":{"url":"https://mcp.linear.app/mcp","headers":{"Authorization":"` + bearer + `"}}}}`}), author)
+	if leaked.Code == http.StatusCreated || !strings.Contains(leaked.Body.String(), "mcp.json") || strings.Contains(leaked.Body.String(), "lin_api_REALVALUE123") {
+		t.Fatalf("bearer %d %s", leaked.Code, leaked.Body.String())
+	}
 }

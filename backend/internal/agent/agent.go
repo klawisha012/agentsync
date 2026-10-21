@@ -136,7 +136,7 @@ func Revert(root, account, agentName string) error {
 		return err
 	}
 	for _, file := range latest.Files {
-		if err := writeFile(home, file); err != nil {
+		if err := writeHomeFile(home, file); err != nil {
 			return err
 		}
 	}
@@ -247,15 +247,10 @@ func applyFiles(root, account, agentName string, next []File, broken bool) error
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	var portable []File
-	for _, file := range current {
-		if isPortable(file.Path, file.Body) {
-			portable = append(portable, file)
-		}
-	}
+	portable := portableOnly(current)
 	if broken {
 		for _, file := range next[:min(1, len(next))] {
-			if err := writeFile(home, file); err != nil {
+			if err := writeHomeFile(home, file); err != nil {
 				return err
 			}
 		}
@@ -263,7 +258,7 @@ func applyFiles(root, account, agentName string, next []File, broken bool) error
 			return err
 		}
 		for _, file := range portable {
-			if err := writeFile(home, file); err != nil {
+			if err := writeHomeFile(home, file); err != nil {
 				return err
 			}
 		}
@@ -276,7 +271,7 @@ func applyFiles(root, account, agentName string, next []File, broken bool) error
 		return err
 	}
 	for _, file := range next {
-		if err := writeFile(home, file); err != nil {
+		if err := writeHomeFile(home, file); err != nil {
 			return err
 		}
 	}
@@ -357,10 +352,19 @@ func clearPortable(home string) error {
 		return err
 	}
 	for _, file := range files {
-		if isPortable(file.Path, file.Body) {
-			if err := os.Remove(filepath.Join(home, filepath.FromSlash(file.Path))); err != nil {
+		if _, ok := portableFile(file); !ok {
+			continue
+		}
+		target := filepath.Join(home, filepath.FromSlash(file.Path))
+		if machine := machineServers(file.Body); len(machine) > 0 {
+			top, _, _ := mcpServers(file.Body)
+			if err := os.WriteFile(target, []byte(encodeMCP(top, machine)), 0o644); err != nil {
 				return err
 			}
+			continue
+		}
+		if err := os.Remove(target); err != nil {
+			return err
 		}
 	}
 	return nil
