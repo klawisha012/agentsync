@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"syscall"
 )
 
 // These match the secret recognition запись already uses.
@@ -52,6 +53,8 @@ type connectPlan struct {
 type ConnectReport struct {
 	Got     []string
 	Skipped []string
+	// Unset names secret variables written as is: the agent does not expand them and the machine has no value.
+	Unset []string
 }
 
 type savedLink struct {
@@ -156,7 +159,7 @@ func connect(root, account, agentName, snapshot, home string) (ConnectReport, er
 	}
 	undo, err := shareCanon(canon, snapshot, home, cat.display, plan, occupied)
 	if err == nil && cat.receiver.MCP != "" {
-		err = connectMCP(root, cat.receiver, servers)
+		plan.report.Unset, err = connectMCP(root, cat.receiver, servers)
 	}
 	if err == nil && cat.receiver.Plugins != "" {
 		file := filepath.Join(filepath.Dir(cat.dir), filepath.FromSlash(cat.receiver.Plugins))
@@ -540,7 +543,10 @@ func shareCanon(canon, snapshot, home, display string, plan connectPlan, occupie
 		if target, ok := linkTarget(link.dest); ok && samePlace(target, link.abs) {
 			continue
 		}
-		if err := os.Symlink(link.abs, link.dest); err != nil {
+		if err := symlink(link.abs, link.dest); err != nil {
+			if linkForbidden(err) {
+				return undo, errors.New("Система не\u00a0разрешила создать ссылку. На\u00a0Windows включите режим разработчика (Параметры → Для разработчиков) или запустите команду от\u00a0администратора.")
+			}
 			return undo, failed()
 		}
 		undo.added = append(undo.added, link.dest)
@@ -570,6 +576,15 @@ func staleLinks(canon string, dirs, files []string, wanted map[string]bool) ([]s
 		}
 	}
 	return stale, nil
+}
+
+// symlink is os.Symlink; a test replaces it to play a system that forbids links.
+var symlink = os.Symlink
+
+// linkForbidden is a missing right to make links: ERROR_PRIVILEGE_NOT_HELD on Windows.
+func linkForbidden(err error) bool {
+	var errno syscall.Errno
+	return errors.Is(err, os.ErrPermission) || (errors.As(err, &errno) && errno == 1314)
 }
 
 func ensureCatalog(dir string) ([]string, error) {

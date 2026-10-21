@@ -114,12 +114,12 @@ func TestOnTranslatesCanonMCPIntoCodexTOML(t *testing.T) {
 	}
 
 	writeRel(t, canon, "mcp.json", `{"mcpServers":{"x":{"command":"x","env":{"K":"${NOPE_NOT_SET}"}}}}`)
-	code, _, stderr = runCLI(t, "codex", "on")
-	if code != 1 || !strings.Contains(stderr, "NOPE_NOT_SET") {
-		t.Fatalf("missing variable %d %s", code, stderr)
+	code, stdout, stderr = runCLI(t, "codex", "on")
+	if code != 0 || !strings.Contains(stdout, "NOPE_NOT_SET") {
+		t.Fatalf("missing variable %d %s %s", code, stdout, stderr)
 	}
-	if got := readFile(t, config); got != body {
-		t.Fatalf("refusal changed the config\n%s", got)
+	if got := readFile(t, config); !strings.Contains(got, `K = "${NOPE_NOT_SET}"`) {
+		t.Fatalf("variable not written as is\n%s", got)
 	}
 }
 
@@ -163,5 +163,24 @@ func TestCanonApplyReconnectsConnectedAgents(t *testing.T) {
 	}
 	if _, servers := claudeServers(t, root); servers["fresh"] == nil || servers["old"] != nil {
 		t.Fatalf("connected agent not updated %v", servers)
+	}
+}
+
+func TestOnKeepsALinkedSettingsFileALink(t *testing.T) {
+	root := connectRoot(t)
+	writeRel(t, filepath.Join(root, ".agents"), "mcp.json", `{"mcpServers":{"docs":{"url":"https://docs.example/mcp"}}}`)
+	dotfiles := t.TempDir()
+	writeRel(t, dotfiles, "claude.json", `{"numStartups":1}`)
+	if err := os.Symlink(filepath.Join(dotfiles, "claude.json"), filepath.Join(root, ".claude.json")); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, stderr := runCLI(t, "claude", "on"); code != 0 {
+		t.Fatal(stderr)
+	}
+	if info, err := os.Lstat(filepath.Join(root, ".claude.json")); err != nil || info.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("the link was replaced by a file")
+	}
+	if body := readFile(t, filepath.Join(dotfiles, "claude.json")); !strings.Contains(body, "docs") || !strings.Contains(body, "numStartups") {
+		t.Fatalf("target %s", body)
 	}
 }

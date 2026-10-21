@@ -122,18 +122,23 @@ func canonMCP(root string) (map[string]json.RawMessage, bool, error) {
 	return servers, true, nil
 }
 
-// connectMCP writes the canon servers into the agent settings file in its format.
-func connectMCP(root string, receiver Receiver, servers map[string]json.RawMessage) error {
+// connectMCP writes the canon servers into the agent settings file in its format. It returns
+// the secret variables the agent cannot expand and the machine has no value for.
+func connectMCP(root string, receiver Receiver, servers map[string]json.RawMessage) ([]string, error) {
 	file := receiver.mcpFile(root)
 	records := map[string]string{}
+	unset := map[string]bool{}
 	for name, server := range servers {
-		record, err := renderRecord(root, receiver.Slug, file, name, server)
+		record, missing, err := renderRecord(root, receiver.Slug, file, name, server)
 		if err != nil {
-			return err
+			return nil, err
+		}
+		for _, key := range missing {
+			unset[key] = true
 		}
 		records[name] = record
 	}
-	return writeRecords(mcpRecords, receiver.Slug, file, records)
+	return slices.Sorted(maps.Keys(unset)), writeRecords(mcpRecords, receiver.Slug, file, records)
 }
 
 // writeRecords writes records into a settings file and removes its own records that are no
@@ -275,18 +280,40 @@ func readSettings(file, key string) (mcpSettings, error) {
 	return settings, nil
 }
 
+// writeSettings replaces a settings file atomically through a temporary file. A file that is a
+// link is written at its target, so the link stays.
 func writeSettings(file string, settings mcpSettings) error {
+	if real, err := filepath.EvalSymlinks(file); err == nil {
+		file = real
+	}
 	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(file, []byte(settings.encode()), 0o600)
+	mode := os.FileMode(0o600)
+	if info, err := os.Stat(file); err == nil {
+		mode = info.Mode().Perm()
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(file), ".agentsync-*")
+	if err != nil {
+		return err
+	}
+	_, err = tmp.WriteString(settings.encode())
+	err = errors.Join(err, tmp.Close(), os.Chmod(tmp.Name(), mode))
+	if err == nil {
+		err = os.Rename(tmp.Name(), file)
+	}
+	if err != nil {
+		_ = os.Remove(tmp.Name())
+	}
+	return err
 }
 
 // renderRecord turns a canon server into the record of the settings format. JSON agents
 // expand ${NAME} themselves; Codex does not, so the value comes from the environment or ~/.agents/.env.
-func renderRecord(root, slug, file, name string, server json.RawMessage) (string, error) {
+// A variable without a value stays as written and comes back in missing.
+func renderRecord(root, slug, file, name string, server json.RawMessage) (string, []string, error) {
 	if !isTOML(file) {
-		return geminiRecord(slug, server), nil
+		return geminiRecord(slug, server), nil, nil
 	}
 	var canon struct {
 		Command  string            `json:"command"`
@@ -297,7 +324,7 @@ func renderRecord(root, slug, file, name string, server json.RawMessage) (string
 		Disabled bool              `json:"disabled"`
 	}
 	if json.Unmarshal(server, &canon) != nil {
-		return "", fmt.Errorf("Сервер %s в ~/.agents/mcp.json не разобран.", name)
+		return "", nil, fmt.Errorf("Сервер %s в ~/.agents/mcp.json не разобран.", name)
 	}
 	lookup := secretLookup(root)
 	var missing []string
@@ -307,6 +334,7 @@ func renderRecord(root, slug, file, name string, server json.RawMessage) (string
 			found, ok := lookup(key)
 			if !ok {
 				missing = append(missing, key)
+				return match
 			}
 			return found
 		})
@@ -334,10 +362,7 @@ func renderRecord(root, slug, file, name string, server json.RawMessage) (string
 	if canon.Disabled {
 		lines = append(lines, "enabled = false")
 	}
-	if len(missing) > 0 {
-		return "", fmt.Errorf("Переменная секрета %s не задана: задайте её в окружении или в ~/.agents/.env.", missing[0])
-	}
-	return strings.Join(lines, "\n") + "\n", nil
+	return strings.Join(lines, "\n") + "\n", missing, nil
 }
 
 // geminiRecord gives Gemini CLI a streamable HTTP server under httpUrl: its url means SSE.

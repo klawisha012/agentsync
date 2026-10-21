@@ -136,7 +136,7 @@ func commands() []spec {
 				"MCP-серверы из\u00a0~/.agents/mcp.json вписываются в\u00a0файл настроек ИИ-агента в\u00a0его формате: Claude Code ~/.claude.json,\n" +
 				"Codex ~/.codex/config.toml, Gemini CLI ~/.gemini/settings.json. Чужие записи с\u00a0другими именами остаются.\n" +
 				"Одноимённая чужая запись заменяется, команда off её возвращает. Codex не\u00a0раскрывает ${NAME}:\n" +
-				"значение берётся из\u00a0окружения или из\u00a0~/.agents/.env.\n" +
+				"значение берётся из\u00a0окружения или из\u00a0~/.agents/.env. Без значения переменная вписывается как есть, вывод её называет.\n" +
 				"Плагины из\u00a0~/.agents/plugins.json (enabledPlugins, extraKnownMarketplaces) вписываются в\u00a0settings.json Claude Code\n" +
 				"по\u00a0тому же учёту своих записей. Сам плагин скачивает ИИ-агент.\n" +
 				"Хуки из\u00a0~/.agents/hooks.json (события Claude Code) вписываются в\u00a0settings.json Claude Code как есть,\n" +

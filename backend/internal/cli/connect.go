@@ -52,6 +52,9 @@ func runConnect(name string, args []string, stdout io.Writer) error {
 	} else {
 		fmt.Fprintf(stdout, "ИИ-агент %s видит из канона: %s.\n", args[0], strings.Join(report.Got, ", "))
 	}
+	if len(report.Unset) > 0 {
+		fmt.Fprintf(stdout, "Переменные секрета вписаны как есть, их значения нет в\u00a0окружении и\u00a0~/.agents/.env: %s.\n", strings.Join(report.Unset, ", "))
+	}
 	if len(report.Skipped) > 0 {
 		fmt.Fprintf(stdout, "Пропущены виды, которых ИИ-агент не понимает: %s.\n", strings.Join(report.Skipped, ", "))
 	}
