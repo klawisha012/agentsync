@@ -19,7 +19,7 @@
 | Переменная | ИИ-агент | Что меняется |
 |---|---|---|
 | `CLAUDE_CONFIG_DIR` | Claude Code | каталог навыков, `agents/`, `commands/`, `CLAUDE.md`, `settings.json`, `.claude.json` |
-| `CODEX_HOME` | Codex | каталог навыков, `prompts/`, `AGENTS.md`, `config.toml` |
+| `CODEX_HOME` | Codex | каталог навыков, `AGENTS.md`, `config.toml` |
 | `GROK_HOME` | Grok Build | каталог навыков |
 | `HERMES_HOME` | Hermes Agent | каталог навыков |
 | `VIBE_HOME` | Mistral Vibe | каталог навыков |

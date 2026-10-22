@@ -437,15 +437,16 @@ func TestOnSkipsKindsCodexDoesNotUnderstand(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("code %d stderr %s", code, stderr)
 	}
-	if !strings.Contains(stdout, "Пропущены") || !strings.Contains(stdout, "субагенты") {
+	if !strings.Contains(stdout, "Пропущены") || !strings.Contains(stdout, "субагенты") || !strings.Contains(stdout, "пользовательские команды") {
 		t.Fatalf("skip not named: %s", stdout)
 	}
 	home := filepath.Join(root, ".codex")
 	if body := readFile(t, filepath.Join(home, "AGENTS.md")); body != "rules" {
 		t.Fatalf("instructions %q", body)
 	}
-	if body := readFile(t, filepath.Join(home, "prompts", "review.md")); body != "review" {
-		t.Fatalf("command %q", body)
+	// Codex 0.117 removed ~/.codex/prompts (openai/codex#15941).
+	if _, err := os.Lstat(filepath.Join(home, "prompts")); !os.IsNotExist(err) {
+		t.Fatal("commands linked for Codex")
 	}
 	if _, err := os.Lstat(filepath.Join(home, "agents")); !os.IsNotExist(err) {
 		t.Fatal("subagents linked for Codex")

@@ -143,7 +143,7 @@ var receivers = []Receiver{
 	{Slug: "codebuddy", Display: "CodeBuddy", Project: ".codebuddy/skills", Global: ".codebuddy/skills"},
 	{Slug: "codemaker", Display: "Codemaker", Project: ".codemaker/skills", Global: ".codemaker/skills"},
 	{Slug: "codestudio", Display: "Code Studio", Project: ".codestudio/skills", Global: ".codestudio/skills"},
-	{Slug: "codex", Display: "Codex", Project: ".agents/skills", Global: ".codex/skills", Env: "CODEX_HOME", Commands: "prompts", Instructions: "AGENTS.md", MCP: ".codex/config.toml"},
+	{Slug: "codex", Display: "Codex", Project: ".agents/skills", Global: ".codex/skills", Env: "CODEX_HOME", Instructions: "AGENTS.md", MCP: ".codex/config.toml"},
 	{Slug: "command-code", Display: "Command Code", Project: ".commandcode/skills", Global: ".commandcode/skills"},
 	{Slug: "continue", Display: "Continue", Project: ".continue/skills", Global: ".continue/skills"},
 	{Slug: "cortex", Display: "Cortex Code", Project: ".cortex/skills", Global: ".snowflake/cortex/skills"},

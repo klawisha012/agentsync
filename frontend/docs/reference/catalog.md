@@ -9,7 +9,7 @@
 | ИИ-агент | Субагенты | Команды | Файл инструкций | MCP-серверы | Плагины | Хуки |
 |---|---|---|---|---|---|---|
 | Claude Code | `agents/` | `commands/` | `CLAUDE.md` | `~/.claude.json` | `settings.json` | `settings.json` |
-| Codex | — | `prompts/` | `AGENTS.md` | `config.toml` | — | — |
+| Codex | — | — | `AGENTS.md` | `config.toml` | — | — |
 | Gemini CLI | — | — | `GEMINI.md` | `settings.json` | — | `settings.json`, перевод событий |
 | Остальные | — | — | — | — | — | — |
 

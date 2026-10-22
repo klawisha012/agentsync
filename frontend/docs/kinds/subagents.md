@@ -39,7 +39,6 @@ tools: Read, Edit, Bash
 | ИИ-агент | Место |
 |---|---|
 | Claude Code | `~/.claude/commands/` |
-| Codex | `~/.codex/prompts/` |
 | Остальные | пропускают вид «пользовательские команды» |
 
 ## Общие правила
