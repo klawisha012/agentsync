@@ -55,7 +55,7 @@ agentsync claude on
 | Файл инструкций | `~/.claude/CLAUDE.md` | `~/.codex/AGENTS.md` | `~/.gemini/GEMINI.md` | — | — |
 | MCP-серверы | `~/.claude.json` | `~/.codex/config.toml` | `~/.gemini/settings.json` | `~/.grok/config.toml` | — |
 | Плагины | `~/.claude/settings.json` | — | — | — | — |
-| Хуки | `~/.claude/settings.json` | — | `~/.gemini/settings.json`, с переводом событий | — | — |
+| Хуки | `~/.claude/settings.json` | `~/.codex/hooks.json` | `~/.gemini/settings.json` | `~/.grok/hooks/agentsync.json` | GitHub Copilot: `~/.copilot/hooks/agentsync.json` |
 
 `CLAUDE_CONFIG_DIR` и `CODEX_HOME` переносят домашнюю папку Claude Code и Codex; подключение их учитывает. Полный список ИИ-агентов и их каталогов: [Каталог ИИ-агентов](../reference/catalog.md).
 

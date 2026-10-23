@@ -53,32 +53,38 @@
 |---|---|
 | Claude Code | `~/.claude/settings.json`, ключ `hooks` |
 | Gemini CLI | `~/.gemini/settings.json`, ключ `hooks`; `timeout` в миллисекундах |
+| Grok Build | `~/.grok/hooks/agentsync.json` |
+| Codex | `~/.codex/hooks.json` |
+| GitHub Copilot | `~/.copilot/hooks/agentsync.json`: одна запись `{type, matcher, bash, timeoutSec}` на каждую команду |
 | Остальные | вид «хуки» пропускается |
 
-| Слово agents | Claude Code | Gemini CLI |
-|---|---|---|
-| `session_start` | `SessionStart` | `SessionStart` |
-| `session_end` | `SessionEnd` | `SessionEnd` |
-| `prompt_submit` | `UserPromptSubmit` | `BeforeAgent` |
-| `before_tool` | `PreToolUse` | `BeforeTool` |
-| `after_tool` | `PostToolUse` | `AfterTool` |
-| `after_tool_failure` | `PostToolUseFailure` | — |
-| `stop` | `Stop` | `AfterAgent` |
-| `subagent_start`, `subagent_stop` | `SubagentStart`, `SubagentStop` | — |
-| `notification` | `Notification` | `Notification` |
-| `pre_compact` | `PreCompact` | `PreCompress` |
-| `shell` | `Bash` | `run_shell_command` |
-| `read` | `Read` | `read_file` |
-| `write` | `Write` | `write_file` |
-| `edit` | `Edit`, `MultiEdit` | `replace` |
-| `glob` | `Glob` | `glob` |
-| `grep` | `Grep` | `search_file_content` |
-| `list` | `LS` | `list_directory` |
-| `web_fetch` | `WebFetch` | `web_fetch` |
-| `web_search` | `WebSearch` | `google_web_search` |
-| `task` | `Task` | — |
-| `mcp:github/*` | `mcp__github__.*` | `mcp_github_.*` |
-| `${AGENTS_PROJECT_DIR}` | `${CLAUDE_PROJECT_DIR}` | `${GEMINI_PROJECT_DIR}` |
+Cursor хуки пока не получает: место его хуков не подтверждено.
+
+| Слово agents | Claude Code | Gemini CLI | Grok Build | Codex | GitHub Copilot |
+|---|---|---|---|---|---|
+| `session_start` | `SessionStart` | `SessionStart` | `SessionStart` | `SessionStart` | `sessionStart` |
+| `session_end` | `SessionEnd` | `SessionEnd` | `SessionEnd` | — | `sessionEnd` |
+| `prompt_submit` | `UserPromptSubmit` | `BeforeAgent` | `UserPromptSubmit` | `UserPromptSubmit` | `userPromptSubmitted` |
+| `before_tool` | `PreToolUse` | `BeforeTool` | `PreToolUse` | `PreToolUse` | `preToolUse` |
+| `after_tool` | `PostToolUse` | `AfterTool` | `PostToolUse` | `PostToolUse` | `postToolUse` |
+| `after_tool_failure` | `PostToolUseFailure` | — | `PostToolUseFailure` | — | `postToolUseFailure` |
+| `stop` | `Stop` | `AfterAgent` | `Stop` | `Stop` | `agentStop` |
+| `subagent_start`, `subagent_stop` | `SubagentStart`, `SubagentStop` | — | `SubagentStart`, `SubagentStop` | — | `subagentStart`, `subagentStop` |
+| `notification` | `Notification` | `Notification` | `Notification` | — | `notification` |
+| `pre_compact` | `PreCompact` | `PreCompress` | `PreCompact` | — | `preCompact` |
+| `post_compact` | — | — | `PostCompact` | — | — |
+| `shell` | `Bash` | `run_shell_command` | `run_terminal_command` | `Bash` | `bash` |
+| `read` | `Read` | `read_file` | `read_file` | — | `view` |
+| `write` | `Write` | `write_file` | `search_replace` | `apply_patch` | `create` |
+| `edit` | `Edit`, `MultiEdit` | `replace` | `search_replace` | `apply_patch` | `edit` |
+| `glob` | `Glob` | `glob` | — | — | `glob` |
+| `grep` | `Grep` | `search_file_content` | `grep` | — | `grep` |
+| `list` | `LS` | `list_directory` | `list_dir` | — | — |
+| `web_fetch` | `WebFetch` | `web_fetch` | — | — | `web_fetch` |
+| `web_search` | `WebSearch` | `google_web_search` | `web_search` | — | — |
+| `task` | `Task` | — | `spawn_subagent` | — | `task` |
+| `mcp:github/*` | `mcp__github__.*` | `mcp_github_.*` | `github__.*` | `mcp__github__.*` | `github/.*` |
+| `${AGENTS_PROJECT_DIR}` | `${CLAUDE_PROJECT_DIR}` | `${GEMINI_PROJECT_DIR}` | `${PWD}` | `${PWD}` | `${PWD}` |
 
 «—» значит, что у ИИ-агента такого события или инструмента нет:
 

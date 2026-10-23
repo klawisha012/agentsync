@@ -34,6 +34,8 @@ type dialect struct {
 	projectDir string
 	// timeoutScale turns a timeout in seconds into the agent's unit.
 	timeoutScale int
+	// flat means one hook entry per command, {type, matcher, bash, timeoutSec}, in a file with "version": 1.
+	flat bool
 }
 
 // dialects is the agents vocabulary: connect, apply and the transfer into agents read it.
@@ -70,6 +72,48 @@ var dialects = map[string]dialect{
 		mcpTool:      "mcp_%s_%s",
 		projectDir:   "GEMINI_PROJECT_DIR",
 		timeoutScale: 1000,
+	},
+	"grok": {
+		slug: "grok",
+		events: map[string]string{
+			"session_start": "SessionStart", "session_end": "SessionEnd", "prompt_submit": "UserPromptSubmit",
+			"before_tool": "PreToolUse", "after_tool": "PostToolUse", "after_tool_failure": "PostToolUseFailure",
+			"stop": "Stop", "subagent_start": "SubagentStart", "subagent_stop": "SubagentStop",
+			"notification": "Notification", "pre_compact": "PreCompact", "post_compact": "PostCompact",
+		},
+		tools: map[string][]string{
+			"shell": {"run_terminal_command"}, "read": {"read_file"}, "edit": {"search_replace"},
+			"write": {"search_replace"}, "grep": {"grep"}, "list": {"list_dir"}, "web_search": {"web_search"},
+			"task": {"spawn_subagent"},
+		},
+		mcpTool:      "%s__%s",
+		timeoutScale: 1,
+	},
+	"codex": {
+		slug: "codex",
+		events: map[string]string{
+			"session_start": "SessionStart", "prompt_submit": "UserPromptSubmit", "before_tool": "PreToolUse",
+			"after_tool": "PostToolUse", "stop": "Stop",
+		},
+		tools:        map[string][]string{"shell": {"Bash"}, "edit": {"apply_patch"}, "write": {"apply_patch"}},
+		mcpTool:      "mcp__%s__%s",
+		timeoutScale: 1,
+	},
+	"github-copilot": {
+		slug: "github-copilot",
+		events: map[string]string{
+			"session_start": "sessionStart", "session_end": "sessionEnd", "prompt_submit": "userPromptSubmitted",
+			"before_tool": "preToolUse", "after_tool": "postToolUse", "after_tool_failure": "postToolUseFailure",
+			"stop": "agentStop", "subagent_start": "subagentStart", "subagent_stop": "subagentStop",
+			"notification": "notification", "pre_compact": "preCompact",
+		},
+		tools: map[string][]string{
+			"shell": {"bash"}, "read": {"view"}, "write": {"create"}, "edit": {"edit"}, "glob": {"glob"},
+			"grep": {"grep"}, "web_fetch": {"web_fetch"}, "task": {"task"},
+		},
+		mcpTool:      "%s/%s",
+		timeoutScale: 1,
+		flat:         true,
 	},
 }
 

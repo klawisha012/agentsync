@@ -171,7 +171,12 @@ func connect(root, account, agentName, snapshot, home string) (ConnectReport, er
 	}
 	if err == nil && cat.receiver.Hooks != "" {
 		file := filepath.Join(filepath.Dir(cat.dir), filepath.FromSlash(cat.receiver.Hooks))
-		err = writeRecords(hookRecords, cat.slug, file, hookBodies, hookOrigins)
+		if dialects[cat.slug].flat && len(hookBodies) > 0 {
+			err = startVersionedFile(file)
+		}
+		if err == nil {
+			err = writeRecords(hookRecords, cat.slug, file, hookBodies, hookOrigins)
+		}
 	}
 	if err != nil {
 		undoErr := rollbackCatalog(undo)

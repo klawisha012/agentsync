@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -189,7 +190,7 @@ func agentHooks(file *canonHookFile, receiver Receiver) (map[string]string, map[
 	var skips hookSkips
 	for name, group := range file.core.records() {
 		word, _, _ := strings.Cut(name, " ")
-		event, body, dropped, skip := toNative(d, word, group)
+		event, bodies, dropped, skip := toNative(d, word, group)
 		skips.tools = append(skips.tools, dropped...)
 		switch skip {
 		case "event":
@@ -198,8 +199,10 @@ func agentHooks(file *canonHookFile, receiver Receiver) (map[string]string, map[
 		case "tools":
 			continue
 		}
-		native := hookName(event, json.RawMessage(body))
-		records[native], origins[native] = body, name
+		for _, body := range bodies {
+			native := hookName(event, json.RawMessage(body))
+			records[native], origins[native] = body, name
+		}
 	}
 	if section := file.ext[receiver.Slug]; section != nil {
 		for name, group := range section.records() {
@@ -209,16 +212,17 @@ func agentHooks(file *canonHookFile, receiver Receiver) (map[string]string, map[
 	return records, origins, skips
 }
 
-// toNative turns one canon group into the agent's form. dropped are the matcher names the agent
+// toNative turns one canon group into the agent's records: one group, or one entry per command
+// for a flat dialect. dropped are the matcher names the agent
 // has no tool for; skip is "event" when the agent has no such event and "tools" when no matcher name is left.
-func toNative(d dialect, word string, group json.RawMessage) (string, string, []string, string) {
+func toNative(d dialect, word string, group json.RawMessage) (string, []string, []string, string) {
 	event, ok := d.events[word]
 	if !ok {
-		return "", "", nil, "event"
+		return "", nil, nil, "event"
 	}
 	var fields map[string]json.RawMessage
 	if json.Unmarshal(group, &fields) != nil {
-		return "", "", nil, "event"
+		return "", nil, nil, "event"
 	}
 	delete(fields, "input")
 	var dropped []string
@@ -242,7 +246,7 @@ func toNative(d dialect, word string, group json.RawMessage) (string, string, []
 			}
 			// An empty list never means every tool.
 			if len(parts) == 0 {
-				return "", "", dropped, "tools"
+				return "", nil, dropped, "tools"
 			}
 			fields["matcher"] = marshalPlain(strings.Join(parts, "|"))
 		}
@@ -254,7 +258,28 @@ func toNative(d dialect, word string, group json.RawMessage) (string, string, []
 	fields["hooks"] = mapHooks(fields["hooks"], func(command string) string {
 		return projectDirVar.ReplaceAllLiteralString(command, native)
 	}, func(seconds float64) float64 { return seconds * float64(d.timeoutScale) })
-	return event, string(marshalPlain(fields)), dropped, ""
+	if !d.flat {
+		return event, []string{string(marshalPlain(fields))}, dropped, ""
+	}
+	var hooks []map[string]json.RawMessage
+	_ = json.Unmarshal(fields["hooks"], &hooks)
+	bodies := make([]string, 0, len(hooks))
+	for _, hook := range hooks {
+		renameKey(hook, "command", "bash")
+		renameKey(hook, "timeout", "timeoutSec")
+		if fields["matcher"] != nil {
+			hook["matcher"] = fields["matcher"]
+		}
+		bodies = append(bodies, string(marshalPlain(hook)))
+	}
+	return event, bodies, dropped, ""
+}
+
+func renameKey(fields map[string]json.RawMessage, from, to string) {
+	if value, ok := fields[from]; ok {
+		fields[to] = value
+		delete(fields, from)
+	}
 }
 
 // fromNative turns one native group of the agent into a canon record name and body. A group the
@@ -265,6 +290,20 @@ func fromNative(d dialect, event string, group json.RawMessage) (string, string)
 	var fields map[string]json.RawMessage
 	if !ok || json.Unmarshal(group, &fields) != nil {
 		return ext, compactJSON(group)
+	}
+	if d.flat {
+		// One flat entry is a group with one command.
+		if fields["bash"] == nil {
+			return ext, compactJSON(group)
+		}
+		hook, matcher := maps.Clone(fields), fields["matcher"]
+		delete(hook, "matcher")
+		renameKey(hook, "bash", "command")
+		renameKey(hook, "timeoutSec", "timeout")
+		fields = map[string]json.RawMessage{"hooks": marshalPlain([]map[string]json.RawMessage{hook})}
+		if matcher != nil {
+			fields["matcher"] = matcher
+		}
 	}
 	if raw := fields["matcher"]; raw != nil {
 		var matcher string
@@ -335,4 +374,15 @@ func checkCanon(root, agentName string) error {
 	}
 	_, _, err := canonHooks(root)
 	return err
+}
+
+// startVersionedFile creates a hooks file that must carry "version": 1, as Copilot's does.
+func startVersionedFile(file string) error {
+	if _, err := os.Stat(file); !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(file, []byte("{\"version\": 1}\n"), 0o600)
 }

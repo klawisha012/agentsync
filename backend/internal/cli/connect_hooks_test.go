@@ -292,3 +292,48 @@ func TestPipeApplyRefusesACanonCardWithOldHooks(t *testing.T) {
 		t.Fatal("old hooks written")
 	}
 }
+
+func TestOnGivesHooksToGrokCodexAndCopilot(t *testing.T) {
+	root := connectRoot(t)
+	writeRel(t, filepath.Join(root, ".agents"), "hooks.json", `{"version":1,"hooks":{
+		"before_tool":[{"matcher":["shell","mcp:github/*"],"hooks":[{"type":"command","command":"lint","timeout":10},{"type":"command","command":"log"}]}],
+		"notification":[{"hooks":[{"type":"command","command":"ping"}]}]}}`)
+	writeRel(t, root, ".codex/hooks.json", `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"mine"}]}]}}`)
+	for _, name := range []string{"grok", "codex", "copilot"} {
+		if code, stdout, stderr := runCLI(t, name, "on"); code != 0 || !strings.Contains(stdout, "хуки") {
+			t.Fatalf("%s: code %d stdout %s stderr %s", name, code, stdout, stderr)
+		}
+	}
+
+	grok := settingsHooks(t, filepath.Join(root, ".grok", "hooks", "agentsync.json"))
+	if len(grok["PreToolUse"]) != 1 || grok["PreToolUse"][0]["matcher"] != "run_terminal_command|github__.*" || len(grok["Notification"]) != 1 {
+		t.Fatalf("grok %v", grok)
+	}
+	if !strings.Contains(readFile(t, filepath.Join(root, ".grok", "config.toml")), "hooks = false") {
+		t.Fatal("grok compat hooks stay on")
+	}
+
+	codex := settingsHooks(t, filepath.Join(root, ".codex", "hooks.json"))
+	if len(codex["PreToolUse"]) != 1 || codex["PreToolUse"][0]["matcher"] != "Bash|mcp__github__.*" || len(codex["Stop"]) != 1 || codex["Notification"] != nil {
+		t.Fatalf("codex %v", codex)
+	}
+
+	copilotFile := filepath.Join(root, ".copilot", "hooks", "agentsync.json")
+	copilot := settingsHooks(t, copilotFile)
+	if pre := copilot["preToolUse"]; len(pre) != 2 || pre[0]["matcher"] != "bash|github/.*" || pre[0]["bash"] == nil || pre[0]["command"] != nil {
+		t.Fatalf("copilot %v", copilot)
+	}
+	if !slices.ContainsFunc(copilot["preToolUse"], func(entry map[string]any) bool { return entry["timeoutSec"] == float64(10) }) {
+		t.Fatalf("copilot timeout %v", copilot)
+	}
+	if !strings.Contains(readFile(t, copilotFile), `"version": 1`) {
+		t.Fatal("copilot hooks file without version")
+	}
+
+	if code, _, stderr := runCLI(t, "codex", "off"); code != 0 {
+		t.Fatal(stderr)
+	}
+	if codex := settingsHooks(t, filepath.Join(root, ".codex", "hooks.json")); len(codex) != 1 || len(codex["Stop"]) != 1 {
+		t.Fatalf("codex off %v", codex)
+	}
+}
