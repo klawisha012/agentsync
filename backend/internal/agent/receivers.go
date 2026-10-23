@@ -30,6 +30,44 @@ type Receiver struct {
 	// Hooks is the settings file with hooks, beside the skills directory. Events and tools are
 	// named by the agent's dialect in the agents vocabulary.
 	Hooks string
+	// Self lists the kinds the AI agent reads from agents itself; connect writes nothing for them.
+	Self []string
+}
+
+// Way is how an AI agent receives one kind of agents elements.
+type Way int
+
+const (
+	WayNone      Way = iota // the AI agent does not understand the kind
+	WayLink                 // a link: the formats match
+	WayTranslate            // a translation into the agent's format, kept as its own records
+	WaySelf                 // the AI agent reads the kind from agents itself
+)
+
+// Way names how the AI agent receives a kind: "agents", "commands", "instructions", "mcp", "plugins" or "hooks".
+func (r Receiver) Way(kind string) Way {
+	if slices.Contains(r.Self, kind) {
+		return WaySelf
+	}
+	place, way := "", WayTranslate
+	switch kind {
+	case "agents":
+		place, way = r.Agents, WayLink
+	case "commands":
+		place, way = r.Commands, WayLink
+	case "instructions":
+		place, way = r.Instructions, WayLink
+	case "mcp":
+		place = r.MCP
+	case "plugins":
+		place = r.Plugins
+	case "hooks":
+		place = r.Hooks
+	}
+	if place == "" {
+		return WayNone
+	}
+	return way
 }
 
 // ReceiverView is the public list the site shows when a person picks a receiver.

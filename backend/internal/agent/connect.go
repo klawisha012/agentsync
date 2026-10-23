@@ -104,7 +104,7 @@ func connect(root, account, agentName, snapshot, home string) (ConnectReport, er
 	if err != nil {
 		return plan.report, err
 	}
-	if haveMCP && cat.receiver.MCP != "" {
+	if haveMCP && cat.receiver.Way("mcp") != WayNone {
 		plan.report.Got = append(plan.report.Got, "MCP-серверы")
 	} else if haveMCP {
 		plan.report.Skipped = append(plan.report.Skipped, "MCP-серверы")
@@ -113,7 +113,7 @@ func connect(root, account, agentName, snapshot, home string) (ConnectReport, er
 	if err != nil {
 		return plan.report, err
 	}
-	if havePlugins && cat.receiver.Plugins != "" {
+	if havePlugins && cat.receiver.Way("plugins") != WayNone {
 		plan.report.Got = append(plan.report.Got, "плагины")
 	} else if havePlugins {
 		plan.report.Skipped = append(plan.report.Skipped, "плагины")
@@ -123,7 +123,7 @@ func connect(root, account, agentName, snapshot, home string) (ConnectReport, er
 		return plan.report, err
 	}
 	var hookBodies map[string]string
-	if haveHooks && cat.receiver.Hooks != "" {
+	if haveHooks && cat.receiver.Way("hooks") != WayNone {
 		var missing []string
 		hookBodies, missing = agentHooks(hooks, cat.receiver)
 		if len(hookBodies) > 0 {
@@ -234,18 +234,19 @@ func planConnect(root string, cat skillCatalog, skills []canonSkill) (connectPla
 	}
 	home := filepath.Dir(cat.dir)
 	for _, kind := range []struct {
-		name, rel, place string
-		dir              bool
+		name, key, rel, place string
+		dir                   bool
 	}{
-		{"субагенты", "agents", cat.receiver.Agents, true},
-		{"пользовательские команды", "commands", cat.receiver.Commands, true},
-		{"файл инструкций", "AGENTS.md", cat.receiver.Instructions, false},
+		{"субагенты", "agents", "agents", cat.receiver.Agents, true},
+		{"пользовательские команды", "commands", "commands", cat.receiver.Commands, true},
+		{"файл инструкций", "instructions", "AGENTS.md", cat.receiver.Instructions, false},
 	} {
 		names, err := canonNames(canon, kind.rel, kind.dir)
 		if err != nil {
 			return plan, err
 		}
-		if kind.place == "" {
+		way := cat.receiver.Way(kind.key)
+		if way == WayNone {
 			if len(names) > 0 {
 				plan.report.Skipped = append(plan.report.Skipped, kind.name)
 			}
@@ -253,6 +254,9 @@ func planConnect(root string, cat skillCatalog, skills []canonSkill) (connectPla
 		}
 		if len(names) > 0 {
 			plan.report.Got = append(plan.report.Got, kind.name)
+		}
+		if way == WaySelf {
+			continue
 		}
 		place := filepath.Join(home, filepath.FromSlash(kind.place))
 		if !kind.dir {
