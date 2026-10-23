@@ -122,16 +122,14 @@ func connect(root, account, agentName, snapshot, home string) (ConnectReport, er
 	if err != nil {
 		return plan.report, err
 	}
-	var hookBodies map[string]string
+	var hookBodies, hookOrigins map[string]string
 	if haveHooks && cat.receiver.Way("hooks") != WayNone {
-		var missing []string
-		hookBodies, missing = agentHooks(hooks, cat.receiver)
+		var skips hookSkips
+		hookBodies, hookOrigins, skips = agentHooks(hooks, cat.receiver)
 		if len(hookBodies) > 0 {
 			plan.report.Got = append(plan.report.Got, "хуки")
 		}
-		if len(missing) > 0 {
-			plan.report.Skipped = append(plan.report.Skipped, "хуки событий "+strings.Join(missing, ", "))
-		}
+		plan.report.Skipped = append(plan.report.Skipped, skips.report()...)
 	} else if haveHooks {
 		plan.report.Skipped = append(plan.report.Skipped, "хуки")
 	}
@@ -163,14 +161,14 @@ func connect(root, account, agentName, snapshot, home string) (ConnectReport, er
 	}
 	if err == nil && cat.receiver.Plugins != "" {
 		file := filepath.Join(filepath.Dir(cat.dir), filepath.FromSlash(cat.receiver.Plugins))
-		err = writeRecords(pluginRecords, cat.slug, file, recordBodies(plugins))
+		err = writeRecords(pluginRecords, cat.slug, file, recordBodies(plugins), nil)
 		if err == nil {
-			err = writeRecords(marketRecords, cat.slug, file, recordBodies(markets))
+			err = writeRecords(marketRecords, cat.slug, file, recordBodies(markets), nil)
 		}
 	}
 	if err == nil && cat.receiver.Hooks != "" {
 		file := filepath.Join(filepath.Dir(cat.dir), filepath.FromSlash(cat.receiver.Hooks))
-		err = writeRecords(hookRecords, cat.slug, file, hookBodies)
+		err = writeRecords(hookRecords, cat.slug, file, hookBodies, hookOrigins)
 	}
 	if err != nil {
 		undoErr := rollbackCatalog(undo)

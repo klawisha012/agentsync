@@ -5,16 +5,17 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 )
 
-const canonHooksBody = `{"hooks":{
-	"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"lint"}]}],
-	"Stop":[{"hooks":[{"type":"command","command":"notify"}]}],
-	"PermissionRequest":[{"hooks":[{"type":"command","command":"ask"}]}]}}`
+const canonHooksBody = `{"version":1,"hooks":{
+	"before_tool":[{"matcher":["shell"],"hooks":[{"type":"command","command":"lint"}]}],
+	"stop":[{"hooks":[{"type":"command","command":"notify"}]}]},
+	"claude":{"hooks":{"PermissionRequest":[{"hooks":[{"type":"command","command":"ask"}]}]}}}`
 
 func settingsHooks(t *testing.T, file string) map[string][]map[string]any {
 	t.Helper()
@@ -42,12 +43,15 @@ func TestOnWritesCanonHooksIntoClaudeSettings(t *testing.T) {
 	if len(hooks["PreToolUse"]) != 2 || len(hooks["Stop"]) != 1 || len(hooks["PermissionRequest"]) != 1 {
 		t.Fatalf("hooks %v", hooks)
 	}
+	if !slices.ContainsFunc(hooks["PreToolUse"], func(group map[string]any) bool { return group["matcher"] == "Bash" }) {
+		t.Fatalf("shell not translated %v", hooks)
+	}
 
-	writeRel(t, canon, "hooks.json", `{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"lint"}]}]}}`)
+	writeRel(t, canon, "hooks.json", `{"version":1,"hooks":{"before_tool":[{"matcher":["shell"],"hooks":[{"type":"command","command":"lint"}]}]}}`)
 	if code, _, stderr := runCLI(t, "claude", "on"); code != 0 {
 		t.Fatal(stderr)
 	}
-	if hooks := settingsHooks(t, settings); len(hooks["Stop"]) != 0 || len(hooks["PreToolUse"]) != 2 {
+	if hooks := settingsHooks(t, settings); len(hooks["Stop"]) != 0 || len(hooks["PermissionRequest"]) != 0 || len(hooks["PreToolUse"]) != 2 {
 		t.Fatalf("second on %v", hooks)
 	}
 
@@ -62,45 +66,98 @@ func TestOnWritesCanonHooksIntoClaudeSettings(t *testing.T) {
 
 func TestOnTranslatesCanonHooksForGemini(t *testing.T) {
 	root := connectRoot(t)
-	writeRel(t, filepath.Join(root, ".agents"), "hooks.json", canonHooksBody)
+	writeRel(t, filepath.Join(root, ".agents"), "hooks.json", `{"version":1,"hooks":{
+		"before_tool":[
+			{"matcher":["shell","task"],"hooks":[{"type":"command","command":"lint","timeout":5}]},
+			{"matcher":["task"],"hooks":[{"type":"command","command":"never"}]}],
+		"after_tool":[{"matcher":"*","hooks":[{"type":"command","command":"\"${AGENTS_PROJECT_DIR}\"/fmt.sh"}]}],
+		"stop":[{"hooks":[{"type":"command","command":"notify"}]}],
+		"subagent_stop":[{"hooks":[{"type":"command","command":"done"}]}]},
+		"claude":{"hooks":{"PermissionRequest":[{"hooks":[{"type":"command","command":"ask"}]}]}}}`)
 	code, stdout, stderr := runCLI(t, "gemini", "on")
-	if code != 0 || !strings.Contains(stdout, "хуки событий PermissionRequest") {
+	if code != 0 || !strings.Contains(stdout, "хуки событий subagent_stop") || !strings.Contains(stdout, "инструменты хуков task") {
 		t.Fatalf("code %d stdout %s stderr %s", code, stdout, stderr)
 	}
 	hooks := settingsHooks(t, filepath.Join(root, ".gemini", "settings.json"))
-	if len(hooks["BeforeTool"]) != 1 || hooks["BeforeTool"][0]["matcher"] != "run_shell_command" || len(hooks["AfterAgent"]) != 1 {
+	before := hooks["BeforeTool"]
+	if len(before) != 1 || before[0]["matcher"] != "run_shell_command" || len(hooks["AfterAgent"]) != 1 {
 		t.Fatalf("hooks %v", hooks)
 	}
-	if hooks["PreToolUse"] != nil || hooks["PermissionRequest"] != nil {
-		t.Fatalf("untranslated events %v", hooks)
+	if entry := before[0]["hooks"].([]any)[0].(map[string]any); entry["timeout"] != float64(5000) {
+		t.Fatalf("timeout not in milliseconds %v", entry)
+	}
+	after := hooks["AfterTool"]
+	if len(after) != 1 || after[0]["matcher"] != nil || !strings.Contains(after[0]["hooks"].([]any)[0].(map[string]any)["command"].(string), "${GEMINI_PROJECT_DIR}") {
+		t.Fatalf("after tool %v", after)
+	}
+	if hooks["PermissionRequest"] != nil || len(hooks) != 3 {
+		t.Fatalf("foreign events %v", hooks)
 	}
 }
 
-func TestHookMatcherToolsTravelBetweenClaudeAndGemini(t *testing.T) {
+func TestOnRefusesHooksOutsideTheAgentsFormat(t *testing.T) {
+	for _, tc := range []struct{ body, want string }{
+		{`{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"lint"}]}]}}`, "старом формате"},
+		{`{"version":1,"hooks":{"PreToolUse":[{"hooks":[{"type":"command","command":"lint"}]}]}}`, "«PreToolUse» не из словаря"},
+		{`{"version":1,"hooks":{"before_tool":[{"matcher":["Bash"],"hooks":[{"type":"command","command":"lint"}]}]}}`, "«Bash» не из словаря"},
+		{`{"version":1,"hooks":{"stop":[{"matcher":["shell"],"hooks":[{"type":"command","command":"lint"}]}]}}`, "событий инструментов"},
+	} {
+		root := connectRoot(t)
+		writeRel(t, filepath.Join(root, ".agents"), "hooks.json", tc.body)
+		code, _, stderr := runCLI(t, "claude", "on")
+		if code != 1 || !strings.Contains(stderr, tc.want) {
+			t.Fatalf("%s: code %d stderr %s", tc.want, code, stderr)
+		}
+		if _, err := os.Lstat(filepath.Join(root, ".claude")); !os.IsNotExist(err) {
+			t.Fatalf("%s: refusal changed the agent", tc.want)
+		}
+	}
+}
+
+func TestRecordAgentsRefusesOldHooks(t *testing.T) {
+	root := connectRoot(t)
+	writeRel(t, filepath.Join(root, ".agents"), "hooks.json", `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"x"}]}]}}`)
+	t.Setenv("AGENTSYNC_TOKEN", "machine")
+	t.Setenv("AGENTSYNC_SERVER", "http://127.0.0.1:1")
+	for _, command := range []string{"record", "push"} {
+		if code, _, stderr := runCLI(t, command, "agents"); code != 1 || !strings.Contains(stderr, "старом формате") {
+			t.Fatalf("%s: code %d stderr %s", command, code, stderr)
+		}
+	}
+}
+
+func TestCardGivesTheCanonBackItsOwnHooks(t *testing.T) {
+	var sent []byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sent, _ = io.ReadAll(r.Body)
+		w.WriteHeader(http.StatusCreated)
+	}))
+	t.Cleanup(srv.Close)
 	root := connectRoot(t)
 	writeRel(t, filepath.Join(root, ".agents"), "hooks.json",
-		`{"hooks":{"PostToolUse":[{"matcher":"Edit|MultiEdit|Task","hooks":[{"type":"command","command":"fmt"}]}]}}`)
+		`{"version":1,"hooks":{"after_tool":[{"matcher":["edit","task"],"input":"none","hooks":[{"type":"command","command":"fmt"}]}]}}`)
 	if code, _, stderr := runCLI(t, "gemini", "on"); code != 0 {
 		t.Fatal(stderr)
 	}
-	hooks := settingsHooks(t, filepath.Join(root, ".gemini", "settings.json"))
-	if len(hooks["AfterTool"]) != 1 || hooks["AfterTool"][0]["matcher"] != "replace|Task" {
-		t.Fatalf("gemini hooks %v", hooks)
+	t.Setenv("AGENTSYNC_SERVER", srv.URL)
+	t.Setenv("AGENTSYNC_TOKEN", "machine")
+	if code, _, stderr := runCLI(t, "push", "gemini"); code != 0 {
+		t.Fatalf("push %s", stderr)
 	}
-
-	code, stderr := pipeApply(t, `{"author":"zwarder","agent":"gemini","files":[
-		{"path":"settings.json","body":"{\"hooks\":{\"AfterTool\":[{\"matcher\":\"replace|Task\",\"hooks\":[{\"type\":\"command\",\"command\":\"fmt\"}]},{\"matcher\":\"replace|glob\",\"hooks\":[{\"type\":\"command\",\"command\":\"fmt\"}]}]}}"}]}`)
-	if code != 0 {
+	var card struct {
+		Files []map[string]string `json:"files"`
+	}
+	if err := json.Unmarshal(sent, &card); err != nil {
+		t.Fatal(err)
+	}
+	payload, _ := json.Marshal(map[string]any{"author": "zwarder", "agent": "gemini", "files": card.Files})
+	t.Setenv("AGENTSYNC_TOKEN", "")
+	if code, stderr := pipeApply(t, string(payload)); code != 0 {
 		t.Fatalf("apply %d %s", code, stderr)
 	}
 	canon := settingsHooks(t, filepath.Join(root, ".agents", "hooks.json"))
-	var matchers []any
-	for _, group := range canon["PostToolUse"] {
-		matchers = append(matchers, group["matcher"])
-	}
-	// The round trip gives back the same canon record instead of a second one.
-	if !slices.Equal(matchers, []any{"Edit|MultiEdit|Task", "Edit|MultiEdit|Glob"}) {
-		t.Fatalf("canon matchers %v", matchers)
+	if len(canon["after_tool"]) != 1 || canon["after_tool"][0]["input"] != "none" || len(canon["after_tool"][0]["matcher"].([]any)) != 2 {
+		t.Fatalf("canon hooks after the round trip %v", canon)
 	}
 }
 
@@ -136,7 +193,7 @@ func TestMachineHookStaysOnTheMachine(t *testing.T) {
 	}
 }
 
-func TestPipeApplyOldGeminiCardSendsHooksToTheCanonInClaudeForm(t *testing.T) {
+func TestPipeApplyOldGeminiCardSendsHooksToTheCanonInAgentsForm(t *testing.T) {
 	root := connectRoot(t)
 	code, stderr := pipeApply(t, `{"author":"zwarder","agent":"gemini","files":[
 		{"path":"settings.json","body":"{\"theme\":\"x\",\"hooks\":{\"BeforeTool\":[{\"matcher\":\"run_shell_command\",\"hooks\":[{\"type\":\"command\",\"command\":\"lint\"}]}]}}"}]}`)
@@ -144,7 +201,7 @@ func TestPipeApplyOldGeminiCardSendsHooksToTheCanonInClaudeForm(t *testing.T) {
 		t.Fatalf("apply %d %s", code, stderr)
 	}
 	hooks := settingsHooks(t, filepath.Join(root, ".agents", "hooks.json"))
-	if len(hooks["PreToolUse"]) != 1 || hooks["PreToolUse"][0]["matcher"] != "Bash" {
+	if len(hooks["before_tool"]) != 1 || hooks["before_tool"][0]["input"] != "gemini-cli" || hooks["before_tool"][0]["matcher"].([]any)[0] != "shell" {
 		t.Fatalf("canon hooks %v", hooks)
 	}
 	if gemini := settingsHooks(t, filepath.Join(root, ".gemini", "settings.json")); len(gemini["BeforeTool"]) != 1 {
@@ -154,7 +211,7 @@ func TestPipeApplyOldGeminiCardSendsHooksToTheCanonInClaudeForm(t *testing.T) {
 
 func TestOnTwiceKeepsOneCopyOfAHookWithAmpersands(t *testing.T) {
 	root := connectRoot(t)
-	writeRel(t, filepath.Join(root, ".agents"), "hooks.json", `{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"lint && say <done>"}]}]}}`)
+	writeRel(t, filepath.Join(root, ".agents"), "hooks.json", `{"version":1,"hooks":{"stop":[{"hooks":[{"type":"command","command":"lint && say <done>"}]}]}}`)
 	settings := filepath.Join(root, ".claude", "settings.json")
 	for range 2 {
 		if code, _, stderr := runCLI(t, "claude", "on"); code != 0 {
@@ -176,7 +233,7 @@ func TestRevertAndCanonApplyKeepMachineHooks(t *testing.T) {
 	root := connectRoot(t)
 	machine := `{"hooks":[{"type":"command","command":"/Users/me/run.sh"}]}`
 	writeRel(t, root, ".claude/settings.json", `{"theme":"dark","hooks":{"Stop":[`+machine+`]}}`)
-	writeRel(t, root, ".agents/hooks.json", `{"hooks":{"Stop":[`+machine+`]}}`)
+	writeRel(t, root, ".agents/hooks.json", `{"version":1,"hooks":{"stop":[`+machine+`]}}`)
 	writeRel(t, root, ".agents/skills/note/SKILL.md", "note")
 	if code, stderr := pipeApply(t, `{"author":"zwarder","agent":"claude","files":[{"path":"settings.json","body":"{\"theme\":\"light\"}"},{"path":"agentsync.json","body":"{}"}]}`); code != 0 {
 		t.Fatalf("apply %s", stderr)

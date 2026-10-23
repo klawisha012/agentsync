@@ -184,6 +184,10 @@ func onlyMachineHooks(path, body string) string {
 		return ""
 	}
 	kept := &hookSettings{top: map[string]json.RawMessage{}, events: map[string][]json.RawMessage{}}
+	// The agents hooks file stays in the agents format.
+	if version, ok := settings.top["version"]; ok {
+		kept.top["version"] = version
+	}
 	for name, group := range machine {
 		kept.set(name, string(group))
 	}
@@ -208,68 +212,4 @@ func keepMachineHooks(onDisk []byte, body string) string {
 		settings.set(name, string(group))
 	}
 	return settings.encode()
-}
-
-// canonHooks reads ~/.agents/hooks.json in the Claude Code form. ok is false without the file.
-func canonHooks(root string) (map[string]json.RawMessage, bool, error) {
-	file := filepath.Join(canonDir(root), "hooks.json")
-	if _, err := os.Stat(file); errors.Is(err, os.ErrNotExist) {
-		return nil, false, nil
-	}
-	settings, err := readHookSettings(file)
-	if err != nil {
-		return nil, false, err
-	}
-	return settings.records(), true, nil
-}
-
-// agentHooks translates canon hook groups into the AI agent's events and tool names. It returns
-// the records and the canon events the agent does not have.
-func agentHooks(hooks map[string]json.RawMessage, receiver Receiver) (map[string]string, []string) {
-	out := map[string]string{}
-	missing := map[string]bool{}
-	for name, group := range hooks {
-		event, _, _ := strings.Cut(name, " ")
-		target, record, ok := translateHook(event, group, canonDialect, dialects[receiver.Slug])
-		if !ok {
-			missing[event] = true
-			continue
-		}
-		out[hookName(target, json.RawMessage(record))] = record
-	}
-	return out, slices.Sorted(maps.Keys(missing))
-}
-
-// translateHook renames the event and the tools in the matcher from one dialect to another through
-// the agents words. An event without a word in both dialects has no counterpart; an unknown tool stays.
-func translateHook(event string, group json.RawMessage, from, to dialect) (string, string, bool) {
-	if from.slug == to.slug {
-		return event, compactJSON(group), true
-	}
-	word, ok := from.eventWord(event)
-	target, known := to.events[word]
-	if !ok || !known {
-		return "", "", false
-	}
-	var fields map[string]json.RawMessage
-	var matcher string
-	if json.Unmarshal(group, &fields) != nil || json.Unmarshal(fields["matcher"], &matcher) != nil {
-		return target, compactJSON(group), true
-	}
-	// A word becomes all its native names, once each, so "Edit|MultiEdit" → "replace" → "Edit|MultiEdit".
-	var parts []string
-	for _, part := range strings.Split(matcher, "|") {
-		names := []string{part}
-		if word, ok := from.toolWord(strings.TrimSpace(part)); ok && len(to.tools[word]) > 0 {
-			names = to.tools[word]
-		}
-		for _, name := range names {
-			if !slices.Contains(parts, name) {
-				parts = append(parts, name)
-			}
-		}
-	}
-	fields["matcher"], _ = json.Marshal(strings.Join(parts, "|"))
-	raw, _ := json.Marshal(fields)
-	return target, string(raw), true
 }

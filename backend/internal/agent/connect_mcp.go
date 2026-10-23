@@ -56,6 +56,7 @@ type recordLedger struct {
 	File     string            `json:"file"`
 	Own      []string          `json:"own"`
 	Replaced map[string]string `json:"replaced,omitempty"`
+	Origins  map[string]string `json:"origins,omitempty"`
 }
 
 // mcpSettings is an AI agent settings file seen as named MCP records in its own format.
@@ -139,12 +140,13 @@ func connectMCP(root string, receiver Receiver, servers map[string]json.RawMessa
 		}
 		records[name] = record
 	}
-	return slices.Sorted(maps.Keys(unset)), writeRecords(mcpRecords, receiver.Slug, file, records)
+	return slices.Sorted(maps.Keys(unset)), writeRecords(mcpRecords, receiver.Slug, file, records, nil)
 }
 
 // writeRecords writes records into a settings file and removes its own records that are no
-// longer asked for. Foreign records with other names and other keys stay.
-func writeRecords(kind recordKind, slug, file string, records map[string]string) error {
+// longer asked for. Foreign records with other names and other keys stay. origins names the canon
+// record each one came from, when it differs from the record itself.
+func writeRecords(kind recordKind, slug, file string, records, origins map[string]string) error {
 	ledgerPath, ledger, err := loadLedger(kind, slug)
 	if err != nil {
 		return err
@@ -177,7 +179,7 @@ func writeRecords(kind recordKind, slug, file string, records map[string]string)
 		}
 		settings.set(name, records[name])
 	}
-	ledger.File, ledger.Own = file, names
+	ledger.File, ledger.Own, ledger.Origins = file, names, origins
 	// The ledger goes first: a record on wrote must never look foreign to the next on.
 	if err := saveLedger(ledgerPath, ledger); err != nil {
 		return err

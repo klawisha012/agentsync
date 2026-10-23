@@ -44,6 +44,9 @@ func Push(ctx context.Context, server, root, agentName, token, cookie string) er
 		return err
 	}
 	defer unlock()
+	if err := checkCanon(root, agentName); err != nil {
+		return err
+	}
 	home := agentHome(root, agentName)
 	files, err := readSnapshot(root, home)
 	if err != nil {

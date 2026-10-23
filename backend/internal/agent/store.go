@@ -40,6 +40,9 @@ func remember(ctx context.Context, server, root, agentName, token, cookie string
 
 func Record(ctx context.Context, server, root, agentName, token, cookie string) ([]byte, error) {
 	var raw []byte
+	if err := checkCanon(root, agentName); err != nil {
+		return nil, err
+	}
 	err := withRootLock(root, func() error {
 		var callErr error
 		raw, callErr = recordFiles(ctx, server, root, agentName, token, cookie)

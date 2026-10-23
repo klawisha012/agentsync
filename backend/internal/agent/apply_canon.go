@@ -24,6 +24,8 @@ type canonMark struct {
 	Plugins      []string `json:"plugins"`
 	Marketplaces []string `json:"marketplaces"`
 	Hooks        []string `json:"hooks"`
+	// HookOrigins names, for each hook on wrote, the canon record it came from.
+	HookOrigins map[string]string `json:"hookOrigins,omitempty"`
 }
 
 // markLists names the mark list of each record kind.
@@ -176,6 +178,12 @@ func markFile(home, outside string) File {
 				var ledger recordLedger
 				if raw, err := os.ReadFile(file); err == nil && json.Unmarshal(raw, &ledger) == nil && (within(home, ledger.File) || outside != "" && samePlace(outside, ledger.File)) {
 					*list = append(*list, ledger.Own...)
+					if kind == hookRecords && len(ledger.Origins) > 0 {
+						if mark.HookOrigins == nil {
+							mark.HookOrigins = map[string]string{}
+						}
+						maps.Copy(mark.HookOrigins, ledger.Origins)
+					}
 				}
 			}
 		}
@@ -254,14 +262,14 @@ func splitCard(files []File, places cardPlaces, connectable bool) cardSplit {
 	for _, kind := range recordKinds {
 		split.records[kind] = map[string]json.RawMessage{}
 	}
-	marked, ours := false, map[recordKind]map[string]bool{}
+	marked, ours, origins := false, map[recordKind]map[string]bool{}, map[string]string{}
 	for _, file := range files {
 		if file.Path != MarkFile {
 			continue
 		}
 		var mark canonMark
 		if json.Unmarshal([]byte(file.Body), &mark) == nil {
-			marked = true
+			marked, origins = true, mark.HookOrigins
 			for kind, list := range mark.lists() {
 				ours[kind] = map[string]bool{}
 				for _, name := range *list {
@@ -286,7 +294,8 @@ func splitCard(files []File, places cardPlaces, connectable bool) cardSplit {
 		top[kind.key] = marshalPlain(records)
 		return len(records)
 	}
-	// takeHooks moves the hook groups that go to the canon out of a settings body, back in Claude form.
+	// takeHooks moves the hook groups that go to the canon out of a settings body, back as the canon
+	// records they came from; a hook without a known origin is translated back.
 	takeHooks := func(top map[string]json.RawMessage) bool {
 		settings := &hookSettings{top: top}
 		if json.Unmarshal(top["hooks"], &settings.events) != nil || settings.events == nil {
@@ -296,12 +305,13 @@ func splitCard(files []File, places cardPlaces, connectable bool) cardSplit {
 			if marked && !ours[hookRecords][name] {
 				continue
 			}
-			event, _, _ := strings.Cut(name, " ")
-			canonEvent, record, ok := translateHook(event, group, places.dialect, canonDialect)
+			canonName, ok := origins[name]
+			body := canonRecordBody(canonName)
 			if !ok {
-				continue
+				event, _, _ := strings.Cut(name, " ")
+				canonName, body = fromNative(places.dialect, event, group)
 			}
-			split.records[hookRecords][hookName(canonEvent, json.RawMessage(record))] = json.RawMessage(record)
+			split.records[hookRecords][canonName] = json.RawMessage(body)
 			settings.remove(name)
 		}
 		settings.encode()
@@ -497,7 +507,13 @@ func writeCard(root, home string, split cardSplit, undo *applyUndo, broken bool)
 		if err := undo.keep(file); err != nil {
 			return err
 		}
-		settings, err := openSettings(kind, file)
+		var settings mcpSettings
+		var err error
+		if kind == hookRecords {
+			settings, err = readCanonHooks(file)
+		} else {
+			settings, err = openSettings(kind, file)
+		}
 		if err != nil {
 			return err
 		}
