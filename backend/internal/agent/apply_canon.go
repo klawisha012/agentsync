@@ -43,6 +43,7 @@ func withMark(root string, files []File, agentName, home string) []File {
 	if isCanonCard(agentName) {
 		return files
 	}
+	files = canonFiles(root, files, agentName, home)
 	user, outside, ok := userMCP(root, agentName, home)
 	if ok {
 		files = append(files, user)
@@ -141,7 +142,7 @@ func reconnect(root, account string) error {
 
 // connected reports an AI agent that holds records on wrote or a link into the canon.
 func connected(root string, receiver Receiver) bool {
-	for _, kind := range recordKinds {
+	for _, kind := range append(slices.Clone(recordKinds), fileRecords) {
 		if _, ledger, err := loadLedger(kind, receiver.Slug); err == nil && ledger.File != "" {
 			return true
 		}

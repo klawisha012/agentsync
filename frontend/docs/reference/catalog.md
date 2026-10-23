@@ -9,10 +9,11 @@
 | ИИ-агент | Субагенты | Команды | Файл инструкций | MCP-серверы | Плагины | Хуки |
 |---|---|---|---|---|---|---|
 | Claude Code | `agents/` | `commands/` | `CLAUDE.md` | `~/.claude.json` | `settings.json` | `settings.json` |
-| Codex | — | — | `AGENTS.md` | `config.toml` | — | `hooks.json` |
-| Gemini CLI | — | — | `GEMINI.md` | `settings.json` | — | `settings.json` |
-| Grok Build | — | — | — | `config.toml` | — | `hooks/agentsync.json` |
-| GitHub Copilot | — | — | — | — | — | `hooks/agentsync.json` |
+| Codex | `agents/`, TOML | — | `AGENTS.md` | `config.toml` | — | `hooks.json` |
+| Gemini CLI | `agents/` | `commands/`, TOML | `GEMINI.md` | `settings.json` | — | `settings.json` |
+| Grok Build | `agents/` | читает сам | — | `config.toml` | — | `hooks/agentsync.json` |
+| GitHub Copilot | `agents/*.agent.md` | — | — | — | — | `hooks/agentsync.json` |
+| Cursor | `agents/`, только readonly | — | — | — | — | — |
 | Остальные | — | — | — | — | — | — |
 
 Пути — относительно домашней папки ИИ-агента (`~/.claude`, `~/.codex`, `~/.gemini`). «—» значит, что вид пропускается и вывод `on` его называет.

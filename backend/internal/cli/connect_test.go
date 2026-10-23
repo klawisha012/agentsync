@@ -437,7 +437,7 @@ func TestOnSkipsKindsCodexDoesNotUnderstand(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("code %d stderr %s", code, stderr)
 	}
-	if !strings.Contains(stdout, "Пропущены") || !strings.Contains(stdout, "субагенты") || !strings.Contains(stdout, "пользовательские команды") {
+	if !strings.Contains(stdout, "Пропущены") || !strings.Contains(stdout, "пользовательские команды") {
 		t.Fatalf("skip not named: %s", stdout)
 	}
 	home := filepath.Join(root, ".codex")
@@ -448,8 +448,8 @@ func TestOnSkipsKindsCodexDoesNotUnderstand(t *testing.T) {
 	if _, err := os.Lstat(filepath.Join(home, "prompts")); !os.IsNotExist(err) {
 		t.Fatal("commands linked for Codex")
 	}
-	if _, err := os.Lstat(filepath.Join(home, "agents")); !os.IsNotExist(err) {
-		t.Fatal("subagents linked for Codex")
+	if body := readFile(t, filepath.Join(home, "agents", "go-developer.toml")); !strings.Contains(body, `name = "go-developer"`) || !strings.Contains(body, "developer_instructions = '''\ngo'''") {
+		t.Fatalf("codex subagent %q", body)
 	}
 }
 

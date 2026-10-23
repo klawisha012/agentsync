@@ -44,6 +44,7 @@ type canonLink struct {
 // connectPlan holds the links for one AI agent and the places where its old canon links live.
 type connectPlan struct {
 	links  []canonLink
+	writes []canonWrite
 	dirs   []string
 	files  []string
 	report ConnectReport
@@ -63,7 +64,9 @@ type savedLink struct {
 }
 
 type catalogUndo struct {
-	added       []string
+	added []string
+	// rewritten are the files connect wrote or removed, with what was there before.
+	rewritten   []keptFile
 	removed     []savedLink
 	moved       []savedLink
 	createdDirs []string
@@ -96,7 +99,11 @@ func connect(root, account, agentName, snapshot, home string) (ConnectReport, er
 	if err != nil {
 		return ConnectReport{}, err
 	}
-	plan, err := planConnect(root, cat, skills)
+	plan, err := planConnect(root, cat, skills, true)
+	if err != nil {
+		return ConnectReport{}, err
+	}
+	ledgerPath, written, err := loadFileLedger(cat.slug)
 	if err != nil {
 		return ConnectReport{}, err
 	}
@@ -148,6 +155,12 @@ func connect(root, account, agentName, snapshot, home string) (ConnectReport, er
 	if err != nil {
 		return plan.report, err
 	}
+	for _, write := range plan.writes {
+		target, linked := linkTarget(write.dest)
+		if _, err := os.Lstat(write.dest); err == nil && !slices.Contains(written.Own, write.dest) && !(linked && within(canon, target)) {
+			occupied[catalogKey(write.dest)] = true
+		}
+	}
 	own := ""
 	if len(occupied) > 0 && snapshot == "" {
 		if snapshot, home, err = snapshotAgent(root, account, cat); err != nil {
@@ -155,7 +168,7 @@ func connect(root, account, agentName, snapshot, home string) (ConnectReport, er
 		}
 		own = snapshot
 	}
-	undo, err := shareCanon(canon, snapshot, home, cat.display, plan, occupied)
+	undo, err := shareCanon(canon, snapshot, home, cat.display, plan, occupied, written.Own)
 	if err == nil && cat.receiver.MCP != "" {
 		plan.report.Unset, err = connectMCP(root, cat.receiver, servers)
 	}
@@ -177,6 +190,9 @@ func connect(root, account, agentName, snapshot, home string) (ConnectReport, er
 		if err == nil {
 			err = writeRecords(hookRecords, cat.slug, file, hookBodies, hookOrigins)
 		}
+	}
+	if err == nil {
+		err = saveFileLedger(ledgerPath, plan.writes)
 	}
 	if err != nil {
 		undoErr := rollbackCatalog(undo)
@@ -209,8 +225,11 @@ func Disconnect(root, agentName string) error {
 		return fmt.Errorf("ИИ-агент «%s» читает навыки прямо из\u00a0agents, отключить их нельзя.", receiver.Display)
 	}
 	cat := skillCatalog{dir: dir, display: receiver.Display, slug: receiver.Slug, receiver: receiver}
-	plan, err := planConnect(root, cat, nil)
+	plan, err := planConnect(root, cat, nil, false)
 	if err != nil {
+		return err
+	}
+	if err := removeWrittenFiles(receiver.Slug); err != nil {
 		return err
 	}
 	stale, err := staleLinks(canonDir(root), plan.dirs, plan.files, nil)
@@ -225,8 +244,9 @@ func Disconnect(root, agentName string) error {
 	return disconnectRecords(receiver.Slug)
 }
 
-// planConnect lays out the links. A place inside the canon is left alone: the agent reads the canon there.
-func planConnect(root string, cat skillCatalog, skills []canonSkill) (connectPlan, error) {
+// planConnect lays out the links and the translated files. A place inside the canon is left alone:
+// the agent reads the canon there. Without translate it only finds the places, as off needs.
+func planConnect(root string, cat skillCatalog, skills []canonSkill, translate bool) (connectPlan, error) {
 	canon := canonDir(root)
 	var plan connectPlan
 	if len(skills) > 0 {
@@ -279,12 +299,38 @@ func planConnect(root string, cat skillCatalog, skills []canonSkill) (connectPla
 			continue
 		}
 		plan.dirs = append(plan.dirs, place)
+		var skippedDocs, droppedTools []string
 		for _, name := range names {
-			plan.links = append(plan.links, canonLink{
-				rel:  kind.rel + "/" + name,
-				abs:  filepath.Join(canon, kind.rel, name),
-				dest: filepath.Join(place, name),
-			})
+			link := canonLink{rel: kind.rel + "/" + name, abs: filepath.Join(canon, kind.rel, name), dest: filepath.Join(place, name)}
+			doc, isDoc := map[string]docKind{"agents": subagentDoc, "commands": commandDoc}[kind.key]
+			if info, err := os.Stat(link.abs); !translate || !isDoc || err != nil || info.IsDir() {
+				plan.links = append(plan.links, link)
+				continue
+			}
+			raw, err := os.ReadFile(link.abs)
+			if err != nil {
+				return plan, err
+			}
+			parsed, err := parseCanonDoc(doc, link.rel, string(raw))
+			if err != nil {
+				return plan, err
+			}
+			native := translateDoc(doc, dialects[cat.slug], name, parsed)
+			droppedTools = append(droppedTools, native.dropped...)
+			switch {
+			case native.skip:
+				skippedDocs = append(skippedDocs, strings.TrimSuffix(name, filepath.Ext(name)))
+			case native.link:
+				plan.links = append(plan.links, link)
+			default:
+				plan.writes = append(plan.writes, canonWrite{rel: link.rel, dest: filepath.Join(place, native.name), body: native.body})
+			}
+		}
+		if len(skippedDocs) > 0 {
+			plan.report.Skipped = append(plan.report.Skipped, kind.name+" "+strings.Join(skippedDocs, ", "))
+		}
+		if len(droppedTools) > 0 {
+			plan.report.Skipped = append(plan.report.Skipped, "инструменты субагентов "+strings.Join(sortedUnique(droppedTools), ", "))
 		}
 	}
 	// A canon entry that is a link to the agent's own file is already seen; linking would make a loop.
@@ -503,7 +549,7 @@ func snapshotAgent(root, account string, cat skillCatalog) (string, string, erro
 	return dir, home, nil
 }
 
-func shareCanon(canon, snapshot, home, display string, plan connectPlan, occupied map[string]bool) (catalogUndo, error) {
+func shareCanon(canon, snapshot, home, display string, plan connectPlan, occupied map[string]bool, written []string) (catalogUndo, error) {
 	var undo catalogUndo
 	failed := func() error {
 		return fmt.Errorf("Не удалось показать agents ИИ-агенту «%s».", display)
@@ -561,7 +607,85 @@ func shareCanon(canon, snapshot, home, display string, plan connectPlan, occupie
 		}
 		undo.added = append(undo.added, link.dest)
 	}
+	wantedFiles := map[string]bool{}
+	for _, write := range plan.writes {
+		wantedFiles[catalogKey(write.dest)] = true
+	}
+	for _, path := range written {
+		if wantedFiles[catalogKey(path)] {
+			continue
+		}
+		if err := undo.rewrite(path, nil); err != nil {
+			return undo, failed()
+		}
+	}
+	for _, write := range plan.writes {
+		created, err := ensureCatalog(filepath.Dir(write.dest))
+		undo.createdDirs = append(undo.createdDirs, created...)
+		if err != nil {
+			return undo, failed()
+		}
+		if occupied[catalogKey(write.dest)] {
+			if err := moveToSnapshot(snapshot, home, write.dest, &undo); err != nil {
+				return undo, failed()
+			}
+		}
+		if err := undo.rewrite(write.dest, []byte(write.body)); err != nil {
+			return undo, failed()
+		}
+	}
 	return undo, nil
+}
+
+// rewrite writes body to path, or removes path when body is nil, and remembers what was there.
+func (u *catalogUndo) rewrite(path string, body []byte) error {
+	old, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	u.rewritten = append(u.rewritten, keptFile{path: path, body: old, existed: err == nil})
+	if body == nil {
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		return nil
+	}
+	return os.WriteFile(path, body, 0o644)
+}
+
+func moveToSnapshot(snapshot, home, path string, undo *catalogUndo) error {
+	rel, err := filepath.Rel(home, path)
+	if err != nil || !filepath.IsLocal(rel) {
+		return errors.New("place outside the home")
+	}
+	kept := filepath.Join(snapshot, rel)
+	if err := os.RemoveAll(kept); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(kept), 0o755); err != nil {
+		return err
+	}
+	if err := os.Rename(path, kept); err != nil {
+		return err
+	}
+	undo.moved = append(undo.moved, savedLink{path: path, target: kept})
+	return nil
+}
+
+// saveFileLedger remembers the files connect wrote and the agents file each came from.
+func saveFileLedger(file string, writes []canonWrite) error {
+	if len(writes) == 0 {
+		if err := os.Remove(file); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		return nil
+	}
+	ledger := recordLedger{File: "files", Origins: map[string]string{}}
+	for _, write := range writes {
+		ledger.Own = append(ledger.Own, write.dest)
+		ledger.Origins[write.dest] = write.rel
+	}
+	return saveLedger(file, ledger)
 }
 
 // staleLinks lists the links into the canon in the agent's places that wanted does not hold.
@@ -617,6 +741,18 @@ func ensureCatalog(dir string) ([]string, error) {
 
 func rollbackCatalog(undo catalogUndo) error {
 	var errs []error
+	for i := len(undo.rewritten) - 1; i >= 0; i-- {
+		kept := undo.rewritten[i]
+		if !kept.existed {
+			if err := os.Remove(kept.path); err != nil && !errors.Is(err, os.ErrNotExist) {
+				errs = append(errs, err)
+			}
+			continue
+		}
+		if err := os.WriteFile(kept.path, kept.body, 0o644); err != nil {
+			errs = append(errs, err)
+		}
+	}
 	for _, link := range undo.added {
 		if err := os.Remove(link); err != nil && !errors.Is(err, os.ErrNotExist) {
 			errs = append(errs, err)

@@ -36,6 +36,16 @@ type dialect struct {
 	timeoutScale int
 	// flat means one hook entry per command, {type, matcher, bash, timeoutSec}, in a file with "version": 1.
 	flat bool
+	// agentFile is the suffix of a subagent file: ".md", ".agent.md" or ".toml".
+	agentFile string
+	// agentTools is how a subagent names its tools: "string" (comma-separated), "list", or
+	// "readonly" for an agent without a tool list that only knows a read-only switch.
+	agentTools string
+	// subagentTools and subagentMCP name subagent tools when they differ from the hook tools.
+	subagentTools map[string][]string
+	subagentMCP   string
+	// commandFile is the suffix of a user command file: ".md" or ".toml".
+	commandFile string
 }
 
 // dialects is the agents vocabulary: connect, apply and the transfer into agents read it.
@@ -56,6 +66,9 @@ var dialects = map[string]dialect{
 		mcpTool:      "mcp__%s__%s",
 		projectDir:   "CLAUDE_PROJECT_DIR",
 		timeoutScale: 1,
+		agentFile:    ".md",
+		agentTools:   "string",
+		commandFile:  ".md",
 	},
 	"gemini-cli": {
 		slug: "gemini-cli",
@@ -72,6 +85,9 @@ var dialects = map[string]dialect{
 		mcpTool:      "mcp_%s_%s",
 		projectDir:   "GEMINI_PROJECT_DIR",
 		timeoutScale: 1000,
+		agentFile:    ".md",
+		agentTools:   "list",
+		commandFile:  ".toml",
 	},
 	"grok": {
 		slug: "grok",
@@ -88,6 +104,8 @@ var dialects = map[string]dialect{
 		},
 		mcpTool:      "%s__%s",
 		timeoutScale: 1,
+		agentFile:    ".md",
+		agentTools:   "list",
 	},
 	"codex": {
 		slug: "codex",
@@ -98,6 +116,8 @@ var dialects = map[string]dialect{
 		tools:        map[string][]string{"shell": {"Bash"}, "edit": {"apply_patch"}, "write": {"apply_patch"}},
 		mcpTool:      "mcp__%s__%s",
 		timeoutScale: 1,
+		agentFile:    ".toml",
+		agentTools:   "readonly",
 	},
 	"github-copilot": {
 		slug: "github-copilot",
@@ -114,7 +134,15 @@ var dialects = map[string]dialect{
 		mcpTool:      "%s/%s",
 		timeoutScale: 1,
 		flat:         true,
+		agentFile:    ".agent.md",
+		agentTools:   "list",
+		subagentTools: map[string][]string{
+			"shell": {"execute"}, "read": {"read"}, "edit": {"edit"}, "write": {"edit"}, "glob": {"search"},
+			"grep": {"search"}, "list": {"read"}, "web_fetch": {"web"}, "web_search": {"web"}, "task": {"agent"},
+		},
+		subagentMCP: "%s/%s",
 	},
+	"cursor": {slug: "cursor", agentFile: ".md", agentTools: "readonly"},
 }
 
 func (d dialect) eventWord(native string) (string, bool) {

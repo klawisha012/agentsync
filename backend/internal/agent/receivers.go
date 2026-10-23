@@ -55,9 +55,9 @@ func (r Receiver) Way(kind string) Way {
 	place, way := "", WayTranslate
 	switch kind {
 	case "agents":
-		place, way = r.Agents, WayLink
+		place = r.Agents
 	case "commands":
-		place, way = r.Commands, WayLink
+		place = r.Commands
 	case "instructions":
 		place, way = r.Instructions, WayLink
 	case "mcp":
@@ -182,12 +182,12 @@ var receivers = []Receiver{
 	{Slug: "codebuddy", Display: "CodeBuddy", Project: ".codebuddy/skills", Global: ".codebuddy/skills"},
 	{Slug: "codemaker", Display: "Codemaker", Project: ".codemaker/skills", Global: ".codemaker/skills"},
 	{Slug: "codestudio", Display: "Code Studio", Project: ".codestudio/skills", Global: ".codestudio/skills"},
-	{Slug: "codex", Display: "Codex", Project: ".agents/skills", Global: ".codex/skills", Env: "CODEX_HOME", Instructions: "AGENTS.md", MCP: ".codex/config.toml", Hooks: "hooks.json"},
+	{Slug: "codex", Display: "Codex", Project: ".agents/skills", Global: ".codex/skills", Env: "CODEX_HOME", Agents: "agents", Instructions: "AGENTS.md", MCP: ".codex/config.toml", Hooks: "hooks.json"},
 	{Slug: "command-code", Display: "Command Code", Project: ".commandcode/skills", Global: ".commandcode/skills"},
 	{Slug: "continue", Display: "Continue", Project: ".continue/skills", Global: ".continue/skills"},
 	{Slug: "cortex", Display: "Cortex Code", Project: ".cortex/skills", Global: ".snowflake/cortex/skills"},
 	{Slug: "crush", Display: "Crush", Project: ".crush/skills", Global: ".config/crush/skills"},
-	{Slug: "cursor", Display: "Cursor", Project: ".agents/skills", Global: ".cursor/skills"},
+	{Slug: "cursor", Display: "Cursor", Project: ".agents/skills", Global: ".cursor/skills", Agents: "agents"},
 	{Slug: "deepagents", Display: "Deep Agents", Project: ".agents/skills", Global: ".deepagents/agent/skills"},
 	{Slug: "devin", Display: "Devin for Terminal", Project: ".devin/skills", Global: "devin/skills", InConfig: true},
 	{Slug: "dexto", Display: "Dexto", Project: ".agents/skills", Global: ".agents/skills"},
@@ -196,10 +196,10 @@ var receivers = []Receiver{
 	{Slug: "firebender", Display: "Firebender", Project: ".agents/skills", Global: ".firebender/skills"},
 	{Slug: "forgecode", Display: "ForgeCode", Project: ".forge/skills", Global: ".forge/skills"},
 	{Slug: "fx", Display: "fx", Project: ".fx/skills", Global: ".fx/skills"},
-	{Slug: "gemini-cli", Aliases: []string{"gemini"}, Display: "Gemini CLI", Project: ".agents/skills", Global: ".gemini/skills", Instructions: "GEMINI.md", MCP: ".gemini/settings.json", Hooks: "settings.json"},
-	{Slug: "github-copilot", Aliases: []string{"copilot"}, Display: "GitHub Copilot", Project: ".agents/skills", Global: ".copilot/skills", Hooks: "hooks/agentsync.json"},
+	{Slug: "gemini-cli", Aliases: []string{"gemini"}, Display: "Gemini CLI", Project: ".agents/skills", Global: ".gemini/skills", Agents: "agents", Commands: "commands", Instructions: "GEMINI.md", MCP: ".gemini/settings.json", Hooks: "settings.json"},
+	{Slug: "github-copilot", Aliases: []string{"copilot"}, Display: "GitHub Copilot", Project: ".agents/skills", Global: ".copilot/skills", Agents: "agents", Hooks: "hooks/agentsync.json"},
 	{Slug: "goose", Display: "Goose", Project: ".goose/skills", Global: "goose/skills", InConfig: true},
-	{Slug: "grok", Display: "Grok Build", Project: ".grok/skills", Global: ".grok/skills", Env: "GROK_HOME", MCP: ".grok/config.toml", Hooks: "hooks/agentsync.json", Compat: []string{"claude", "cursor"}},
+	{Slug: "grok", Display: "Grok Build", Project: ".grok/skills", Global: ".grok/skills", Env: "GROK_HOME", Agents: "agents", MCP: ".grok/config.toml", Hooks: "hooks/agentsync.json", Self: []string{"commands"}, Compat: []string{"claude", "cursor"}},
 	{Slug: "hermes-agent", Display: "Hermes Agent", Project: ".hermes/skills", Global: ".hermes/skills", Env: "HERMES_HOME"},
 	{Slug: "inference-sh", Display: "inference.sh", Project: ".inferencesh/skills", Global: ".inferencesh/skills"},
 	{Slug: "jazz", Display: "Jazz", Project: ".jazz/skills", Global: ".jazz/skills"},
