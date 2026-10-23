@@ -190,7 +190,7 @@ type cardPlaces struct {
 	hasMCP                                                      bool
 	// userMCP is the settings file outside the snapshot whose servers travel as UserMCPFile.
 	userMCP string
-	hookEvents, hookTools                                       map[string]string
+	dialect dialect
 }
 
 // agentPlaces finds the canon places of the card's AI agent. ok is false when the home is not
@@ -232,7 +232,7 @@ func agentPlaces(root, home, name string) (cardPlaces, bool) {
 	}
 	places.plugins = beside(receiver.Plugins)
 	places.hooks = beside(receiver.Hooks)
-	places.hookEvents, places.hookTools = receiver.HookEvents, receiver.HookTools
+	places.dialect = dialects[receiver.Slug]
 	return places, true
 }
 
@@ -292,13 +292,12 @@ func splitCard(files []File, places cardPlaces, connectable bool) cardSplit {
 		if json.Unmarshal(top["hooks"], &settings.events) != nil || settings.events == nil {
 			return false
 		}
-		events, tools := invert(places.hookEvents), invert(places.hookTools)
 		for name, group := range settings.records() {
 			if marked && !ours[hookRecords][name] {
 				continue
 			}
 			event, _, _ := strings.Cut(name, " ")
-			canonEvent, record, ok := translateHook(event, group, events, tools)
+			canonEvent, record, ok := translateHook(event, group, places.dialect, canonDialect)
 			if !ok {
 				continue
 			}

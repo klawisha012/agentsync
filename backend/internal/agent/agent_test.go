@@ -86,3 +86,11 @@ func TestPushSkipsProductDelivery(t *testing.T) {
 		t.Fatalf("body %s", body)
 	}
 }
+
+func TestEveryHookReceiverHasADialect(t *testing.T) {
+	for _, receiver := range receivers {
+		if _, ok := dialects[receiver.Slug]; receiver.Hooks != "" && !ok {
+			t.Errorf("%s takes hooks but has no dialect", receiver.Slug)
+		}
+	}
+}

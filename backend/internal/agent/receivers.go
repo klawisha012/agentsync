@@ -27,11 +27,9 @@ type Receiver struct {
 	MCP string
 	// Plugins is the settings file with enabled plugins and marketplaces, beside the skills directory.
 	Plugins string
-	// Hooks is the settings file with hooks, beside the skills directory. HookEvents and HookTools
-	// rename Claude Code events and tools; nil keeps the Claude names.
-	Hooks      string
-	HookEvents map[string]string
-	HookTools  map[string]string
+	// Hooks is the settings file with hooks, beside the skills directory. Events and tools are
+	// named by the agent's dialect in the agents vocabulary.
+	Hooks string
 }
 
 // ReceiverView is the public list the site shows when a person picks a receiver.
@@ -157,7 +155,7 @@ var receivers = []Receiver{
 	{Slug: "firebender", Display: "Firebender", Project: ".agents/skills", Global: ".firebender/skills"},
 	{Slug: "forgecode", Display: "ForgeCode", Project: ".forge/skills", Global: ".forge/skills"},
 	{Slug: "fx", Display: "fx", Project: ".fx/skills", Global: ".fx/skills"},
-	{Slug: "gemini-cli", Aliases: []string{"gemini"}, Display: "Gemini CLI", Project: ".agents/skills", Global: ".gemini/skills", Instructions: "GEMINI.md", MCP: ".gemini/settings.json", Hooks: "settings.json", HookEvents: geminiHookEvents, HookTools: geminiHookTools},
+	{Slug: "gemini-cli", Aliases: []string{"gemini"}, Display: "Gemini CLI", Project: ".agents/skills", Global: ".gemini/skills", Instructions: "GEMINI.md", MCP: ".gemini/settings.json", Hooks: "settings.json"},
 	{Slug: "github-copilot", Aliases: []string{"copilot"}, Display: "GitHub Copilot", Project: ".agents/skills", Global: ".copilot/skills"},
 	{Slug: "goose", Display: "Goose", Project: ".goose/skills", Global: "goose/skills", InConfig: true},
 	{Slug: "grok", Display: "Grok Build", Project: ".grok/skills", Global: ".grok/skills", Env: "GROK_HOME"},

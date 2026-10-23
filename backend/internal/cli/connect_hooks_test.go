@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -72,6 +73,34 @@ func TestOnTranslatesCanonHooksForGemini(t *testing.T) {
 	}
 	if hooks["PreToolUse"] != nil || hooks["PermissionRequest"] != nil {
 		t.Fatalf("untranslated events %v", hooks)
+	}
+}
+
+func TestHookMatcherToolsTravelBetweenClaudeAndGemini(t *testing.T) {
+	root := connectRoot(t)
+	writeRel(t, filepath.Join(root, ".agents"), "hooks.json",
+		`{"hooks":{"PostToolUse":[{"matcher":"Edit|MultiEdit|Task","hooks":[{"type":"command","command":"fmt"}]}]}}`)
+	if code, _, stderr := runCLI(t, "gemini", "on"); code != 0 {
+		t.Fatal(stderr)
+	}
+	hooks := settingsHooks(t, filepath.Join(root, ".gemini", "settings.json"))
+	if len(hooks["AfterTool"]) != 1 || hooks["AfterTool"][0]["matcher"] != "replace|Task" {
+		t.Fatalf("gemini hooks %v", hooks)
+	}
+
+	code, stderr := pipeApply(t, `{"author":"zwarder","agent":"gemini","files":[
+		{"path":"settings.json","body":"{\"hooks\":{\"AfterTool\":[{\"matcher\":\"replace|Task\",\"hooks\":[{\"type\":\"command\",\"command\":\"fmt\"}]},{\"matcher\":\"replace|glob\",\"hooks\":[{\"type\":\"command\",\"command\":\"fmt\"}]}]}}"}]}`)
+	if code != 0 {
+		t.Fatalf("apply %d %s", code, stderr)
+	}
+	canon := settingsHooks(t, filepath.Join(root, ".agents", "hooks.json"))
+	var matchers []any
+	for _, group := range canon["PostToolUse"] {
+		matchers = append(matchers, group["matcher"])
+	}
+	// The round trip gives back the same canon record instead of a second one.
+	if !slices.Equal(matchers, []any{"Edit|MultiEdit|Task", "Edit|MultiEdit|Glob"}) {
+		t.Fatalf("canon matchers %v", matchers)
 	}
 }
 

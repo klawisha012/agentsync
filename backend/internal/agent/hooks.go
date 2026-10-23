@@ -13,22 +13,8 @@ import (
 	"strings"
 )
 
-// Gemini CLI names Claude Code hook events and tools its own way. A Claude event missing
-// here has no Gemini counterpart, so its hooks are skipped.
-var (
-	geminiHookEvents = map[string]string{
-		"PreToolUse": "BeforeTool", "PostToolUse": "AfterTool", "UserPromptSubmit": "BeforeAgent",
-		"Stop": "AfterAgent", "SessionStart": "SessionStart", "SessionEnd": "SessionEnd",
-		"PreCompact": "PreCompress", "Notification": "Notification",
-	}
-	geminiHookTools = map[string]string{
-		"Bash": "run_shell_command", "Write": "write_file", "Edit": "replace", "MultiEdit": "replace",
-		"Read": "read_file", "Glob": "glob", "Grep": "search_file_content", "LS": "list_directory",
-		"WebFetch": "web_fetch", "WebSearch": "google_web_search",
-	}
-	// hookPathVar is a path under a variable such as "$CLAUDE_PROJECT_DIR"/: it travels with the hook.
-	hookPathVar = regexp.MustCompile(`\$\{?[A-Za-z_][A-Za-z0-9_]*\}?(?:\\?")?/`)
-)
+// hookPathVar is a path under a variable such as "$CLAUDE_PROJECT_DIR"/: it travels with the hook.
+var hookPathVar = regexp.MustCompile(`\$\{?[A-Za-z_][A-Za-z0-9_]*\}?(?:\\?")?/`)
 
 // hookSettings sees the hooks object of a JSON settings file as records named
 // "<event> <group JSON>": one matcher group under one event.
@@ -244,7 +230,7 @@ func agentHooks(hooks map[string]json.RawMessage, receiver Receiver) (map[string
 	missing := map[string]bool{}
 	for name, group := range hooks {
 		event, _, _ := strings.Cut(name, " ")
-		target, record, ok := translateHook(event, group, receiver.HookEvents, receiver.HookTools)
+		target, record, ok := translateHook(event, group, canonDialect, dialects[receiver.Slug])
 		if !ok {
 			missing[event] = true
 			continue
@@ -254,13 +240,15 @@ func agentHooks(hooks map[string]json.RawMessage, receiver Receiver) (map[string
 	return out, slices.Sorted(maps.Keys(missing))
 }
 
-// translateHook renames the event and the tools in the matcher. Nil maps keep the Claude names.
-func translateHook(event string, group json.RawMessage, events, tools map[string]string) (string, string, bool) {
-	if events == nil {
+// translateHook renames the event and the tools in the matcher from one dialect to another through
+// the agents words. An event without a word in both dialects has no counterpart; an unknown tool stays.
+func translateHook(event string, group json.RawMessage, from, to dialect) (string, string, bool) {
+	if from.slug == to.slug {
 		return event, compactJSON(group), true
 	}
-	target, ok := events[event]
-	if !ok {
+	word, ok := from.eventWord(event)
+	target, known := to.events[word]
+	if !ok || !known {
 		return "", "", false
 	}
 	var fields map[string]json.RawMessage
@@ -268,24 +256,20 @@ func translateHook(event string, group json.RawMessage, events, tools map[string
 	if json.Unmarshal(group, &fields) != nil || json.Unmarshal(fields["matcher"], &matcher) != nil {
 		return target, compactJSON(group), true
 	}
-	parts := strings.Split(matcher, "|")
-	for i, part := range parts {
-		if renamed, ok := tools[strings.TrimSpace(part)]; ok {
-			parts[i] = renamed
+	// A word becomes all its native names, once each, so "Edit|MultiEdit" → "replace" → "Edit|MultiEdit".
+	var parts []string
+	for _, part := range strings.Split(matcher, "|") {
+		names := []string{part}
+		if word, ok := from.toolWord(strings.TrimSpace(part)); ok && len(to.tools[word]) > 0 {
+			names = to.tools[word]
+		}
+		for _, name := range names {
+			if !slices.Contains(parts, name) {
+				parts = append(parts, name)
+			}
 		}
 	}
 	fields["matcher"], _ = json.Marshal(strings.Join(parts, "|"))
 	raw, _ := json.Marshal(fields)
 	return target, string(raw), true
-}
-
-func invert(names map[string]string) map[string]string {
-	if names == nil {
-		return nil
-	}
-	out := make(map[string]string, len(names))
-	for from, to := range names {
-		out[to] = from
-	}
-	return out
 }
