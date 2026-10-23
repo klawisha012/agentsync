@@ -87,6 +87,13 @@ func applyCanon(root, account string, files []File, broken bool) error {
 	if err := pathsFit(files); err != nil {
 		return err
 	}
+	for _, file := range files {
+		if file.Path == "hooks.json" {
+			if _, err := parseCanonHooks([]byte(file.Body)); err != nil {
+				return err
+			}
+		}
+	}
 	canon := canonDir(root)
 	current, err := readTree(canon)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {

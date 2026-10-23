@@ -275,3 +275,20 @@ func TestPushKeepsPortableHooksAndDropsMachineHookFiles(t *testing.T) {
 		t.Fatalf("hook file with a machine path published %s", sent)
 	}
 }
+
+func TestPipeApplyRefusesACanonCardWithOldHooks(t *testing.T) {
+	root := connectRoot(t)
+	writeRel(t, root, ".agents/skills/mine/SKILL.md", "mine")
+	code, stderr := pipeApply(t, `{"author":"zwarder","agent":"agents","files":[
+		{"path":"skills/other/SKILL.md","body":"other"},
+		{"path":"hooks.json","body":"{\"hooks\":{\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"x\"}]}]}}"}]}`)
+	if code == 0 || !strings.Contains(stderr, "старом формате") {
+		t.Fatalf("apply %d %s", code, stderr)
+	}
+	if readFile(t, filepath.Join(root, ".agents", "skills", "mine", "SKILL.md")) != "mine" {
+		t.Fatal("refused apply changed the canon")
+	}
+	if _, err := os.Lstat(filepath.Join(root, ".agents", "hooks.json")); !os.IsNotExist(err) {
+		t.Fatal("old hooks written")
+	}
+}
