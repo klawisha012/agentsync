@@ -47,15 +47,15 @@ agentsync claude on
 
 ### Что получает каждый ИИ-агент
 
-| Вид | Claude Code | Codex | Gemini CLI | Остальные |
-|---|---|---|---|---|
-| Навыки | `~/.claude/skills` | `~/.codex/skills` | `~/.gemini/skills` | свой каталог навыков |
-| Субагенты | `~/.claude/agents` | — | — | — |
-| Команды | `~/.claude/commands` | — | — | — |
-| Файл инструкций | `~/.claude/CLAUDE.md` | `~/.codex/AGENTS.md` | `~/.gemini/GEMINI.md` | — |
-| MCP-серверы | `~/.claude.json` | `~/.codex/config.toml` | `~/.gemini/settings.json` | — |
-| Плагины | `~/.claude/settings.json` | — | — | — |
-| Хуки | `~/.claude/settings.json` | — | `~/.gemini/settings.json`, с переводом событий | — |
+| Вид | Claude Code | Codex | Gemini CLI | Grok Build | Остальные |
+|---|---|---|---|---|---|
+| Навыки | `~/.claude/skills` | `~/.codex/skills` | `~/.gemini/skills` | `~/.grok/skills` | свой каталог навыков |
+| Субагенты | `~/.claude/agents` | — | — | — | — |
+| Команды | `~/.claude/commands` | — | — | — | — |
+| Файл инструкций | `~/.claude/CLAUDE.md` | `~/.codex/AGENTS.md` | `~/.gemini/GEMINI.md` | — | — |
+| MCP-серверы | `~/.claude.json` | `~/.codex/config.toml` | `~/.gemini/settings.json` | `~/.grok/config.toml` | — |
+| Плагины | `~/.claude/settings.json` | — | — | — | — |
+| Хуки | `~/.claude/settings.json` | — | `~/.gemini/settings.json`, с переводом событий | — | — |
 
 `CLAUDE_CONFIG_DIR` и `CODEX_HOME` переносят домашнюю папку Claude Code и Codex; подключение их учитывает. Полный список ИИ-агентов и их каталогов: [Каталог ИИ-агентов](../reference/catalog.md).
 
@@ -106,6 +106,10 @@ agentsync claude off
 ## ИИ-агенты, которые читают `~/.agents` сами
 
 Cline, Warp, Zed, Droid и ещё несколько ИИ-агентов читают навыки прямо из `~/.agents/skills`. Для них `on` навыки не трогает, а `off` отказывает: отключить их нельзя.
+
+## ИИ-агенты не зависят друг от друга
+
+ИИ-агент получает элементы `~/.agents` только своим подключением, а не через файлы другого ИИ-агента. Grok Build по умолчанию читает и навыки, MCP и хуки Claude Code и Cursor (`[compat.claude]`, `[compat.cursor]` в `~/.grok/config.toml`). Тогда один элемент `~/.agents` дошёл бы до Grok дважды. Поэтому `agentsync grok on` выставляет `false` для ключей видов, которые Grok получает из `~/.agents` (`skills`, `mcps`, `hooks`), и запоминает прежние значения. Остальные ключи таблиц остаются. `agentsync grok off` возвращает прежние значения.
 
 ## Публикация и откат `~/.agents`
 

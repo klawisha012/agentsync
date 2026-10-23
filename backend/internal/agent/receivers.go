@@ -32,6 +32,9 @@ type Receiver struct {
 	Hooks string
 	// Self lists the kinds the AI agent reads from agents itself; connect writes nothing for them.
 	Self []string
+	// Compat lists the [compat.<name>] tables of the MCP file through which the AI agent reads
+	// another agent's files; connect turns them off for the kinds agents gives (ADR 0039).
+	Compat []string
 }
 
 // Way is how an AI agent receives one kind of agents elements.
@@ -196,7 +199,7 @@ var receivers = []Receiver{
 	{Slug: "gemini-cli", Aliases: []string{"gemini"}, Display: "Gemini CLI", Project: ".agents/skills", Global: ".gemini/skills", Instructions: "GEMINI.md", MCP: ".gemini/settings.json", Hooks: "settings.json"},
 	{Slug: "github-copilot", Aliases: []string{"copilot"}, Display: "GitHub Copilot", Project: ".agents/skills", Global: ".copilot/skills"},
 	{Slug: "goose", Display: "Goose", Project: ".goose/skills", Global: "goose/skills", InConfig: true},
-	{Slug: "grok", Display: "Grok Build", Project: ".grok/skills", Global: ".grok/skills", Env: "GROK_HOME"},
+	{Slug: "grok", Display: "Grok Build", Project: ".grok/skills", Global: ".grok/skills", Env: "GROK_HOME", MCP: ".grok/config.toml", Compat: []string{"claude", "cursor"}},
 	{Slug: "hermes-agent", Display: "Hermes Agent", Project: ".hermes/skills", Global: ".hermes/skills", Env: "HERMES_HOME"},
 	{Slug: "inference-sh", Display: "inference.sh", Project: ".inferencesh/skills", Global: ".inferencesh/skills"},
 	{Slug: "jazz", Display: "Jazz", Project: ".jazz/skills", Global: ".jazz/skills"},

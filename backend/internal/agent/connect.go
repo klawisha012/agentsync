@@ -159,6 +159,9 @@ func connect(root, account, agentName, snapshot, home string) (ConnectReport, er
 	if err == nil && cat.receiver.MCP != "" {
 		plan.report.Unset, err = connectMCP(root, cat.receiver, servers)
 	}
+	if err == nil && len(cat.receiver.Compat) > 0 {
+		err = connectCompat(root, cat.receiver)
+	}
 	if err == nil && cat.receiver.Plugins != "" {
 		file := filepath.Join(filepath.Dir(cat.dir), filepath.FromSlash(cat.receiver.Plugins))
 		err = writeRecords(pluginRecords, cat.slug, file, recordBodies(plugins), nil)

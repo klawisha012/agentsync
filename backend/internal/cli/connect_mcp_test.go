@@ -198,3 +198,40 @@ func TestCanonApplyNamesAnUnsetVariableOfAReconnectedAgent(t *testing.T) {
 		t.Fatalf("code %d stdout %s stderr %s", code, out.String(), errOut.String())
 	}
 }
+
+func TestOnGivesGrokMCPAndTurnsOffItsCompat(t *testing.T) {
+	root := connectRoot(t)
+	canon := filepath.Join(root, ".agents")
+	writeRel(t, canon, "skills/note/SKILL.md", "note")
+	writeRel(t, canon, "mcp.json", `{"mcpServers":{
+		"github":{"command":"npx","args":["-y","gh"],"env":{"GITHUB_TOKEN":"${GITHUB_TOKEN}"}},
+		"docs":{"type":"http","url":"https://docs.example/mcp","headers":{"Authorization":"Bearer ${DOCS_TOKEN}"}}}}`)
+	config := filepath.Join(root, ".grok", "config.toml")
+	writeRel(t, root, ".grok/config.toml", "# mine\nmodel = \"grok-4\"\n\n[compat.claude]\nrules = false\nskills = true\n\n[mcp_servers.own]\ncommand = \"own\"\n")
+
+	code, stdout, stderr := runCLI(t, "grok", "on")
+	if code != 0 || !strings.Contains(stdout, "MCP-серверы") || strings.Contains(stdout, "Переменные секрета") {
+		t.Fatalf("code %d stdout %s stderr %s", code, stdout, stderr)
+	}
+	body := readFile(t, config)
+	for _, want := range []string{
+		"# mine", "[mcp_servers.own]", "[mcp_servers.github]", `GITHUB_TOKEN = "${GITHUB_TOKEN}"`,
+		`headers = { Authorization = "Bearer ${DOCS_TOKEN}" }`,
+		"[compat.claude]\nrules = false\nskills = false\nmcps = false\n", "[compat.cursor]\nskills = false\nmcps = false\n",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("config misses %q:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "skills = true") || strings.Contains(body, "http_headers") {
+		t.Fatalf("config %s", body)
+	}
+
+	if code, _, stderr := runCLI(t, "grok", "off"); code != 0 {
+		t.Fatal(stderr)
+	}
+	body = readFile(t, config)
+	if strings.Contains(body, "github") || strings.Contains(body, "compat.cursor") || !strings.Contains(body, "[compat.claude]\nrules = false\nskills = true") || !strings.Contains(body, "[mcp_servers.own]") {
+		t.Fatalf("off left %s", body)
+	}
+}

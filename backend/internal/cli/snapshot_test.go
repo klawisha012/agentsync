@@ -105,13 +105,13 @@ func TestPushSendsMCPWithoutMachineServers(t *testing.T) {
 
 func TestApplyKeepsMachineMCPServer(t *testing.T) {
 	root := t.TempDir()
-	writeAgentFile(t, root, ".grok/mcp.json", machineAndSharedMCP)
+	writeAgentFile(t, root, ".vibe/mcp.json", machineAndSharedMCP)
 	t.Setenv("AGENTSYNC_ROOT", root)
 	t.Setenv("AGENTSYNC_ACCOUNT", "zwarder")
 	t.Setenv("AGENTSYNC_STATE", t.TempDir())
 
 	incoming, _ := json.Marshal(map[string]any{
-		"author": "alice", "agent": "grok",
+		"author": "alice", "agent": "mistral-vibe",
 		"files": []map[string]string{{"path": "mcp.json", "body": `{"mcpServers":{"docs":{"command":"npx","args":["docs"]}}}`}},
 	})
 	var out, errOut bytes.Buffer
@@ -121,7 +121,7 @@ func TestApplyKeepsMachineMCPServer(t *testing.T) {
 	var got struct {
 		Servers map[string]json.RawMessage `json:"mcpServers"`
 	}
-	if err := json.Unmarshal([]byte(readFile(t, filepath.Join(root, ".grok", "mcp.json"))), &got); err != nil {
+	if err := json.Unmarshal([]byte(readFile(t, filepath.Join(root, ".vibe", "mcp.json"))), &got); err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := got.Servers["docs"]; !ok {

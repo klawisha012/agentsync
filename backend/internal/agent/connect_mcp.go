@@ -30,7 +30,8 @@ var (
 	pluginRecords = recordKind{ledger: "plugins", key: "enabledPlugins"}
 	marketRecords = recordKind{ledger: "marketplaces", key: "extraKnownMarketplaces"}
 	hookRecords   = recordKind{ledger: "hooks", key: "hooks"}
-	recordKinds   = []recordKind{mcpRecords, pluginRecords, marketRecords, hookRecords}
+	compatRecords = recordKind{ledger: "compat", key: "compat"}
+	recordKinds   = []recordKind{mcpRecords, pluginRecords, marketRecords, hookRecords, compatRecords}
 )
 
 // canonRecordFile is the canon file that holds the records of a kind.
@@ -265,7 +266,11 @@ func readSettings(file, key string) (mcpSettings, error) {
 		return nil, err
 	}
 	if isTOML(file) {
-		return &tomlSettings{lines: splitLines(string(raw))}, nil
+		table := key
+		if key == mcpRecords.key {
+			table = "mcp_servers"
+		}
+		return &tomlSettings{lines: splitLines(string(raw)), table: table}, nil
 	}
 	settings := &jsonSettings{top: map[string]json.RawMessage{}, key: key, servers: map[string]json.RawMessage{}}
 	if len(strings.TrimSpace(string(raw))) == 0 {
@@ -308,6 +313,8 @@ func renderRecord(lookup func(string) (string, bool), slug, file, name string, s
 	if !isTOML(file) {
 		return geminiRecord(slug, server), nil, nil
 	}
+	// Grok expands ${NAME} itself and names the headers table headers.
+	grok := slug == "grok"
 	var canon struct {
 		Command  string            `json:"command"`
 		Args     []string          `json:"args"`
@@ -321,6 +328,9 @@ func renderRecord(lookup func(string) (string, bool), slug, file, name string, s
 	}
 	var missing []string
 	expand := func(value string) string {
+		if grok {
+			return value
+		}
 		return secretVariable.ReplaceAllStringFunc(value, func(match string) string {
 			key := secretVariable.FindStringSubmatch(match)[1]
 			found, ok := lookup(key)
@@ -348,7 +358,9 @@ func renderRecord(lookup func(string) (string, bool), slug, file, name string, s
 	if canon.URL != "" {
 		lines = append(lines, "url = "+tomlString(expand(canon.URL)))
 	}
-	if len(canon.Headers) > 0 {
+	if len(canon.Headers) > 0 && grok {
+		lines = append(lines, "headers = "+tomlTable(canon.Headers, expand))
+	} else if len(canon.Headers) > 0 {
 		lines = append(lines, "http_headers = "+tomlTable(canon.Headers, expand))
 	}
 	if canon.Disabled {
@@ -420,6 +432,8 @@ func (s *jsonSettings) encode() string {
 // shortcut: a server written as dotted keys or an inline table under [mcp_servers] is not seen; parse TOML fully if users write that form.
 type tomlSettings struct {
 	lines []string
+	// table holds the records: [<table>.<name>] and its sub-tables.
+	table string
 }
 
 // blocks returns the line ranges of the tables that belong to a server: its header up to the next header.
@@ -440,7 +454,7 @@ func (s *tomlSettings) blocks(name string) [][2]int {
 			found = append(found, [2]int{start, i})
 			start = -1
 		}
-		if keys := tomlKeys(match[1]); len(keys) >= 2 && keys[0] == "mcp_servers" && keys[1] == name {
+		if keys := tomlKeys(match[1]); len(keys) >= 2 && keys[0] == s.table && keys[1] == name {
 			start = i
 		}
 	}
@@ -580,4 +594,48 @@ func tomlTable(values map[string]string, expand func(string) string) string {
 		parts[i] = tomlKey(key) + " = " + tomlString(expand(values[key]))
 	}
 	return "{ " + strings.Join(parts, ", ") + " }"
+}
+
+// compatKeys maps a kind agents gives to its key in a [compat.<name>] table of Grok.
+var compatKeys = []struct{ kind, key string }{{"skills", "skills"}, {"mcp", "mcps"}, {"hooks", "hooks"}}
+
+// connectCompat turns off the compat keys of the kinds agents gives, so the AI agent does not
+// read them a second time from another agent's files. The other keys of the table stay.
+func connectCompat(root string, receiver Receiver) error {
+	file := receiver.mcpFile(root)
+	settings, err := readSettings(file, compatRecords.key)
+	if err != nil {
+		return err
+	}
+	_, ledger, err := loadLedger(compatRecords, receiver.Slug)
+	if err != nil {
+		return err
+	}
+	var off []string
+	for _, item := range compatKeys {
+		if item.kind == "skills" || receiver.Way(item.kind) != WayNone {
+			off = append(off, item.key)
+		}
+	}
+	records := map[string]string{}
+	for _, name := range receiver.Compat {
+		base, ok := ledger.Replaced[name]
+		if !slices.Contains(ledger.Own, name) {
+			base, ok = settings.get(name)
+		}
+		lines := []string{"[compat." + tomlKey(name) + "]"}
+		if ok {
+			for _, line := range splitLines(base)[1:] {
+				key, _, _ := strings.Cut(line, "=")
+				if !slices.Contains(off, strings.TrimSpace(key)) && strings.TrimSpace(line) != "" {
+					lines = append(lines, line)
+				}
+			}
+		}
+		for _, key := range off {
+			lines = append(lines, key+" = false")
+		}
+		records[name] = strings.Join(lines, "\n") + "\n"
+	}
+	return writeRecords(compatRecords, receiver.Slug, file, records, nil)
 }

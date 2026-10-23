@@ -11,6 +11,7 @@
 | Claude Code | `agents/` | `commands/` | `CLAUDE.md` | `~/.claude.json` | `settings.json` | `settings.json` |
 | Codex | — | — | `AGENTS.md` | `config.toml` | — | — |
 | Gemini CLI | — | — | `GEMINI.md` | `settings.json` | — | `settings.json`, перевод событий |
+| Grok Build | — | — | — | `config.toml` | — | — |
 | Остальные | — | — | — | — | — | — |
 
 Пути — относительно домашней папки ИИ-агента (`~/.claude`, `~/.codex`, `~/.gemini`). «—» значит, что вид пропускается и вывод `on` его называет.

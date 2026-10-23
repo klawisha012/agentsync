@@ -28,9 +28,10 @@ MCP-серверы `~/.agents` описываются один раз в `~/.age
 | Claude Code | `~/.claude.json` (`$CLAUDE_CONFIG_DIR/.claude.json`) | JSON, ключ `mcpServers`, без изменений |
 | Codex | `~/.codex/config.toml` (`$CODEX_HOME/config.toml`) | TOML, таблицы `[mcp_servers.<имя>]` |
 | Gemini CLI | `~/.gemini/settings.json` | JSON, ключ `mcpServers`; HTTP-сервер получает `httpUrl` |
+| Grok Build | `~/.grok/config.toml` (`$GROK_HOME/config.toml`) | TOML, таблицы `[mcp_servers.<имя>]` |
 | Остальные | — | вид «MCP-серверы» пропускается |
 
-Для Codex поля переводятся так: `headers` → `http_headers`, `disabled: true` → `enabled = false`. Остальной текст `config.toml`, в том числе комментарии и другие таблицы, не меняется.
+Для Codex поля переводятся так: `headers` → `http_headers`, `disabled: true` → `enabled = false`. Grok получает `headers` как есть. Остальной текст `config.toml`, в том числе комментарии и другие таблицы, не меняется.
 
 ## Свои и чужие записи
 
@@ -60,7 +61,7 @@ DOCS_TOKEN=…
 
 | ИИ-агент | Как вписывается переменная |
 |---|---|
-| Claude Code, Gemini CLI | `${NAME}` как есть: ИИ-агент раскрывает её сам |
+| Claude Code, Gemini CLI, Grok Build | `${NAME}` как есть: ИИ-агент раскрывает её сам |
 | Codex | значение из окружения или `~/.agents/.env` |
 
 Если у Codex значения нет ни в окружении, ни в `.env`, переменная вписывается как есть, и вывод `on` называет её. Положите значение и повторите `on`.
