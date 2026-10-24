@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -39,7 +40,7 @@ type ownMove struct {
 }
 
 // transferOwn is the transfer into agents (ADR 0039), the first step of a snapshot of an AI agent:
-// its own hooks and MCP servers go into agents in the agents format, and the agent then sees them
+// its own hooks, MCP servers, subagents and commands go into agents in the agents format, and the agent then sees them
 // as records of its connection. A name agents already has stays with the agent. A break puts
 // agents and the agent back. The caller holds the root lock.
 func transferOwn(root, account, agentName string) (TransferReport, error) {
@@ -60,8 +61,12 @@ func transferOwn(root, account, agentName string) (TransferReport, error) {
 	if err != nil {
 		return report, err
 	}
+	docs, err := ownDocs(root, receiver, dir, &report)
+	if err != nil {
+		return report, err
+	}
 	moves := append(hooks, servers...)
-	if len(moves) == 0 {
+	if len(moves)+len(docs) == 0 {
 		return report, nil
 	}
 	snapshot, err := snapshotTree(root, account, canonCard, canonDir(root))
@@ -72,6 +77,11 @@ func transferOwn(root, account, agentName string) (TransferReport, error) {
 	err = keepRecords(&undo, root, receiver.Slug)
 	if err == nil {
 		err = writeMoves(root, moves, &undo)
+	}
+	for _, move := range docs {
+		if err == nil {
+			err = writeDocMove(root, move, &undo)
+		}
 	}
 	if err == nil {
 		_, err = connect(root, account, receiver.Slug, "", "")
@@ -94,7 +104,32 @@ func transferOwn(root, account, agentName string) (TransferReport, error) {
 		slices.Sort(names)
 		report.Moved = append(report.Moved, "MCP-серверы: "+strings.Join(names, ", "))
 	}
+	for _, kind := range []docKind{subagentDoc, commandDoc} {
+		var names []string
+		for _, move := range docs {
+			if move.kind.key == kind.key {
+				names = append(names, strings.TrimSuffix(strings.TrimPrefix(move.rel, kind.key+"/"), ".md"))
+			}
+		}
+		if len(names) > 0 {
+			report.Moved = append(report.Moved, kind.name+": "+strings.Join(names, ", "))
+		}
+	}
 	return report, nil
+}
+
+// writeDocMove puts the file into agents and takes the agent's own file away; connect then gives it back.
+func writeDocMove(root string, move docMove, undo *applyUndo) error {
+	target := filepath.Join(canonDir(root), filepath.FromSlash(move.rel))
+	for _, file := range []string{target, move.file} {
+		if err := undo.keep(file); err != nil {
+			return err
+		}
+	}
+	if err := writeFile(canonDir(root), File{Path: move.rel, Body: move.body}); err != nil {
+		return err
+	}
+	return os.Remove(move.file)
 }
 
 // ownHooks lists the agent's own hook groups in the agents format. Machine hooks stay.

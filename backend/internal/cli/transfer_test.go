@@ -145,3 +145,65 @@ func TestPushWithASecretInAnOwnServerChangesNothing(t *testing.T) {
 		t.Fatal("gemini changed before the secret check")
 	}
 }
+
+func TestPushMovesOwnSubagentsAndCommands(t *testing.T) {
+	root := connectRoot(t)
+	pushServer(t)
+	writeRel(t, root, ".claude/agents/rev.md", "---\nname: rev\ndescription: d\ntools: Read, Grep, NotebookEdit\nmodel: opus\n---\nBody\n")
+	writeRel(t, root, ".claude/commands/ship.md", "---\ndescription: Ship\nallowed-tools: Bash\n---\nShip $ARGUMENTS\n")
+	writeRel(t, root, ".gemini/commands/fix.toml", "description = \"Fix\"\nprompt = \"\"\"\nFix {{args}}\n\"\"\"\n")
+	writeRel(t, root, ".codex/agents/ro.toml", "name = \"ro\"\ndescription = \"r\"\nsandbox_mode = \"read-only\"\nmodel = \"o4\"\ndeveloper_instructions = '''\nLook.\n'''\n")
+	writeRel(t, root, ".copilot/agents/cp.agent.md", "---\nname: cp\ndescription: c\ntools: [execute, read]\n---\nX\n")
+	writeRel(t, root, ".copilot/skills/x/SKILL.md", "x")
+
+	code, stdout, stderr := runCLI(t, "push", "claude")
+	if code != 0 || !strings.Contains(stdout, "субагенты: rev") || !strings.Contains(stdout, "пользовательские команды: ship") {
+		t.Fatalf("code %d stdout %s stderr %s", code, stdout, stderr)
+	}
+	for _, name := range []string{"gemini", "codex", "copilot"} {
+		if code, _, stderr := runCLI(t, "push", name); code != 0 {
+			t.Fatalf("%s: %s", name, stderr)
+		}
+	}
+	canon := filepath.Join(root, ".agents")
+	for file, wants := range map[string][]string{
+		"agents/rev.md":    {"tools: [read, grep]", "claude-code:", "model: opus", "tools: Read, Grep, NotebookEdit"},
+		"commands/ship.md": {"description: Ship", "allowed-tools: Bash", "Ship $ARGUMENTS"},
+		"commands/fix.md":  {"description: Fix", "Fix $ARGUMENTS"},
+		"agents/ro.md":     {"tools: [read, glob, grep, list, web_fetch, web_search]", "codex:", "model: o4", "Look."},
+		"agents/cp.md":     {"tools: [shell, read]"},
+	} {
+		body := readFile(t, filepath.Join(canon, filepath.FromSlash(file)))
+		for _, want := range wants {
+			if !strings.Contains(body, want) {
+				t.Fatalf("%s misses %q:\n%s", file, want, body)
+			}
+		}
+	}
+	// Claude gets its own fields back on top, with its full tool list.
+	if body := readFile(t, filepath.Join(root, ".claude", "agents", "rev.md")); !strings.Contains(body, "model: opus") || !strings.Contains(body, "tools: Read, Grep, NotebookEdit") || strings.Contains(body, "claude-code:") {
+		t.Fatalf("claude subagent after transfer %s", body)
+	}
+	// Gemini, without NotebookEdit, gets only what the vocabulary says.
+	if code, _, stderr := runCLI(t, "gemini", "on"); code != 0 {
+		t.Fatal(stderr)
+	}
+	if body := readFile(t, filepath.Join(root, ".gemini", "agents", "rev.md")); !strings.Contains(body, "tools: [read_file, search_file_content]") || strings.Contains(body, "opus") {
+		t.Fatalf("gemini subagent %s", body)
+	}
+}
+
+func TestPushKeepsAnOwnSubagentWhoseNameAgentsHas(t *testing.T) {
+	root := connectRoot(t)
+	pushServer(t)
+	writeRel(t, root, ".agents/agents/dup.md", "agents")
+	writeRel(t, root, ".grok/agents/dup.md", "grok")
+	writeRel(t, root, ".grok/skills/x/SKILL.md", "x")
+	code, stdout, stderr := runCLI(t, "push", "grok")
+	if code != 0 || !strings.Contains(stdout, "субагент dup (имя занято в\u00a0agents)") {
+		t.Fatalf("code %d stdout %s stderr %s", code, stdout, stderr)
+	}
+	if readFile(t, filepath.Join(root, ".agents", "agents", "dup.md")) != "agents" {
+		t.Fatal("agents lost its subagent")
+	}
+}

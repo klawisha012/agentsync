@@ -19,12 +19,13 @@ import (
 type docKind struct {
 	key  string // the kind in the catalog: "agents" or "commands"
 	name string // the kind in a report
+	one  string // one element of the kind in a report
 	core []string
 }
 
 var (
-	subagentDoc = docKind{key: "agents", name: "субагенты", core: []string{"name", "description", "tools"}}
-	commandDoc  = docKind{key: "commands", name: "пользовательские команды", core: []string{"description", "argument-hint"}}
+	subagentDoc = docKind{key: "agents", name: "субагенты", one: "субагент", core: []string{"name", "description", "tools"}}
+	commandDoc  = docKind{key: "commands", name: "пользовательские команды", one: "пользовательская команда", core: []string{"description", "argument-hint"}}
 	// readOnlyTools are the tool words that never change files or run commands.
 	readOnlyTools = []string{"read", "glob", "grep", "list", "web_fetch", "web_search"}
 	numberedArg   = regexp.MustCompile(`\$[1-9]`)
@@ -194,8 +195,13 @@ func translateDoc(kind docKind, d dialect, base string, doc canonDoc) nativeDoc 
 		}
 		out.dropped = nil
 	default:
-		if doc.tools != nil && len(native) == 0 {
+		// The extension's own tool list, kept by the transfer, replaces the core list for its agent.
+		ownTools := slices.ContainsFunc(ext, func(field docField) bool { return field.key == "tools" })
+		if doc.tools != nil && len(native) == 0 && !ownTools {
 			return nativeDoc{skip: true, dropped: out.dropped}
+		}
+		if ownTools {
+			out.dropped = nil
 		}
 	}
 	if d.agentFile == ".toml" {
