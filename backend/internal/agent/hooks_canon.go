@@ -163,6 +163,8 @@ func canonRecordBody(name string) string {
 // hookSkips collects what an AI agent does not get from the canon hooks.
 type hookSkips struct {
 	events, tools []string
+	// wrapped is true when a hook runs through agentsync hook.
+	wrapped bool
 }
 
 func (s hookSkips) report() []string {
@@ -192,6 +194,7 @@ func agentHooks(file *canonHookFile, receiver Receiver) (map[string]string, map[
 		word, _, _ := strings.Cut(name, " ")
 		event, bodies, dropped, skip := toNative(d, word, group)
 		skips.tools = append(skips.tools, dropped...)
+		skips.wrapped = skips.wrapped || slices.ContainsFunc(bodies, func(body string) bool { return strings.Contains(body, `"agentsync hook `) })
 		switch skip {
 		case "event":
 			skips.events = append(skips.events, word)
@@ -224,7 +227,15 @@ func toNative(d dialect, word string, group json.RawMessage) (string, []string, 
 	if json.Unmarshal(group, &fields) != nil {
 		return "", nil, nil, "event"
 	}
+	// A hook that reads its input in another format runs through the wrapper.
+	var input, wrapTo string
+	_ = json.Unmarshal(fields["input"], &input)
 	delete(fields, "input")
+	if receiver, found := FindReceiver(input); found && receiver.Slug != d.slug {
+		wrapTo = receiver.Slug
+	} else if input == "agents" {
+		wrapTo = "agents"
+	}
 	var dropped []string
 	if raw := fields["matcher"]; raw != nil {
 		var names []string
@@ -256,7 +267,11 @@ func toNative(d dialect, word string, group json.RawMessage) (string, []string, 
 		native = "${" + d.projectDir + "}"
 	}
 	fields["hooks"] = mapHooks(fields["hooks"], func(command string) string {
-		return projectDirVar.ReplaceAllLiteralString(command, native)
+		command = projectDirVar.ReplaceAllLiteralString(command, native)
+		if wrapTo != "" {
+			command = wrapCommand(d.slug, wrapTo, word, command)
+		}
+		return command
 	}, func(seconds float64) float64 { return seconds * float64(d.timeoutScale) })
 	if !d.flat {
 		return event, []string{string(marshalPlain(fields))}, dropped, ""
@@ -331,7 +346,11 @@ func fromNative(d dialect, event string, group json.RawMessage) (string, string)
 		}
 	}
 	nativeDir := regexp.MustCompile(`\$\{` + regexp.QuoteMeta(d.projectDir) + `\}|\$` + regexp.QuoteMeta(d.projectDir) + `\b`)
+	input := d.slug
 	fields["hooks"] = mapHooks(fields["hooks"], func(command string) string {
+		if to, inner, ok := unwrapCommand(command); ok {
+			input, command = to, inner
+		}
 		if d.projectDir == "" {
 			return command
 		}
@@ -343,7 +362,7 @@ func fromNative(d dialect, event string, group json.RawMessage) (string, string)
 		}
 		return seconds
 	})
-	fields["input"] = marshalPlain(d.slug)
+	fields["input"] = marshalPlain(input)
 	body := string(marshalPlain(fields))
 	return hookName(word, json.RawMessage(body)), body
 }

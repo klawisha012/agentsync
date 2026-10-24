@@ -29,6 +29,10 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if args[0] == "help" {
 		return runHelp(args[1:], stdout, stderr)
 	}
+	// hook runs inside an AI agent on every tool call: no update check, no help, only the wrapper.
+	if args[0] == "hook" {
+		return runHook(args[1:], stdin, stdout, stderr)
+	}
 	args = connectArgs(args)
 	item, ok := commandByName(args[0])
 	if !ok {

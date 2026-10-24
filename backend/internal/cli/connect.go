@@ -58,7 +58,27 @@ func runConnect(name string, args []string, stdout io.Writer) error {
 	if len(report.Skipped) > 0 {
 		fmt.Fprintf(stdout, "Пропущены виды, которых ИИ-агент не понимает: %s.\n", strings.Join(report.Skipped, ", "))
 	}
+	for _, line := range report.Warnings {
+		fmt.Fprintln(stdout, line)
+	}
 	return nil
+}
+
+// runHook is agentsync hook --from <ИИ-агент> --to <формат> --event <слово> -- <команда>.
+func runHook(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	flags := map[string]string{}
+	for len(args) >= 2 && args[0] != "--" {
+		flags[args[0]], args = args[1], args[2:]
+	}
+	from, to, event := flags["--from"], flags["--to"], flags["--event"]
+	if len(args) < 2 || args[0] != "--" || from == "" || to == "" || event == "" {
+		fmt.Fprintln(stderr, "Вызов: agentsync hook --from <ИИ-агент> --to <формат> --event <событие> -- <команда>")
+		return 2
+	}
+	if stdin == nil {
+		stdin = strings.NewReader("")
+	}
+	return agent.RunHook(from, to, event, strings.Join(args[1:], " "), stdin, stdout, stderr)
 }
 
 func agentRoot() (string, error) {

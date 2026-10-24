@@ -56,6 +56,8 @@ type ConnectReport struct {
 	Skipped []string
 	// Unset names secret variables written as is: the agent does not expand them and the machine has no value.
 	Unset []string
+	// Warnings are lines the person should read: the connect itself succeeded.
+	Warnings []string
 }
 
 type savedLink struct {
@@ -137,6 +139,9 @@ func connect(root, account, agentName, snapshot, home string) (ConnectReport, er
 			plan.report.Got = append(plan.report.Got, "хуки")
 		}
 		plan.report.Skipped = append(plan.report.Skipped, skips.report()...)
+		if skips.wrapped && agentsyncMissing() {
+			plan.report.Warnings = append(plan.report.Warnings, "Хуки с обёрткой вызывают agentsync, но его нет в PATH: такие хуки не сработают.")
+		}
 	} else if haveHooks {
 		plan.report.Skipped = append(plan.report.Skipped, "хуки")
 	}
