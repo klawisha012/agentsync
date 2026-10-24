@@ -38,25 +38,34 @@ func Install(dir string) error {
 	return os.WriteFile(filepath.Join(base, installedFile), []byte("confirm-machine\n"), 0o644)
 }
 
-func Push(ctx context.Context, server, root, agentName, token, cookie string) error {
+// Push publishes a snapshot of the AI agent or agents. The snapshot first moves the agent's own
+// hooks and MCP servers into agents; the report names them.
+func Push(ctx context.Context, server, root, agentName, token, cookie string) (TransferReport, error) {
 	unlock, err := lockRoot(root)
 	if err != nil {
-		return err
+		return TransferReport{}, err
 	}
 	defer unlock()
 	if err := checkCanon(root, agentName); err != nil {
-		return err
+		return TransferReport{}, err
 	}
 	home := agentHome(root, agentName)
+	if _, err := os.Stat(home); errors.Is(err, os.ErrNotExist) {
+		return TransferReport{}, errors.New("на компьютере нет этого ИИ-агента")
+	}
+	report, err := transferOwn(root, EnvOrHome("AGENTSYNC_ACCOUNT", "account"), agentName)
+	if err != nil {
+		return report, err
+	}
 	files, err := readSnapshot(root, home)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return errors.New("на компьютере нет этого ИИ-агента")
+			return report, errors.New("на компьютере нет этого ИИ-агента")
 		}
-		return err
+		return report, err
 	}
 	_, err = postAgent(ctx, server, "/agent/push", agentName, token, cookie, withMark(root, portableOnly(files), agentName, home), false)
-	return err
+	return report, err
 }
 
 func Apply(ctx context.Context, server, root, author, agentName, account, token, cookie string) error {

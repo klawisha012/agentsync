@@ -121,7 +121,7 @@ func (item spec) execute(args []string, stdout io.Writer) error {
 		}
 		return login(ctx, server, email, stdout)
 	case "push":
-		return agent.Push(
+		report, err := agent.Push(
 			ctx,
 			server,
 			root,
@@ -129,13 +129,17 @@ func (item spec) execute(args []string, stdout io.Writer) error {
 			token,
 			cookie,
 		)
+		for _, line := range report.Lines() {
+			fmt.Fprintln(stdout, line)
+		}
+		return err
 	case "all":
 		if len(args) > 0 {
 			return usageError{text: "Неизвестный аргумент «" + args[0] + "»."}
 		}
 		return pushAll(ctx, server, root, token, cookie, stdout)
 	case "record":
-		raw, err := agent.Record(
+		raw, report, err := agent.Record(
 			ctx,
 			server,
 			root,
@@ -143,6 +147,9 @@ func (item spec) execute(args []string, stdout io.Writer) error {
 			token,
 			cookie,
 		)
+		for _, line := range report.Lines() {
+			fmt.Fprintln(stdout, line)
+		}
 		if err != nil {
 			return err
 		}

@@ -38,7 +38,7 @@ func TestRecordWritesLocalCacheWithoutPrivateFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	raw, err := Record(context.Background(), srv.URL, root, "Grok", "machine", "session=1")
+	raw, _, err := Record(context.Background(), srv.URL, root, "Grok", "machine", "session=1")
 	if err != nil {
 		t.Fatal(err)
 	}

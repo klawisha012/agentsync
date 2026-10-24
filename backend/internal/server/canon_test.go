@@ -44,7 +44,7 @@ func TestCanonCardPushApplyBreakRevert(t *testing.T) {
 	write(src, "skills/note/SKILL.md", "note")
 	write(src, "AGENTS.md", "rules")
 	write(src, ".env", "SECRET=from-author")
-	if err := agent.Push(t.Context(), ts.URL, src, "agents", "", cookie); err != nil {
+	if _, err := agent.Push(t.Context(), ts.URL, src, "agents", "", cookie); err != nil {
 		t.Fatal(err)
 	}
 	page := getJSON(t, e, "/accounts/Canon", nil)

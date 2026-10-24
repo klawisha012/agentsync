@@ -36,7 +36,7 @@ func TestPushReadsDottedHomeWithoutInstall(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := Push(context.Background(), srv.URL, root, "grok", "machine", "")
+	_, err := Push(context.Background(), srv.URL, root, "grok", "machine", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func TestPushSkipsProductDelivery(t *testing.T) {
 		}
 	}
 
-	if err := Push(context.Background(), srv.URL, root, "grok", "machine", ""); err != nil {
+	if _, err := Push(context.Background(), srv.URL, root, "grok", "machine", ""); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(body, "skills/mine.md") || strings.Contains(body, "bundled/") || strings.Contains(body, "marketplace-cache/") || strings.Contains(body, "EXAMPLEKEY99") {

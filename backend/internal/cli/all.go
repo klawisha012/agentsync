@@ -19,7 +19,11 @@ func pushAll(ctx context.Context, server, root, token, cookie string, stdout io.
 	}
 	failed := 0
 	for _, name := range names {
-		if err := agent.Push(ctx, server, root, name, token, cookie); err != nil {
+		report, err := agent.Push(ctx, server, root, name, token, cookie)
+		for _, line := range report.Lines() {
+			fmt.Fprintf(stdout, "%s: %s\n", name, line)
+		}
+		if err != nil {
 			failed++
 			fmt.Fprintf(stdout, "%s: %s\n", name, err.Error())
 			continue

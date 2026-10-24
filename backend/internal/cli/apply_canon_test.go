@@ -189,7 +189,8 @@ func TestPushMarksTheMCPRecordsOnWrote(t *testing.T) {
 	if code, _, stderr := runCLI(t, "push", "gemini"); code != 0 {
 		t.Fatalf("push %s", stderr)
 	}
-	if !hasBody(sent.Files, "agentsync.json", `{"mcp":["docs"],"plugins":[],"marketplaces":[],"hooks":[]}`) {
+	// The push moved the agent's own server into agents first, so it is a record of the connection too.
+	if !hasBody(sent.Files, "agentsync.json", `{"mcp":["docs","own"],"plugins":[],"marketplaces":[],"hooks":[]}`) {
 		t.Fatalf("mark %+v", sent.Files)
 	}
 }

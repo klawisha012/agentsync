@@ -38,17 +38,25 @@ func remember(ctx context.Context, server, root, agentName, token, cookie string
 	return err
 }
 
-func Record(ctx context.Context, server, root, agentName, token, cookie string) ([]byte, error) {
+// Record writes a snapshot of the AI agent or agents into its store. Like Push, it first moves the
+// agent's own hooks and MCP servers into agents.
+func Record(ctx context.Context, server, root, agentName, token, cookie string) ([]byte, TransferReport, error) {
 	var raw []byte
+	var report TransferReport
 	if err := checkCanon(root, agentName); err != nil {
-		return nil, err
+		return nil, report, err
 	}
 	err := withRootLock(root, func() error {
 		var callErr error
+		if _, missing, err := readHome(root, agentName); err != nil || !missing {
+			if report, callErr = transferOwn(root, EnvOrHome("AGENTSYNC_ACCOUNT", "account"), agentName); callErr != nil {
+				return callErr
+			}
+		}
 		raw, callErr = recordFiles(ctx, server, root, agentName, token, cookie)
 		return callErr
 	})
-	return raw, err
+	return raw, report, err
 }
 
 func recordFiles(ctx context.Context, server, root, agentName, token, cookie string) ([]byte, error) {

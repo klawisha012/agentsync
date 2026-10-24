@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 
 	"github.com/klawisha012/agentsync/internal/agent"
 )
@@ -199,7 +200,7 @@ func runTool(ctx context.Context, name string, args toolArgs, env Env) (string, 
 		if args.Agent == "" {
 			return "", errors.New("назовите ИИ-агента")
 		}
-		err := agent.Push(
+		report, err := agent.Push(
 			ctx,
 			env.Server,
 			env.Root,
@@ -207,12 +208,15 @@ func runTool(ctx context.Context, name string, args toolArgs, env Env) (string, 
 			env.Token,
 			env.Cookie,
 		)
-		return done(err)
+		if out, doneErr := done(err); doneErr != nil || len(report.Lines()) == 0 {
+			return out, doneErr
+		}
+		return strings.Join(append(report.Lines(), "готово"), "\n"), nil
 	case "record":
 		if args.Agent == "" {
 			return "", errors.New("назовите ИИ-агента")
 		}
-		raw, err := agent.Record(
+		raw, _, err := agent.Record(
 			ctx,
 			env.Server,
 			env.Root,
