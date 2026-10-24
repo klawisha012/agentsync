@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -107,10 +108,10 @@ func translateInput(from, to, word string, raw []byte) ([]byte, error) {
 	if value, ok := fields[src.input]; ok {
 		if src.inputText {
 			var text string
-			if json.Unmarshal(value, &text) != nil {
+			if json.Unmarshal(value, &text) != nil || text != "" && !json.Valid([]byte(text)) {
 				return nil, errors.New("аргументы инструмента во входе хука не разобраны")
 			}
-			value = json.RawMessage(text)
+			value = json.RawMessage(cmp.Or(text, "{}"))
 		}
 		if dst.inputText {
 			value = marshalPlain(string(value))
@@ -191,6 +192,10 @@ func writeAnswer(format string, answer hookAnswer, stdout, stderr io.Writer) int
 	if !answer.block {
 		_, _ = stdout.Write(answer.stdout)
 		_, _ = stderr.Write(answer.stderr)
+		// Exit 2 blocks everywhere but Copilot; a hook that did not block must not block here.
+		if answer.code == 2 && format != "github-copilot" {
+			return 1
+		}
 		return answer.code
 	}
 	if format == "github-copilot" {

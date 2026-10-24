@@ -166,11 +166,11 @@ func translateDoc(kind docKind, d dialect, base string, doc canonDoc) nativeDoc 
 			return nativeDoc{skip: true}
 		}
 		lines := []string{}
-		if text := doc.text("description"); text != "" {
+		if text := cmp.Or(fieldText(ext, "description"), doc.text("description")); text != "" {
 			lines = append(lines, "description = "+tomlString(text))
 		}
 		lines = append(lines, "prompt = "+tomlText(strings.ReplaceAll(doc.body, "$ARGUMENTS", "{{args}}")))
-		return nativeDoc{name: stem + ".toml", body: strings.Join(append(lines, tomlFields(ext)...), "\n") + "\n"}
+		return nativeDoc{name: stem + ".toml", body: strings.Join(append(lines, tomlFields(ext, "description", "prompt")...), "\n") + "\n"}
 	}
 	var out nativeDoc
 	var native []string
@@ -206,13 +206,14 @@ func translateDoc(kind docKind, d dialect, base string, doc canonDoc) nativeDoc 
 	}
 	if d.agentFile == ".toml" {
 		// Codex needs both fields; a file without them is named after itself.
-		name, description := cmp.Or(doc.text("name"), stem), cmp.Or(doc.text("description"), doc.text("name"), stem)
+		name := cmp.Or(fieldText(ext, "name"), doc.text("name"), stem)
+		description := cmp.Or(fieldText(ext, "description"), doc.text("description"), name)
 		lines := []string{"name = " + tomlString(name), "description = " + tomlString(description)}
 		if readOnly {
 			lines = append(lines, `sandbox_mode = "read-only"`)
 		}
 		lines = append(lines, "developer_instructions = "+tomlText(doc.body))
-		out.name, out.body = stem+".toml", strings.Join(append(lines, tomlFields(ext)...), "\n")+"\n"
+		out.name, out.body = stem+".toml", strings.Join(append(lines, tomlFields(ext, "name", "description", "sandbox_mode", "developer_instructions")...), "\n")+"\n"
 		return out
 	}
 	fields := slices.DeleteFunc(slices.Clone(doc.fields), func(field docField) bool { return field.key == "tools" })
@@ -256,6 +257,16 @@ func markdownDoc(fields, ext []docField, body string) string {
 	return "---\n" + out.String() + "---\n" + body
 }
 
+// fieldText is a scalar of the agent's extension section; it wins over the core, as in Markdown.
+func fieldText(fields []docField, key string) string {
+	for _, field := range fields {
+		if field.key == key && field.value.Kind == yaml.ScalarNode {
+			return field.value.Value
+		}
+	}
+	return ""
+}
+
 // tomlText writes a multi-line literal string when the text allows it, so it reads as written.
 func tomlText(text string) string {
 	if strings.Contains(text, "'''") || strings.HasSuffix(text, "'") {
@@ -265,10 +276,11 @@ func tomlText(text string) string {
 }
 
 // tomlFields writes scalar extension fields as TOML keys; a list or a table stays out.
-func tomlFields(fields []docField) []string {
+func tomlFields(fields []docField, written ...string) []string {
 	var lines []string
 	for _, field := range fields {
-		if field.value.Kind != yaml.ScalarNode {
+		// TOML forbids a key twice; the keys already written stay as they are.
+		if field.value.Kind != yaml.ScalarNode || slices.Contains(written, field.key) {
 			continue
 		}
 		value := tomlString(field.value.Value)

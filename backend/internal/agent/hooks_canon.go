@@ -345,15 +345,18 @@ func fromNative(d dialect, event string, group json.RawMessage) (string, string)
 			fields["matcher"] = marshalPlain(names)
 		}
 	}
-	nativeDir := regexp.MustCompile(`\$\{` + regexp.QuoteMeta(d.projectDir) + `\}|\$` + regexp.QuoteMeta(d.projectDir) + `\b`)
-	input := d.slug
+	// Without a native variable connect wrote ${PWD} for the project folder; it goes back as the agents variable.
+	nativeDir := regexp.MustCompile(`\$\{PWD\}`)
+	if d.projectDir != "" {
+		nativeDir = regexp.MustCompile(`\$\{` + regexp.QuoteMeta(d.projectDir) + `\}|\$` + regexp.QuoteMeta(d.projectDir) + `\b`)
+	}
+	inputs := map[string]bool{}
 	fields["hooks"] = mapHooks(fields["hooks"], func(command string) string {
+		input := d.slug
 		if to, inner, ok := unwrapCommand(command); ok {
 			input, command = to, inner
 		}
-		if d.projectDir == "" {
-			return command
-		}
+		inputs[input] = true
 		return nativeDir.ReplaceAllLiteralString(command, "${"+projectDirWord+"}")
 	}, func(value float64) float64 {
 		seconds := value / float64(d.timeoutScale)
@@ -362,6 +365,14 @@ func fromNative(d dialect, event string, group json.RawMessage) (string, string)
 		}
 		return seconds
 	})
+	// One group has one input format; hooks that read different ones stay in the agent's section.
+	if len(inputs) > 1 {
+		return ext, compactJSON(group)
+	}
+	input := d.slug
+	for format := range inputs {
+		input = format
+	}
 	fields["input"] = marshalPlain(input)
 	body := string(marshalPlain(fields))
 	return hookName(word, json.RawMessage(body)), body

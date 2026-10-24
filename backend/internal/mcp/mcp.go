@@ -216,7 +216,7 @@ func runTool(ctx context.Context, name string, args toolArgs, env Env) (string, 
 		if args.Agent == "" {
 			return "", errors.New("назовите ИИ-агента")
 		}
-		raw, _, err := agent.Record(
+		raw, report, err := agent.Record(
 			ctx,
 			env.Server,
 			env.Root,
@@ -224,7 +224,7 @@ func runTool(ctx context.Context, name string, args toolArgs, env Env) (string, 
 			env.Token,
 			env.Cookie,
 		)
-		return string(raw), err
+		return strings.Join(append(report.Lines(), string(raw)), "\n"), err
 	case "store":
 		if args.Agent == "" {
 			return "", errors.New("назовите ИИ-агента")

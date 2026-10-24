@@ -158,3 +158,15 @@ func TestOnTranslatesCommandsForGeminiAndLeavesThemToGrok(t *testing.T) {
 		t.Fatal("commands written for Grok, which reads agents itself")
 	}
 }
+
+func TestCodexSubagentKeepsOneDescription(t *testing.T) {
+	root := connectRoot(t)
+	writeRel(t, filepath.Join(root, ".agents"), "agents/x.md", "---\nname: x\ndescription: core\ncodex:\n  description: own\n  model: o4\n---\nX\n")
+	if code, _, stderr := runCLI(t, "codex", "on"); code != 0 {
+		t.Fatal(stderr)
+	}
+	body := readFile(t, filepath.Join(root, ".codex", "agents", "x.toml"))
+	if strings.Count(body, "description =") != 1 || !strings.Contains(body, `description = "own"`) || !strings.Contains(body, `model = "o4"`) {
+		t.Fatalf("codex subagent %s", body)
+	}
+}

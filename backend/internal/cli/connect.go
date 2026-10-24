@@ -78,7 +78,16 @@ func runHook(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if stdin == nil {
 		stdin = strings.NewReader("")
 	}
-	return agent.RunHook(from, to, event, strings.Join(args[1:], " "), stdin, stdout, stderr)
+	command := strings.Join(args[1:], " ")
+	// cmd.exe keeps the single quotes the wrapper put around the command and splits it at spaces.
+	if inner, quoted := strings.CutPrefix(command, "'"); quoted && len(inner) > 0 && strings.HasSuffix(inner, "'") {
+		inner = strings.TrimSuffix(inner, "'")
+		// Only the wrapper's own quoting: inside it a quote appears only as '\''.
+		if !strings.Contains(strings.ReplaceAll(inner, `'\''`, ""), "'") {
+			command = strings.ReplaceAll(inner, `'\''`, "'")
+		}
+	}
+	return agent.RunHook(from, to, event, command, stdin, stdout, stderr)
 }
 
 func agentRoot() (string, error) {

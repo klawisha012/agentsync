@@ -309,11 +309,23 @@ func splitCard(files []File, places cardPlaces, connectable bool) cardSplit {
 		if json.Unmarshal(top["hooks"], &settings.events) != nil || settings.events == nil {
 			return false
 		}
+		// A canon group comes back whole only when every record it gave the agent is still here:
+		// a flat agent such as Copilot holds one record per command, and the person may have removed one.
+		expected, present := map[string]int{}, map[string]int{}
+		for _, origin := range origins {
+			expected[origin]++
+		}
+		for name := range settings.records() {
+			if origin, ok := origins[name]; ok {
+				present[origin]++
+			}
+		}
 		for name, group := range settings.records() {
 			if marked && !ours[hookRecords][name] {
 				continue
 			}
 			canonName, ok := origins[name]
+			ok = ok && present[canonName] == expected[canonName]
 			body := canonRecordBody(canonName)
 			if !ok {
 				event, _, _ := strings.Cut(name, " ")

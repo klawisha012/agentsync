@@ -162,7 +162,7 @@ func connect(root, account, agentName, snapshot, home string) (ConnectReport, er
 	}
 	for _, write := range plan.writes {
 		target, linked := linkTarget(write.dest)
-		if _, err := os.Lstat(write.dest); err == nil && !slices.Contains(written.Own, write.dest) && !(linked && within(canon, target)) {
+		if _, err := os.Lstat(write.dest); err == nil && !containsPath(written.Own, write.dest) && !(linked && within(canon, target)) {
 			occupied[catalogKey(write.dest)] = true
 		}
 	}

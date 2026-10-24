@@ -45,7 +45,7 @@ func ownDocs(root string, receiver Receiver, dir string, report *TransferReport)
 		for _, entry := range entries {
 			file := filepath.Join(place, entry.Name())
 			// A link is agents itself; a folder and a written file are not the agent's own files.
-			if entry.Type()&os.ModeSymlink != 0 || entry.IsDir() || slices.Contains(ledger.Own, file) {
+			if entry.Type()&os.ModeSymlink != 0 || entry.IsDir() || containsPath(ledger.Own, file) {
 				continue
 			}
 			stem, ok := docStem(item.kind, d, entry.Name())
@@ -73,6 +73,11 @@ func ownDocs(root string, receiver Receiver, dir string, report *TransferReport)
 		}
 	}
 	return moves, nil
+}
+
+// containsPath compares paths the way the file system does: without letter case on Windows.
+func containsPath(paths []string, path string) bool {
+	return slices.ContainsFunc(paths, func(have string) bool { return catalogKey(have) == catalogKey(path) })
 }
 
 // docStem is the element name of an agent's file, or false for a file that is not one.

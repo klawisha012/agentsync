@@ -48,7 +48,7 @@ func Record(ctx context.Context, server, root, agentName, token, cookie string) 
 	}
 	err := withRootLock(root, func() error {
 		var callErr error
-		if _, missing, err := readHome(root, agentName); err != nil || !missing {
+		if _, err := os.Stat(agentHome(root, agentName)); err == nil {
 			if report, callErr = transferOwn(root, EnvOrHome("AGENTSYNC_ACCOUNT", "account"), agentName); callErr != nil {
 				return callErr
 			}
