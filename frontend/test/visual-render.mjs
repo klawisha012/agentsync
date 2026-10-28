@@ -515,7 +515,7 @@ function assertIcons(root, label) {
 }
 
 function snapshot(host) {
-  const sw = host.querySelector("[aria-label='Режим выделения навыков']");
+  const sw = host.querySelector("[aria-label='Режим выделения элементов']");
   const checks = [...host.querySelectorAll("input.tree-check")].map((el) => {
     return `${el.getAttribute("aria-label")}:${el.checked ? "1" : "0"}${el.indeterminate ? "?" : ""}`;
   }).sort();
@@ -530,7 +530,7 @@ function snapshot(host) {
     `hint=${hints}`,
     `clash=${clash}`,
     `selectAll=${host.textContent.includes("Выделить все")}`,
-    `stageControls=${Boolean(stage?.querySelector("[aria-label='Режим выделения навыков'], input"))}`,
+    `stageControls=${Boolean(stage?.querySelector("[aria-label='Режим выделения элементов'], input"))}`,
     `preview=${stageText.includes("Просмотр")}`,
     `source=${stageText.includes("Исходник")}`,
     `copy=${stageText.includes("Копировать")}`,
@@ -551,7 +551,7 @@ async function runVersionPass() {
   const ready = await waitFor(host, (node) => Boolean(namedButton(node, "loose.yml")) && node.querySelector(".side-head-files .count-pill")?.textContent !== "…");
   check("версия открылась", ready, host.textContent.slice(0, 180));
   assertIcons(host, "версия");
-  const sw = host.querySelector("[aria-label='Режим выделения навыков']");
+  const sw = host.querySelector("[aria-label='Режим выделения элементов']");
   const swStyle = sw ? window.getComputedStyle(sw) : null;
   const thumb = sw?.querySelector(".skill-switch-thumb");
   const thumbStyle = thumb ? window.getComputedStyle(thumb) : null;
@@ -576,8 +576,8 @@ async function runVersionPass() {
   lines.push(snapshot(host));
 
   await userClick(sw);
-  check("режим включён", host.querySelector("[aria-label='Режим выделения навыков']")?.getAttribute("aria-checked") === "true", "не включился");
-  check("команда пустого выбора", flat(host.textContent).includes("Отметьте навыки в списке файлов"), host.querySelector(".skill-pick")?.textContent || "");
+  check("режим включён", host.querySelector("[aria-label='Режим выделения элементов']")?.getAttribute("aria-checked") === "true", "не включился");
+  check("команда пустого выбора", flat(host.textContent).includes("Отметьте элементы в списке файлов"), host.querySelector(".skill-pick")?.textContent || "");
   const pack = folderRow(host, "pack");
   const alpha = folderRow(pack, "alpha");
   const guide = folderRow(host, "guide");
@@ -603,7 +603,7 @@ async function runVersionPass() {
 
   await userClick(rowCheck(pack));
   const folderCode = commandText(host);
-  check("команда только навык папки", folderCode.includes("agentsync") && folderCode.includes("skills") && folderCode.includes("pack/alpha") && !folderCode.includes("loose.yml") && !folderCode.includes("SKILL.md") && !folderCode.includes("sample.txt") && !folderCode.includes("guide"), folderCode);
+  check("команда папки", folderCode.includes("agentsync apply alice grok --version 1") && folderCode.includes("pack/alpha") && folderCode.includes("pack/loose.yml") && !folderCode.includes("SKILL.md") && !folderCode.includes("body.md") && !folderCode.includes("sample.txt") && !folderCode.includes("guide"), folderCode);
   check("папка отмечена целиком", rowCheck(pack)?.checked === true && rowCheck(pack)?.indeterminate === false, `checked=${rowCheck(pack)?.checked}`);
   const checkedStyle = window.getComputedStyle(rowCheck(alpha));
   const markRule = ruleText(".tree-check:checked");
@@ -611,20 +611,20 @@ async function runVersionPass() {
   const fileCheck = namedButton(host, "sample.txt")?.parentElement?.querySelector(":scope > input.tree-check");
   await userClick(fileCheck);
   check("файл отмечен", fileCheck?.checked === true, String(fileCheck?.checked));
-  check("файл не входит в команду", commandText(host) === folderCode && !commandText(host).includes("sample.txt"), commandText(host));
+  check("файл входит в команду", commandText(host).includes("sample.txt") && commandText(host).includes("pack/alpha"), commandText(host));
   await userClick(rowCheck(guide));
   const both = commandText(host);
-  check("два навыка", both.includes("guide") && both.includes("pack/alpha") && !both.includes("sample.txt"), both);
+  check("два навыка и файл", both.includes("guide") && both.includes("pack/alpha") && both.includes("sample.txt"), both);
   await userClick(rowCheck(otherAlpha));
   check("конфликт имён", (host.querySelector(".skill-pick .explanation")?.textContent || "").includes("называются одинаково") && commandText(host) === "", host.querySelector(".skill-pick")?.textContent || "");
   lines.push("clash");
   lines.push(snapshot(host));
 
   const kept = host.querySelector(".skill-pick")?.textContent || "";
-  await userClick(host.querySelector("[aria-label='Режим выделения навыков']"));
+  await userClick(host.querySelector("[aria-label='Режим выделения элементов']"));
   check("выключение прячет флажки", host.querySelectorAll("input.tree-check").length === 0, String(host.querySelectorAll("input.tree-check").length));
   check("выбор сохранён", host.querySelector(".skill-pick")?.textContent === kept && kept.includes("называются одинаково"), host.querySelector(".skill-pick")?.textContent || "");
-  await userClick(host.querySelector("[aria-label='Режим выделения навыков']"));
+  await userClick(host.querySelector("[aria-label='Режим выделения элементов']"));
   check("отметки на месте", rowCheck(guide)?.checked === true && rowCheck(otherAlpha)?.checked === true, snapshot(host));
   lines.push("kept");
   lines.push(snapshot(host));
@@ -635,7 +635,7 @@ async function runVersionPass() {
   });
   const second = await waitFor(host, (node) => node.textContent.includes("v2") && Boolean(namedButton(node, "solo.txt")));
   check("другая версия", second, host.textContent.slice(0, 160));
-  check("без навыков нет переключателя", !host.querySelector("[aria-label='Режим выделения навыков']") && !host.querySelector(".skill-pick") && host.querySelectorAll("input.tree-check").length === 0, snapshot(host));
+  check("без навыков есть переключатель", Boolean(host.querySelector("[aria-label='Режим выделения элементов']")) && !host.querySelector(".skill-pick") && host.querySelectorAll("input.tree-check").length === 0, snapshot(host));
   check("иконка файла без навыков", Boolean(iconSignature(namedButton(host, "solo.txt"))), "нет иконки");
   lines.push("v2");
   lines.push(snapshot(host));
@@ -645,7 +645,7 @@ async function runVersionPass() {
     view.root.render(createElement(mod.VersionPage));
   });
   const back = await waitFor(host, (node) => node.textContent.includes("v1") && Boolean(namedButton(node, "loose.yml")));
-  check("возврат сбрасывает режим", back && host.querySelector("[aria-label='Режим выделения навыков']")?.getAttribute("aria-checked") === "false" && !host.querySelector(".skill-pick") && host.querySelectorAll("input.tree-check").length === 0, snapshot(host));
+  check("возврат сбрасывает режим", back && host.querySelector("[aria-label='Режим выделения элементов']")?.getAttribute("aria-checked") === "false" && !host.querySelector(".skill-pick") && host.querySelectorAll("input.tree-check").length === 0, snapshot(host));
   lines.push("reset");
   lines.push(snapshot(host));
 

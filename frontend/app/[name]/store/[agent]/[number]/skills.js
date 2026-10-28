@@ -7,8 +7,7 @@ export default function SkillCommand({ author, agent, version, skills, picked })
   const [copied, setCopied] = useState(false);
   const [note, setNote] = useState("");
   const clashes = duplicateSkillNames(skills, picked);
-  const chosen = skills.filter((item) => picked.has(item.path));
-  const command = clashes.length > 0 ? "" : skillCommand(author, agent, version, chosen);
+  const command = clashes.length > 0 ? "" : applyCommand(author, agent, version, chosenPaths(skills, picked));
 
   async function copyCommand() {
     try {
@@ -21,10 +20,6 @@ export default function SkillCommand({ author, agent, version, skills, picked })
     }
   }
 
-  if (skills.length === 0) {
-    return <p className="hint skill-empty">{"В\u00A0этой версии нет навыков"}</p>;
-  }
-
   return (
     <div className="skill-pick">
       <div className="skill-command">
@@ -34,7 +29,7 @@ export default function SkillCommand({ author, agent, version, skills, picked })
             <button type="button" onClick={copyCommand}>{copied ? "Скопировано" : "Скопировать"}</button>
           </div>
         ) : clashes.length === 0 ? (
-          <p className="hint">{"Отметьте навыки в\u00A0списке файлов"}</p>
+          <p className="hint">{"Отметьте элементы в\u00A0списке файлов"}</p>
         ) : null}
       </div>
       {clashes.length > 0 ? <p className="explanation">{clashText(clashes)}</p> : null}
@@ -108,17 +103,16 @@ function clashText(paths) {
   return `Навыки ${paths.map((item) => `«${item}»`).join(" и ")} называются одинаково. Оставьте один.`;
 }
 
-function skillCommand(author, source, version, skills) {
-  if (skills.length === 0) {
+// chosenPaths keeps picked skill folders whole and the picked files outside them.
+function chosenPaths(skills, picked) {
+  const folders = skills.filter((item) => picked.has(item.path)).map((item) => item.path);
+  const inside = (path) => folders.some((folder) => path.startsWith(`${folder}/`));
+  return [...picked].filter((path) => folders.includes(path) || !inside(path)).sort();
+}
+
+function applyCommand(author, source, version, paths) {
+  if (paths.length === 0) {
     return "";
   }
-  return shellCommand([
-    "agentsync",
-    "skills",
-    author,
-    source,
-    "--version",
-    String(version),
-    ...skills.map((skill) => skill.label || skill.path),
-  ]);
+  return shellCommand(["agentsync", "apply", author, source, "--version", String(version), ...paths]);
 }

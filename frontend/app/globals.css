@@ -3238,10 +3238,6 @@ input:focus-visible {
   min-width: min(100%, 16rem);
 }
 
-.preview-top .skill-empty {
-  margin: 0 0 0 auto;
-}
-
 .preview-top .skill-command {
   align-items: center;
 }

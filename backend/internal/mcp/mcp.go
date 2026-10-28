@@ -46,13 +46,11 @@ type toolCall struct {
 }
 
 type toolArgs struct {
-	Agent   string   `json:"agent"`
-	Author  string   `json:"author"`
-	Number  any      `json:"number"`
-	Version int      `json:"version"`
-	Skills  []string `json:"skills"`
-	Into    []string `json:"into"`
-	Place   string   `json:"place"`
+	Agent    string   `json:"agent"`
+	Author   string   `json:"author"`
+	Number   any      `json:"number"`
+	Version  int      `json:"version"`
+	Elements []string `json:"elements"`
 }
 
 func Run(ctx context.Context, in io.Reader, out io.Writer, env Env) error {
@@ -129,8 +127,7 @@ func toolList() []map[string]any {
 		tool("record", "Записывает снимок ИИ-агента в\u00a0хранилище.", agentSchema),
 		tool("store", "Читает снимок ИИ-агента из\u00a0хранилища.", objectSchema([]string{"agent"})),
 		tool("revert", "Возвращает последний снимок на\u00a0этой машине.", agentSchema),
-		tool("apply", "Применяет публикацию автора к\u00a0ИИ-агенту.", objectSchema([]string{"author", "agent"})),
-		tool("skills", "Кладёт выбранные навыки публикации в\u00a0каталоги ИИ-агентов.", skillsSchema()),
+		tool("apply", "Применяет публикацию автора к\u00a0ИИ-агенту.", applySchema()),
 	}
 }
 
@@ -142,25 +139,12 @@ func tool(name, description string, schema map[string]any) map[string]any {
 	}
 }
 
-func skillsSchema() map[string]any {
-	return map[string]any{
-		"type": "object",
-		"properties": map[string]any{
-			"author":  map[string]any{"type": "string"},
-			"agent":   map[string]any{"type": "string"},
-			"version": map[string]any{"type": "integer"},
-			"skills": map[string]any{
-				"type":  "array",
-				"items": map[string]any{"type": "string"},
-			},
-			"into": map[string]any{
-				"type":  "array",
-				"items": map[string]any{"type": "string"},
-			},
-			"place": map[string]any{"type": "string", "enum": []string{"global", "project"}},
-		},
-		"required": []string{"author", "agent", "version", "skills", "into", "place"},
-	}
+func applySchema() map[string]any {
+	schema := objectSchema([]string{"author", "agent"})
+	properties := schema["properties"].(map[string]any)
+	properties["version"] = map[string]any{"type": "integer"}
+	properties["elements"] = map[string]any{"type": "array", "items": map[string]any{"type": "string"}}
+	return schema
 }
 
 func objectSchema(required []string) map[string]any {
@@ -245,20 +229,17 @@ func runTool(ctx context.Context, name string, args toolArgs, env Env) (string, 
 		}
 		err := agent.Revert(env.Root, env.Account, args.Agent)
 		return done(err)
-	case "skills":
-		err := agent.CopySkills(ctx, env.Server, env.Root, env.Account, env.Token, env.Cookie, agent.SkillCopy{
-			Author:  args.Author,
-			Source:  args.Agent,
-			Version: args.Version,
-			Skills:  args.Skills,
-			Targets: args.Into,
-			Place:   args.Place,
-		})
-		return done(err)
 	case "apply":
 		missingName := args.Author == "" || args.Agent == ""
 		if missingName {
 			return "", errors.New("назовите автора и ИИ-агента")
+		}
+		if len(args.Elements) > 0 {
+			skipped, err := agent.ApplyElements(ctx, env.Server, env.Root, args.Author, args.Agent, env.Account, env.Token, env.Cookie, args.Version, args.Elements)
+			if out, doneErr := done(err); doneErr != nil || len(skipped) == 0 {
+				return out, doneErr
+			}
+			return "Не элементы agents, пропущены: " + strings.Join(skipped, ", ") + "\nГотово.", nil
 		}
 		err := agent.Apply(
 			ctx,

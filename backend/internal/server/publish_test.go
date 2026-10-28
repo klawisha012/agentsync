@@ -207,7 +207,7 @@ func TestApplyReadsNamedVersion(t *testing.T) {
 	}
 }
 
-func TestSkillInstallWithoutLogin(t *testing.T) {
+func TestElementApplyWithoutLogin(t *testing.T) {
 	e := newServer(t)
 	owner := mustAccount(t, e, "skills@example.com", "secret-pass", "Skills")
 	machine := postJSON(t, e, "/machine", map[string]string{
@@ -239,14 +239,11 @@ func TestSkillInstallWithoutLogin(t *testing.T) {
 	t.Cleanup(ts.Close)
 	root := t.TempDir()
 	t.Setenv("GROK_HOME", "")
-	err := agent.CopySkills(t.Context(), ts.URL, root, "", "", "", agent.SkillCopy{
-		Author: "Skills", Source: "Grok", Version: 1, Place: "global",
-		Skills: []string{"ru-text"}, Targets: []string{"grok"},
-	})
+	_, err := agent.ApplyElements(t.Context(), ts.URL, root, "Skills", "Grok", "", "", "", 1, []string{"skills/ru-text"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	body, err := os.ReadFile(filepath.Join(root, ".grok", "skills", "ru-text", "SKILL.md"))
+	body, err := os.ReadFile(filepath.Join(root, ".agents", "skills", "ru-text", "SKILL.md"))
 	if err != nil || string(body) != "text" {
 		t.Fatalf("installed %q %v", body, err)
 	}

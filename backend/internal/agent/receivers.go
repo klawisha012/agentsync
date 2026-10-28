@@ -138,14 +138,6 @@ func (r Receiver) GlobalDir(root string) (string, bool) {
 	return filepath.Join(root, filepath.FromSlash(r.Global)), true
 }
 
-// ProjectDir is the skills directory for an install into cwd.
-func (r Receiver) ProjectDir(cwd string) (string, bool) {
-	if r.Project == "" {
-		return "", false
-	}
-	return filepath.Join(cwd, filepath.FromSlash(r.Project)), true
-}
-
 func openClawDir(root string) string {
 	for _, name := range []string{".openclaw", ".clawdbot", ".moltbot"} {
 		dir := filepath.Join(root, name)

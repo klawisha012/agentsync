@@ -176,30 +176,24 @@ func (item spec) execute(args []string, stdout io.Writer) error {
 		return nil
 	case "revert":
 		return agent.Revert(root, account, args[0])
-	case "skills":
-		call, err := parseSkillArgs(args)
-		if err != nil {
-			return err
-		}
-		call, err = fillSkillChoice(call)
-		if err != nil {
-			return err
-		}
-		return agent.CopySkills(ctx, server, root, account, token, cookie, agent.SkillCopy{
-			Author:  call.author,
-			Source:  call.source,
-			Version: call.version,
-			Skills:  call.skills,
-			Targets: call.targets,
-			Place:   call.place,
-		})
 	case "apply":
+		call, err := parseApplyArgs(args)
+		if err != nil {
+			return err
+		}
+		if len(call.paths) > 0 {
+			skipped, err := agent.ApplyElements(ctx, server, root, call.author, call.source, account, token, cookie, call.version, call.paths)
+			if len(skipped) > 0 {
+				fmt.Fprintln(stdout, "Не элементы agents, пропущены: "+strings.Join(skipped, ", "))
+			}
+			return err
+		}
 		return agent.Apply(
 			ctx,
 			server,
 			root,
-			args[0],
-			args[1],
+			call.author,
+			call.source,
 			account,
 			token,
 			cookie,

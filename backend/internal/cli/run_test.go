@@ -88,7 +88,7 @@ func TestRunHelp(t *testing.T) {
 		{name: "short help flag", args: []string{"-h"}, code: 0, stdout: "AGENTSYNC_SERVER", stderr: ""},
 		{name: "help command", args: []string{"help"}, code: 0, stdout: "agentsync push", stderr: ""},
 		{name: "command help", args: []string{"help", "apply"}, code: 0, stdout: "agentsync apply <автор> <ии-агент>", stderr: ""},
-		{name: "skills help", args: []string{"help", "skills"}, code: 0, stdout: "agentsync skills <автор> <ии-агент>", stderr: ""},
+		{name: "skills removed", args: []string{"skills", "Author", "Grok"}, code: 2, stdout: "", stderr: "Неизвестная команда «skills»."},
 		{name: "flag after command", args: []string{"push", "--help"}, code: 0, stdout: "agentsync push <ии-агент>", stderr: ""},
 		{name: "unknown command", args: []string{"nope"}, code: 2, stdout: "", stderr: "Неизвестная команда «nope»."},
 		{name: "unknown topic", args: []string{"help", "nope"}, code: 2, stdout: "", stderr: "agentsync help"},

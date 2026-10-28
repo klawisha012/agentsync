@@ -22,7 +22,7 @@ iwr https://zwarder.ru/api/install.ps1 -useb | iex
 agentsync login
 ```
 
-Без входа работают справка, версия, обновление, подключение к `~/.agents` и установка открытых навыков. Публикации и хранилище требуют входа. Подробно: [Вход и машина](./login.md).
+Без входа работают справка, версия, обновление, подключение к `~/.agents` и выборочное применение открытой версии. Публикации и хранилище требуют входа. Подробно: [Вход и машина](./login.md).
 
 ## 3. Соберите общую настройку в `~/.agents`
 
@@ -59,13 +59,13 @@ agentsync apply Author claude
 
 `Author` — имя автора на сайте. Подробно: [Применение](../config/apply.md).
 
-## 7. Возьмите отдельные навыки
+## 7. Возьмите отдельные элементы
 
 ```sh
-agentsync skills Author claude --version 4 --global --into cursor ru-text
+agentsync apply Author claude --version 4 skills/ru-text agents/reviewer.md
 ```
 
-Подробно: [Навыки](../config/skills.md).
+Подробно: [Отдельные элементы](../config/skills.md).
 
 ::: tip Если что-то пошло не так
 `agentsync revert claude` возвращает последний снимок Claude Code. `agentsync revert agents` возвращает последний снимок `~/.agents`.

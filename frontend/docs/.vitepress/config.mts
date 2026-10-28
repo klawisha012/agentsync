@@ -36,7 +36,7 @@ export default defineConfig({
           { text: "agents и подключение", link: "/config/agents" },
           { text: "Локальные снимки", link: "/config/snapshots" },
           { text: "Применение", link: "/config/apply" },
-          { text: "Навыки", link: "/config/skills" },
+          { text: "Отдельные элементы", link: "/config/skills" },
         ],
       },
       {

@@ -136,12 +136,10 @@ export default function VersionPage() {
           <div className="side-head side-head-files">
             <div className="side-head-title">
               <h2>Файлы версии</h2>
-              {skills.length > 0 ? (
-                <label className="skill-toggle" htmlFor="skill-selection-mode">
-                  <span>Выделение</span>
-                  <SelectionSwitch checked={selectionMode} onChange={setSelectionMode} />
-                </label>
-              ) : null}
+              <label className="skill-toggle" htmlFor="skill-selection-mode">
+                <span>Выделение</span>
+                <SelectionSwitch checked={selectionMode} onChange={setSelectionMode} />
+              </label>
             </div>
             <span className="count-pill">{countTokens ? ruTokens(skillTokenTotal(tree)) : "…"}</span>
           </div>
@@ -181,7 +179,7 @@ function SelectionSwitch({ checked, onChange }) {
       role="switch"
       className="skill-switch"
       aria-checked={checked}
-      aria-label="Режим выделения навыков"
+      aria-label="Режим выделения элементов"
       onClick={() => onChange(!checked)}
     >
       <span className="skill-switch-thumb" />

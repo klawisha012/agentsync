@@ -152,6 +152,11 @@ func PrivatePath(path string) bool {
 	if strings.HasSuffix(base, ".lock") || strings.HasSuffix(base, ".log") {
 		return true
 	}
+	// Archives and installers are not AI agent settings: they stay on the machine.
+	switch filepath.Ext(base) {
+	case ".zip", ".rar", ".7z", ".tar", ".gz", ".tgz", ".bz2", ".xz", ".zst", ".exe", ".msi", ".dmg", ".iso":
+		return true
+	}
 	segs := strings.Split(clean, "/")
 	for i, seg := range segs {
 		switch seg {

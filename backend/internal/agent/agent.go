@@ -232,7 +232,7 @@ func fetchPublication(ctx context.Context, server, author, agentName, token, coo
 	return getPublication(ctx, target, token, cookie)
 }
 
-func fetchSkillPublication(ctx context.Context, server, author, agentName, token, cookie string, version int) (publicationPayload, error) {
+func fetchVersion(ctx context.Context, server, author, agentName, token, cookie string, version int) (publicationPayload, error) {
 	target := strings.TrimRight(server, "/") + "/accounts/" + url.PathEscape(author) + "/versions/" + url.PathEscape(agentName) + "/" + strconv.Itoa(version)
 	return getPublication(ctx, target, token, cookie)
 }

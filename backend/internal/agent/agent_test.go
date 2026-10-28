@@ -94,3 +94,15 @@ func TestEveryHookReceiverHasADialect(t *testing.T) {
 		}
 	}
 }
+
+func TestArchivesStayOnMachine(t *testing.T) {
+	kept := portableOnly([]File{
+		{Path: "skills/pdf/SKILL.md", Body: "x"},
+		{Path: "skills/pdf/assets.zip", Body: "x"},
+		{Path: "skills/pdf/Backup.RAR", Body: "x"},
+		{Path: "skills/pdf/setup.exe", Body: "x"},
+	})
+	if len(kept) != 1 || kept[0].Path != "skills/pdf/SKILL.md" {
+		t.Fatalf("kept %v", kept)
+	}
+}

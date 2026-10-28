@@ -99,34 +99,6 @@ func commands() []spec {
 			missing:  "Назовите ИИ-агента.",
 		},
 		{
-			name:    "skills",
-			summary: "Кладёт выбранные навыки публикации в\u00a0каталоги ИИ-агентов",
-			usage:   "agentsync skills <автор> <ии-агент> --version <номер> [--global|--project] [--into <ии-агент>…] <навык>…",
-			about: "Команда берёт названную версию и\u00a0копирует только названные навыки.\n" +
-				"Навык\u00a0— папка с\u00a0SKILL.md. Имя можно дать коротко или путём, например skills/ru-text.\n" +
-				"Навыки пишутся списком в\u00a0конце команды, каждый своим аргументом.\n" +
-				"Флаг --skill тоже принимает один навык и\u00a0может повторяться.\n" +
-				"Без --into и\u00a0без --global или --project команда сначала спрашивает ИИ-агентов, затем видимость: текущий проект или глобально. Стрелки, поиск, пробел, Enter.\n" +
-				"Ровно один из флагов --global и\u00a0--project называет место. --into повторяется для каждого ИИ-агента.\n" +
-				"Папка навыка ложится прямо в\u00a0каталог навыков ИИ-агента. Остальные навыки не меняются.\n" +
-				"Хранилище команда не пополняет. Вход в\u00a0аккаунт не нужен.\n" +
-				"Открытую версию команда копирует без сессии и\u00a0без токена.\n" +
-				"Скрытую версию команда копирует с\u00a0сессией этого аккаунта или с\u00a0токеном его машины.\n" +
-				"Пароль в\u00a0команду не входит.",
-			envs: []envLine{
-				root,
-				server,
-				{name: "AGENTSYNC_TOKEN", text: "Не обязателен. Токен машины владельца открывает его скрытую версию"},
-				{name: "AGENTSYNC_COOKIE", text: "Не обязательна. Сессия владельца открывает его скрытую версию"},
-			},
-			examples: []string{
-				"agentsync skills Author Grok --version 4 ru-text",
-				"agentsync skills Author Grok --version 4 --global --into cursor ru-text",
-			},
-			minArgs: 2,
-			missing: "Назовите автора и\u00a0ИИ-агента.",
-		},
-		{
 			name:    "on",
 			summary: "Подключает ИИ-агента к\u00a0~/.agents: элементы agents видны ему ссылками",
 			usage:   "agentsync <ии-агент> on",
@@ -167,7 +139,7 @@ func commands() []spec {
 		{
 			name:    "apply",
 			summary: "Применяет публикацию к\u00a0ИИ-агенту",
-			usage:   "agentsync apply <автор> <ии-агент>",
+			usage:   "agentsync apply <автор> <ии-агент> [--version <номер> <путь>…]",
 			about: "Элементы agents из\u00a0публикации (навыки, субагенты, команды, файл инструкций, MCP) ложатся в\u00a0~/.agents:\n" +
 				"одноимённые заменяются целиком, остальные остаются. Собственные файлы ИИ-агента ложатся в\u00a0его папку по\u00a0тому же правилу.\n" +
 				"Затем ИИ-агент подключается к\u00a0agents, как после agentsync <ии-агент> on.\n" +
@@ -176,11 +148,20 @@ func commands() []spec {
 				"Откат ИИ-агента: agentsync revert <ии-агент>. Откат agents: agentsync revert agents.\n" +
 				"Учётные данные, машинный MCP и\u00a0машинные хуки остаются на месте.\n" +
 				"Своя публикация требует cookie сессии этого аккаунта. Чужую можно применить без входа на сайт.\n" +
+				"С\u00a0--version и\u00a0путями команда берёт названную версию и\u00a0кладёт в\u00a0~/.agents только названные пути.\n" +
+				"Путь\u00a0— файл или папка версии, как на\u00a0странице версии. Папка с\u00a0SKILL.md ложится в\u00a0~/.agents/skills/<имя>.\n" +
+				"Субагенты, команды, файл инструкций и\u00a0записи MCP, плагинов и\u00a0хуков ложатся на\u00a0свои места в\u00a0agents.\n" +
+				"Одноимённый элемент заменяется целиком, остальные остаются. Файл, который ничего не\u00a0даёт agents, пропускается, вывод его называет.\n" +
+				"Перед заменой agents записывается в\u00a0снимок. Собственные файлы ИИ-агента не\u00a0меняются.\n" +
+				"Открытую версию команда берёт без входа. Скрытую\u00a0— с\u00a0сессией владельца или токеном его машины.\n" +
 				"Пароль в\u00a0команду не входит.",
-			envs:     []envLine{root, server, token, cookie},
-			examples: []string{"agentsync apply Author Grok"},
-			minArgs:  2,
-			missing:  "Назовите автора и\u00a0ИИ-агента.",
+			envs: []envLine{root, server, token, cookie},
+			examples: []string{
+				"agentsync apply Author Grok",
+				"agentsync apply Author claude --version 4 skills/ru-text agents/reviewer.md CLAUDE.md",
+			},
+			minArgs: 2,
+			missing: "Назовите автора и\u00a0ИИ-агента.",
 		},
 		{
 			name:     "version",
@@ -258,7 +239,7 @@ func rootHelp() string {
 		"agentsync all",
 		"agentsync store Grok 2",
 		"agentsync apply Author Grok",
-		"agentsync skills Author Grok --version 4 ru-text",
+		"agentsync apply Author claude --version 4 skills/ru-text",
 		"agentsync version",
 		"agentsync update",
 		"agentsync help apply",
