@@ -99,6 +99,22 @@ func commands() []spec {
 			missing:  "Назовите ИИ-агента.",
 		},
 		{
+			name:    "export",
+			summary: "Переносит переносимую настройку ИИ-агентов в\u00a0~/.agents",
+			usage:   "agentsync export [ии-агент…]",
+			about: "Без аргументов команда обходит найденных на\u00a0машине ИИ-агентов из\u00a0каталога.\n" +
+				"С\u00a0именами берёт только перечисленных ИИ-агентов.\n" +
+				"Навыки, субагенты, пользовательские команды, файл инструкций, MCP-серверы, плагины и\u00a0хуки\n" +
+				"переводятся в\u00a0формат agents и\u00a0кладутся в\u00a0~/.agents. Файлы самих ИИ-агентов остаются на\u00a0месте.\n" +
+				"Машинные MCP и\u00a0машинные хуки остаются у\u00a0ИИ-агента.\n" +
+				"Если имя элемента уже занято в\u00a0~/.agents, элемент в\u00a0~/.agents остаётся, вывод называет пропущенное.\n" +
+				"Перед записью ~/.agents сохраняется в\u00a0снимок: откат\u00a0— agentsync revert agents.\n" +
+				"Чтобы раздать элементы из\u00a0~/.agents ИИ-агенту в\u00a0его формате, запустите agentsync <ии-агент> on.\n" +
+				"Аккаунт и\u00a0сервер не\u00a0нужны.",
+			envs:     []envLine{root, account},
+			examples: []string{"agentsync export", "agentsync export claude codex gemini"},
+		},
+		{
 			name:    "on",
 			summary: "Подключает ИИ-агента к\u00a0~/.agents: элементы agents видны ему ссылками",
 			usage:   "agentsync <ии-агент> on",
@@ -235,6 +251,7 @@ func rootHelp() string {
 	b.WriteString("\nПримеры:\n")
 	b.WriteString(formatExamples([]string{
 		"agentsync login",
+		"agentsync export",
 		"agentsync push Grok",
 		"agentsync all",
 		"agentsync store Grok 2",

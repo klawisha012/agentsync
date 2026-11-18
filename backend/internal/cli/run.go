@@ -96,6 +96,8 @@ func (item spec) execute(args []string, stdout io.Writer) error {
 	switch item.name {
 	case "on", "off":
 		return runConnect(item.name, args, stdout)
+	case "export":
+		return runExport(args, stdout)
 	case "version":
 		if len(args) > 0 {
 			return usageError{text: "Неизвестный аргумент «" + args[0] + "»."}
