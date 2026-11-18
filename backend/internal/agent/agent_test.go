@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-func TestPushReadsDottedHomeWithoutInstall(t *testing.T) {
+func TestPushReadsCanonWithoutPrivateFiles(t *testing.T) {
 	var body string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		raw, err := io.ReadAll(r.Body)
@@ -24,24 +24,25 @@ func TestPushReadsDottedHomeWithoutInstall(t *testing.T) {
 	defer srv.Close()
 
 	root := t.TempDir()
-	home := filepath.Join(root, ".grok", "rules")
+	home := filepath.Join(root, ".agents", "rules")
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(home, "ok.md"), []byte("hello"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	secret := filepath.Join(root, ".grok", "credentials.json")
-	if err := os.WriteFile(secret, []byte("secret-token"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, ".agents", ".env"), []byte("TOKEN=secret-token"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".agents", "credentials.json"), []byte("secret-token"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	_, err := Push(context.Background(), srv.URL, root, "grok", "machine", "")
-	if err != nil {
+	if err := Push(context.Background(), srv.URL, root, "machine", ""); err != nil {
 		t.Fatal(err)
 	}
-	sentRules := strings.Contains(body, "rules/ok.md")
-	sentSecret := strings.Contains(body, "secret-token") || strings.Contains(body, "credentials.json")
+	sentRules := strings.Contains(body, "rules/ok.md") && strings.Contains(body, `"agent":"agents"`)
+	sentSecret := strings.Contains(body, "secret-token") || strings.Contains(body, "credentials.json") || strings.Contains(body, ".env")
 	if !sentRules || sentSecret {
 		t.Fatalf("body %s", body)
 	}
@@ -60,7 +61,7 @@ func TestPushSkipsProductDelivery(t *testing.T) {
 	defer srv.Close()
 
 	root := t.TempDir()
-	home := filepath.Join(root, ".grok")
+	home := filepath.Join(root, ".agents")
 	for _, rel := range []string{
 		filepath.Join("skills", "mine.md"),
 		filepath.Join("bundled", "skills", "pdf", "SKILL.md"),
@@ -70,16 +71,16 @@ func TestPushSkipsProductDelivery(t *testing.T) {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		body := "hello"
+		text := "hello"
 		if strings.Contains(rel, "SKILL.md") {
-			body = "token=EXAMPLEKEY99"
+			text = "token=EXAMPLEKEY99"
 		}
-		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	if _, err := Push(context.Background(), srv.URL, root, "grok", "machine", ""); err != nil {
+	if err := Push(context.Background(), srv.URL, root, "machine", ""); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(body, "skills/mine.md") || strings.Contains(body, "bundled/") || strings.Contains(body, "marketplace-cache/") || strings.Contains(body, "EXAMPLEKEY99") {

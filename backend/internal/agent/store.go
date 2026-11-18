@@ -22,11 +22,11 @@ type storedSnapshot struct {
 	Files   []File `json:"files"`
 }
 
-func remember(ctx context.Context, server, root, agentName, token, cookie string) error {
+func remember(ctx context.Context, server, root, token, cookie string) error {
 	if strings.TrimSpace(token) == "" && strings.TrimSpace(cookie) == "" {
 		return nil
 	}
-	files, missing, err := readHome(root, agentName)
+	files, missing, err := readHome(root, canonCard)
 	if err != nil || missing {
 		return err
 	}
@@ -34,40 +34,33 @@ func remember(ctx context.Context, server, root, agentName, token, cookie string
 	if len(files) == 0 {
 		return nil
 	}
-	_, err = recordFiles(ctx, server, root, agentName, token, cookie)
+	_, err = recordFiles(ctx, server, root, token, cookie)
 	return err
 }
 
-// Record writes a snapshot of the AI agent or agents into its store. Like Push, it first moves the
-// agent's own hooks and MCP servers into agents.
-func Record(ctx context.Context, server, root, agentName, token, cookie string) ([]byte, TransferReport, error) {
-	var raw []byte
-	var report TransferReport
-	if err := checkCanon(root, agentName); err != nil {
-		return nil, report, err
+// Record writes a snapshot of ~/.agents into its store.
+func Record(ctx context.Context, server, root, token, cookie string) ([]byte, error) {
+	if err := checkCanon(root, canonCard); err != nil {
+		return nil, err
 	}
+	var raw []byte
 	err := withRootLock(root, func() error {
 		var callErr error
-		if _, err := os.Stat(agentHome(root, agentName)); err == nil {
-			if report, callErr = transferOwn(root, EnvOrHome("AGENTSYNC_ACCOUNT", "account"), agentName); callErr != nil {
-				return callErr
-			}
-		}
-		raw, callErr = recordFiles(ctx, server, root, agentName, token, cookie)
+		raw, callErr = recordFiles(ctx, server, root, token, cookie)
 		return callErr
 	})
-	return raw, report, err
+	return raw, err
 }
 
-func recordFiles(ctx context.Context, server, root, agentName, token, cookie string) ([]byte, error) {
-	files, missing, err := readHome(root, agentName)
+func recordFiles(ctx context.Context, server, root, token, cookie string) ([]byte, error) {
+	files, missing, err := readHome(root, canonCard)
 	if err != nil {
 		return nil, err
 	}
 	if !missing {
-		files = withMark(root, portableOnly(files), agentName, agentHome(root, agentName))
+		files = portableOnly(files)
 	}
-	raw, err := postAgent(ctx, server, "/agent/record", agentName, token, cookie, files, missing)
+	raw, err := postAgent(ctx, server, "/agent/record", canonCard, token, cookie, files, missing)
 	if err != nil {
 		return nil, err
 	}
@@ -81,13 +74,13 @@ func recordFiles(ctx context.Context, server, root, agentName, token, cookie str
 	return raw, nil
 }
 
-func ReadStore(ctx context.Context, server, root, agentName, number, token, cookie string) ([]byte, error) {
+func ReadStore(ctx context.Context, server, root, number, token, cookie string) ([]byte, error) {
 	unlock, err := lockRoot(root)
 	if err != nil {
 		return nil, err
 	}
 	defer unlock()
-	target := strings.TrimRight(server, "/") + "/agent/store/" + url.PathEscape(agentName)
+	target := strings.TrimRight(server, "/") + "/agent/store/" + url.PathEscape(canonCard)
 	if number != "" {
 		target += "/" + url.PathEscape(number)
 	}

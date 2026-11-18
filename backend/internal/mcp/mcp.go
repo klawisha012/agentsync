@@ -121,13 +121,12 @@ func initialize(raw json.RawMessage) (map[string]any, error) {
 }
 
 func toolList() []map[string]any {
-	agentSchema := objectSchema([]string{"agent"})
 	return []map[string]any{
-		tool("push", "Записывает переносимую настройку ИИ-агента в\u00a0публикацию.", agentSchema),
-		tool("record", "Записывает снимок ИИ-агента в\u00a0хранилище.", agentSchema),
-		tool("store", "Читает снимок ИИ-агента из\u00a0хранилища.", objectSchema([]string{"agent"})),
-		tool("revert", "Возвращает последний снимок на\u00a0этой машине.", agentSchema),
-		tool("apply", "Применяет публикацию автора к\u00a0ИИ-агенту.", applySchema()),
+		tool("push", "Записывает переносимую настройку ~/.agents в\u00a0публикацию.", objectSchema([]string{})),
+		tool("record", "Записывает снимок ~/.agents в\u00a0хранилище.", objectSchema([]string{})),
+		tool("store", "Читает снимок ~/.agents из\u00a0хранилища.", objectSchema([]string{})),
+		tool("revert", "Возвращает последний снимок на\u00a0этой машине.", objectSchema([]string{"agent"})),
+		tool("apply", "Применяет публикацию agents автора к\u00a0~/.agents.", applySchema()),
 	}
 }
 
@@ -140,7 +139,7 @@ func tool(name, description string, schema map[string]any) map[string]any {
 }
 
 func applySchema() map[string]any {
-	schema := objectSchema([]string{"author", "agent"})
+	schema := objectSchema([]string{"author"})
 	properties := schema["properties"].(map[string]any)
 	properties["version"] = map[string]any{"type": "integer"}
 	properties["elements"] = map[string]any{"type": "array", "items": map[string]any{"type": "string"}}
@@ -178,80 +177,53 @@ func callTool(ctx context.Context, raw json.RawMessage, env Env) map[string]any 
 	return toolText(text, false)
 }
 
+func canonOnlyArg(agentArg string) error {
+	v := strings.ToLower(strings.TrimSpace(agentArg))
+	if v == "" || v == "agents" || v == ".agents" {
+		return nil
+	}
+	return errors.New("работает только для agents (~/.agents)")
+}
+
 func runTool(ctx context.Context, name string, args toolArgs, env Env) (string, error) {
 	switch name {
 	case "push":
-		if args.Agent == "" {
-			return "", errors.New("назовите ИИ-агента")
+		if err := canonOnlyArg(args.Agent); err != nil {
+			return "", err
 		}
-		report, err := agent.Push(
-			ctx,
-			env.Server,
-			env.Root,
-			args.Agent,
-			env.Token,
-			env.Cookie,
-		)
-		if out, doneErr := done(err); doneErr != nil || len(report.Lines()) == 0 {
-			return out, doneErr
-		}
-		return strings.Join(append(report.Lines(), "готово"), "\n"), nil
+		return done(agent.Push(ctx, env.Server, env.Root, env.Token, env.Cookie))
 	case "record":
-		if args.Agent == "" {
-			return "", errors.New("назовите ИИ-агента")
+		if err := canonOnlyArg(args.Agent); err != nil {
+			return "", err
 		}
-		raw, report, err := agent.Record(
-			ctx,
-			env.Server,
-			env.Root,
-			args.Agent,
-			env.Token,
-			env.Cookie,
-		)
-		return strings.Join(append(report.Lines(), string(raw)), "\n"), err
+		raw, err := agent.Record(ctx, env.Server, env.Root, env.Token, env.Cookie)
+		return string(raw), err
 	case "store":
-		if args.Agent == "" {
-			return "", errors.New("назовите ИИ-агента")
+		if err := canonOnlyArg(args.Agent); err != nil {
+			return "", err
 		}
-		raw, err := agent.ReadStore(
-			ctx,
-			env.Server,
-			env.Root,
-			args.Agent,
-			numberText(args.Number),
-			env.Token,
-			env.Cookie,
-		)
+		raw, err := agent.ReadStore(ctx, env.Server, env.Root, numberText(args.Number), env.Token, env.Cookie)
 		return string(raw), err
 	case "revert":
 		if args.Agent == "" {
-			return "", errors.New("назовите ИИ-агента")
+			return "", errors.New("назовите ИИ-агента или agents")
 		}
-		err := agent.Revert(env.Root, env.Account, args.Agent)
-		return done(err)
+		return done(agent.Revert(env.Root, env.Account, args.Agent))
 	case "apply":
-		missingName := args.Author == "" || args.Agent == ""
-		if missingName {
-			return "", errors.New("назовите автора и ИИ-агента")
+		if args.Author == "" {
+			return "", errors.New("назовите автора")
+		}
+		if err := canonOnlyArg(args.Agent); err != nil {
+			return "", err
 		}
 		if len(args.Elements) > 0 {
-			skipped, err := agent.ApplyElements(ctx, env.Server, env.Root, args.Author, args.Agent, env.Account, env.Token, env.Cookie, args.Version, args.Elements)
+			skipped, err := agent.ApplyElements(ctx, env.Server, env.Root, args.Author, env.Account, env.Token, env.Cookie, args.Version, args.Elements)
 			if out, doneErr := done(err); doneErr != nil || len(skipped) == 0 {
 				return out, doneErr
 			}
 			return "Не элементы agents, пропущены: " + strings.Join(skipped, ", ") + "\nГотово.", nil
 		}
-		err := agent.Apply(
-			ctx,
-			env.Server,
-			env.Root,
-			args.Author,
-			args.Agent,
-			env.Account,
-			env.Token,
-			env.Cookie,
-		)
-		return done(err)
+		return done(agent.Apply(ctx, env.Server, env.Root, args.Author, env.Account, env.Token, env.Cookie))
 	default:
 		return "", errors.New("неизвестный инструмент")
 	}

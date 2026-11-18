@@ -51,19 +51,19 @@ func TestOneViewAndLike(t *testing.T) {
 		t.Fatal("preview increased the page view")
 	}
 
-	pushed := postAuth(t, e, "/agent/push", "", pushBody("Grok", false, pushFile{"rules/ok.md", "one"}), alice)
+	pushed := postAuth(t, e, "/agent/push", "", pushBody("agents", false, pushFile{"rules/ok.md", "one"}), alice)
 	if pushed.Code != http.StatusCreated {
 		t.Fatalf("push %d %s", pushed.Code, pushed.Body.String())
 	}
-	guest := postJSON(t, e, "/accounts/Alice/agents/Grok/like", map[string]string{}, nil)
+	guest := postJSON(t, e, "/accounts/Alice/agents/agents/like", map[string]string{}, nil)
 	if guest.Code != http.StatusUnauthorized || likesOf(t, getJSON(t, e, "/accounts/Alice", alice)) != 0 {
 		t.Fatalf("guest like %d %s", guest.Code, guest.Body.String())
 	}
-	self := postJSON(t, e, "/accounts/Alice/agents/Grok/like", map[string]string{}, alice)
+	self := postJSON(t, e, "/accounts/Alice/agents/agents/like", map[string]string{}, alice)
 	if self.Code == http.StatusOK || likesOf(t, getJSON(t, e, "/accounts/Alice", alice)) != 0 {
 		t.Fatalf("self like %d %s", self.Code, self.Body.String())
 	}
-	on := postJSON(t, e, "/accounts/Alice/agents/Grok/like", map[string]string{}, bob)
+	on := postJSON(t, e, "/accounts/Alice/agents/agents/like", map[string]string{}, bob)
 	if on.Code != http.StatusOK || !strings.Contains(on.Body.String(), `"likes":1`) {
 		t.Fatalf("like %d %s", on.Code, on.Body.String())
 	}
@@ -74,39 +74,39 @@ func TestOneViewAndLike(t *testing.T) {
 	if !strings.Contains(list.Body.String(), `"name":"Alice"`) || !strings.Contains(list.Body.String(), `"likes":1`) {
 		t.Fatalf("list %s", list.Body.String())
 	}
-	off := postJSON(t, e, "/accounts/Alice/agents/Grok/like", map[string]string{}, bob)
+	off := postJSON(t, e, "/accounts/Alice/like", map[string]string{}, bob)
 	if off.Code != http.StatusOK || likesOf(t, getJSON(t, e, "/accounts/Alice", alice)) != 0 {
 		t.Fatalf("unlike %d %s", off.Code, off.Body.String())
 	}
 }
 
-func TestPublicationLikesSum(t *testing.T) {
+func TestPublicationLikesCanonOnly(t *testing.T) {
 	e := newServer(t)
 	alice := mustAccount(t, e, "alice@example.com", "secret-pass", "Alice")
 	bob := mustAccount(t, e, "bob@example.com", "secret-pass", "Bob")
-	for _, agent := range []string{"Grok", "Claude"} {
-		pushed := postAuth(t, e, "/agent/push", "", pushBody(agent, false, pushFile{"rules/ok.md", "one"}), alice)
-		if pushed.Code != http.StatusCreated {
-			t.Fatalf("push %s %d %s", agent, pushed.Code, pushed.Body.String())
-		}
-	}
 	hidden := postJSON(t, e, "/accounts/Alice/agents/Agents/like", map[string]string{}, bob)
 	if hidden.Code != http.StatusNotFound {
 		t.Fatalf("unpublished %d %s", hidden.Code, hidden.Body.String())
 	}
-	for _, agent := range []string{"Grok", "Claude"} {
-		liked := postJSON(t, e, "/accounts/Alice/agents/"+agent+"/like", map[string]string{}, bob)
-		if liked.Code != http.StatusOK || !strings.Contains(liked.Body.String(), `"likes":1`) || !strings.Contains(liked.Body.String(), `"total":`) {
-			t.Fatalf("like %s %d %s", agent, liked.Code, liked.Body.String())
-		}
+	pushed := postAuth(t, e, "/agent/push", "", pushBody("agents", false, pushFile{"rules/ok.md", "one"}), alice)
+	if pushed.Code != http.StatusCreated {
+		t.Fatalf("push %d %s", pushed.Code, pushed.Body.String())
+	}
+	foreign := postJSON(t, e, "/accounts/Alice/agents/Grok/like", map[string]string{}, bob)
+	if foreign.Code != http.StatusNotFound {
+		t.Fatalf("non-canon like %d %s", foreign.Code, foreign.Body.String())
+	}
+	liked := postJSON(t, e, "/accounts/Alice/agents/Agents/like", map[string]string{}, bob)
+	if liked.Code != http.StatusOK || !strings.Contains(liked.Body.String(), `"likes":1`) || !strings.Contains(liked.Body.String(), `"total":1`) {
+		t.Fatalf("like %d %s", liked.Code, liked.Body.String())
 	}
 	page := getJSON(t, e, "/accounts/Alice", bob)
-	if likesOf(t, page) != 2 || agentLikesOf(t, page.Body.Bytes(), "Grok") != 1 || agentLikesOf(t, page.Body.Bytes(), "Claude") != 1 {
-		t.Fatalf("sum %s", page.Body.String())
+	if likesOf(t, page) != 1 || agentLikesOf(t, page.Body.Bytes(), "agents") != 1 {
+		t.Fatalf("likes %s", page.Body.String())
 	}
 	list := getJSON(t, e, "/accounts", nil)
-	if !strings.Contains(list.Body.String(), `"name":"Alice"`) || !strings.Contains(list.Body.String(), `"likes":2`) {
-		t.Fatalf("list sum %s", list.Body.String())
+	if !strings.Contains(list.Body.String(), `"name":"Alice"`) || !strings.Contains(list.Body.String(), `"likes":1`) {
+		t.Fatalf("list likes %s", list.Body.String())
 	}
 }
 

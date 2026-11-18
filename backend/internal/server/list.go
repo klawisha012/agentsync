@@ -43,25 +43,19 @@ func sameAgent(a, b string) bool {
 }
 
 func (a account) agentSlots() []agentSlot {
-	latest := map[string]*publication{}
+	var latest *publication
 	for _, pub := range a.publications {
-		if pub.withdrawn {
+		if pub.withdrawn || !isCanonAgentName(pub.agent) {
 			continue
 		}
-		key := foldKey.String(pub.agent)
-		prev := latest[key]
-		if prev == nil || pub.version > prev.version {
-			latest[key] = pub
+		if latest == nil || pub.version > latest.version {
+			latest = pub
 		}
 	}
-	slots := make([]agentSlot, 0, len(latest))
-	for _, pub := range latest {
-		slots = append(slots, slotFor(pub.agent, pub))
+	if latest == nil {
+		return []agentSlot{}
 	}
-	slices.SortFunc(slots, func(a, b agentSlot) int {
-		return strings.Compare(foldKey.String(a.Name), foldKey.String(b.Name))
-	})
-	return slots
+	return []agentSlot{slotFor(canonAgent, latest)}
 }
 
 func (a account) withLikes(slots []agentSlot, viewer *account) []agentSlot {

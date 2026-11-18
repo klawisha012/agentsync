@@ -30,7 +30,7 @@ func TestPushKeepsPortableFiles(t *testing.T) {
 	}
 	token := decodeMachine(t, machine.Body.Bytes()).AgentToken
 
-	early := postAuth(t, e, "/agent/push", token, pushBody("Grok", false, pushFile{"rules/ok.md", "early"}), author)
+	early := postAuth(t, e, "/agent/push", token, pushBody("agents", false, pushFile{"rules/ok.md", "early"}), author)
 	if early.Code != http.StatusCreated || !strings.Contains(early.Body.String(), `"version":1`) {
 		t.Fatalf("upload before mail %d %s", early.Code, early.Body.String())
 	}
@@ -45,17 +45,17 @@ func TestPushKeepsPortableFiles(t *testing.T) {
 		"id": testMachineID("pc-other"), "host": "lap", "listener": "127.0.0.1:49152",
 	}, other)
 	otherToken := decodeMachine(t, otherMachine.Body.Bytes()).AgentToken
-	mismatch := postAuth(t, e, "/agent/push", otherToken, pushBody("Grok", false, pushFile{"rules/ok.md", "hello"}), author)
+	mismatch := postAuth(t, e, "/agent/push", otherToken, pushBody("agents", false, pushFile{"rules/ok.md", "hello"}), author)
 	if mismatch.Code != http.StatusCreated || !strings.Contains(mismatch.Body.String(), `"version":2`) {
 		t.Fatalf("session ignores the machine token %d %s", mismatch.Code, mismatch.Body.String())
 	}
 
-	versions := getJSON(t, e, "/accounts/Author/versions/grok", author)
+	versions := getJSON(t, e, "/accounts/Author/versions/agents", author)
 	if versions.Code != http.StatusOK || !strings.Contains(versions.Body.String(), `"version":1`) || !strings.Contains(versions.Body.String(), `"version":2`) || !strings.Contains(versions.Body.String(), `"current":true`) {
 		t.Fatalf("versions %d %s", versions.Code, versions.Body.String())
 	}
-	openedV1 := getJSON(t, e, "/accounts/Author/versions/Grok/1", author)
-	openedV2 := getJSON(t, e, "/accounts/Author/versions/Grok/2", author)
+	openedV1 := getJSON(t, e, "/accounts/Author/versions/Agents/1", author)
+	openedV2 := getJSON(t, e, "/accounts/Author/versions/agents/2", author)
 	if openedV1.Code != http.StatusOK || !strings.Contains(openedV1.Body.String(), "early") || strings.Contains(openedV1.Body.String(), "hello") {
 		t.Fatalf("version 1 %d %s", openedV1.Code, openedV1.Body.String())
 	}
@@ -63,36 +63,36 @@ func TestPushKeepsPortableFiles(t *testing.T) {
 		t.Fatalf("version 2 %d %s", openedV2.Code, openedV2.Body.String())
 	}
 
-	missing := postAuth(t, e, "/agent/push", token, map[string]any{"agent": "Grok", "missing": true}, author)
+	missing := postAuth(t, e, "/agent/push", token, map[string]any{"agent": "agents", "missing": true}, author)
 	if missing.Code == http.StatusCreated || !strings.Contains(missing.Body.String(), "компьютере") {
 		t.Fatalf("missing %d %s", missing.Code, missing.Body.String())
 	}
-	empty := postAuth(t, e, "/agent/push", token, pushBody("Grok", false, pushFile{"credentials.json", `{"token":"abc"}`}), author)
+	empty := postAuth(t, e, "/agent/push", token, pushBody("agents", false, pushFile{"credentials.json", `{"token":"abc"}`}), author)
 	if empty.Code == http.StatusCreated || !strings.Contains(empty.Body.String(), "переносим") {
 		t.Fatalf("empty %d %s", empty.Code, empty.Body.String())
 	}
 
-	bare := postAuth(t, e, "/agent/push", "", pushBody("Grok", false, pushFile{"rules/ok.md", "bare"}), author)
+	bare := postAuth(t, e, "/agent/push", "", pushBody("", false, pushFile{"rules/ok.md", "bare"}), author)
 	if bare.Code != http.StatusCreated || !strings.Contains(bare.Body.String(), `"version":3`) {
 		t.Fatalf("push with the account session %d %s", bare.Code, bare.Body.String())
 	}
 	secret := "sk-live-SUPERSECRETVALUE"
-	leaked := postAuth(t, e, "/agent/push", token, pushBody("Grok", false, pushFile{"rules/key.md", "token=" + secret}), author)
+	leaked := postAuth(t, e, "/agent/push", token, pushBody("agents", false, pushFile{"rules/key.md", "token=" + secret}), author)
 	if leaked.Code == http.StatusCreated || !strings.Contains(leaked.Body.String(), "rules/key.md") || strings.Contains(leaked.Body.String(), secret) {
 		t.Fatalf("secret %d %s", leaked.Code, leaked.Body.String())
 	}
 	jsonSecret := "JSONSECRETVALUE99"
-	leakedJSON := postAuth(t, e, "/agent/push", token, pushBody("Grok", false, pushFile{"rules/key.json", `{"token":"` + jsonSecret + `"}`}), author)
+	leakedJSON := postAuth(t, e, "/agent/push", token, pushBody("agents", false, pushFile{"rules/key.json", `{"token":"` + jsonSecret + `"}`}), author)
 	if leakedJSON.Code == http.StatusCreated || !strings.Contains(leakedJSON.Body.String(), "rules/key.json") || strings.Contains(leakedJSON.Body.String(), jsonSecret) {
 		t.Fatalf("json secret %d %s", leakedJSON.Code, leakedJSON.Body.String())
 	}
 
-	envToken := postAuth(t, e, "/agent/push", token, pushBody("Grok", false, pushFile{"mcp/env.json", `{"env":{"GITHUB_TOKEN":"ghp_abcdefghijklmnopqrst"}}`}), author)
+	envToken := postAuth(t, e, "/agent/push", token, pushBody("agents", false, pushFile{"mcp/env.json", `{"env":{"GITHUB_TOKEN":"ghp_abcdefghijklmnopqrst"}}`}), author)
 	if envToken.Code == http.StatusCreated || !strings.Contains(envToken.Body.String(), "mcp/env.json") || strings.Contains(envToken.Body.String(), "ghp_abcdefghijklmnopqrst") {
 		t.Fatalf("mcp secret %d %s", envToken.Code, envToken.Body.String())
 	}
 
-	first := postAuth(t, e, "/agent/push", token, pushBody("Grok", false,
+	first := postAuth(t, e, "/agent/push", token, pushBody("agents", false,
 		pushFile{"rules/ok.md", "hello"},
 		pushFile{"credentials.json", `{"token":"abc"}`},
 		pushFile{"hooks/machine.json", "bash /Users/alex/run.sh"},
@@ -120,7 +120,7 @@ func TestPushKeepsPortableFiles(t *testing.T) {
 	}
 	firstID := publicationID(t, first.Body.Bytes())
 
-	second := postAuth(t, e, "/agent/push", token, pushBody("Grok", false, pushFile{"rules/next.md", "again"}), author)
+	second := postAuth(t, e, "/agent/push", token, pushBody("agents", false, pushFile{"rules/next.md", "again"}), author)
 	if second.Code != http.StatusCreated || !strings.Contains(second.Body.String(), `"version":5`) {
 		t.Fatalf("second %d %s", second.Code, second.Body.String())
 	}
@@ -139,7 +139,7 @@ type pushFile struct {
 	Body string `json:"body"`
 }
 
-func TestPublishedNameStaysAsWritten(t *testing.T) {
+func TestPushAcceptsOnlyCanonAgents(t *testing.T) {
 	e := newServer(t)
 	created := postJSON(t, e, "/accounts", map[string]string{
 		"email": "fold@example.com", "password": "secret-pass", "name": "Folder",
@@ -148,7 +148,11 @@ func TestPublishedNameStaysAsWritten(t *testing.T) {
 		t.Fatalf("create %d %s", created.Code, created.Body.String())
 	}
 	author := readSessionCookie(t, created)
-	pushed := postAuth(t, e, "/agent/push", "", pushBody("grok", false, pushFile{"skills/mine.md", "hello"}), author)
+	rejected := postAuth(t, e, "/agent/push", "", pushBody("Grok", false, pushFile{"skills/mine.md", "hello"}), author)
+	if rejected.Code != http.StatusBadRequest || !strings.Contains(rejected.Body.String(), "agents") {
+		t.Fatalf("non-canon push %d %s", rejected.Code, rejected.Body.String())
+	}
+	pushed := postAuth(t, e, "/agent/push", "", pushBody(".agents", false, pushFile{"skills/mine.md", "hello"}), author)
 	if pushed.Code != http.StatusCreated {
 		t.Fatalf("push %d %s", pushed.Code, pushed.Body.String())
 	}
@@ -166,7 +170,7 @@ func TestPublishedNameStaysAsWritten(t *testing.T) {
 	if err := json.Unmarshal(page.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if len(body.Agents) != 1 || body.Agents[0].Name != "grok" || body.Agents[0].Version == nil || *body.Agents[0].Version != 1 || body.Agents[0].Files != 1 {
+	if len(body.Agents) != 1 || body.Agents[0].Name != "agents" || body.Agents[0].Version == nil || *body.Agents[0].Version != 1 || body.Agents[0].Files != 1 {
 		t.Fatalf("agents %+v", body.Agents)
 	}
 }
@@ -180,28 +184,28 @@ func TestApplyReadsNamedVersion(t *testing.T) {
 		t.Fatalf("create %d %s", created.Code, created.Body.String())
 	}
 	author := readSessionCookie(t, created)
-	first := postAuth(t, e, "/agent/push", "", pushBody("Grok", false, pushFile{"rules/one.md", "one"}), author)
+	first := postAuth(t, e, "/agent/push", "", pushBody("agents", false, pushFile{"rules/one.md", "one"}), author)
 	if first.Code != http.StatusCreated {
 		t.Fatalf("first %d %s", first.Code, first.Body.String())
 	}
-	second := postAuth(t, e, "/agent/push", "", pushBody("Grok", false, pushFile{"rules/two.md", "two"}), author)
+	second := postAuth(t, e, "/agent/push", "", pushBody("agents", false, pushFile{"rules/two.md", "two"}), author)
 	if second.Code != http.StatusCreated {
 		t.Fatalf("second %d %s", second.Code, second.Body.String())
 	}
 
-	old := getJSON(t, e, "/api/apply/Versions/Grok?version=1", author)
+	old := getJSON(t, e, "/api/apply/Versions/agents?version=1", author)
 	if old.Code != http.StatusOK || !strings.Contains(old.Body.String(), "one") || strings.Contains(old.Body.String(), "two") {
 		t.Fatalf("version 1 %d %s", old.Code, old.Body.String())
 	}
-	latest := getJSON(t, e, "/api/apply/Versions/Grok", author)
+	latest := getJSON(t, e, "/api/apply/Versions", author)
 	if latest.Code != http.StatusOK || !strings.Contains(latest.Body.String(), "two") || strings.Contains(latest.Body.String(), "one") {
 		t.Fatalf("latest %d %s", latest.Code, latest.Body.String())
 	}
-	missing := getJSON(t, e, "/api/apply/Versions/Grok?version=9", author)
+	missing := getJSON(t, e, "/api/apply/Versions?version=9", author)
 	if missing.Code != http.StatusNotFound || !strings.Contains(missing.Body.String(), "Версия не найдена") {
 		t.Fatalf("missing %d %s", missing.Code, missing.Body.String())
 	}
-	bad := getJSON(t, e, "/api/apply/Versions/Grok?version=0", author)
+	bad := getJSON(t, e, "/api/apply/Versions?version=0", author)
 	if bad.Code != http.StatusNotFound {
 		t.Fatalf("bad version %d %s", bad.Code, bad.Body.String())
 	}
@@ -217,16 +221,16 @@ func TestElementApplyWithoutLogin(t *testing.T) {
 		t.Fatalf("machine %d %s", machine.Code, machine.Body.String())
 	}
 	token := decodeMachine(t, machine.Body.Bytes()).AgentToken
-	pushed := postAuth(t, e, "/agent/push", "", pushBody("Grok", false, pushFile{"skills/ru-text/SKILL.md", "text"}), owner)
+	pushed := postAuth(t, e, "/agent/push", "", pushBody("agents", false, pushFile{"skills/ru-text/SKILL.md", "text"}), owner)
 	if pushed.Code != http.StatusCreated {
 		t.Fatalf("push %d %s", pushed.Code, pushed.Body.String())
 	}
 
-	hidden := getJSON(t, e, "/accounts/Skills/versions/Grok/1", nil)
+	hidden := getJSON(t, e, "/accounts/Skills/versions/agents/1", nil)
 	if hidden.Code != http.StatusNotFound || !strings.Contains(hidden.Body.String(), "скрыта") {
 		t.Fatalf("hidden %d %s", hidden.Code, hidden.Body.String())
 	}
-	owned := getBearer(t, e, "/accounts/Skills/versions/Grok/1", token)
+	owned := getBearer(t, e, "/accounts/Skills/versions/agents/1", token)
 	if owned.Code != http.StatusOK || !strings.Contains(owned.Body.String(), "text") {
 		t.Fatalf("owner token %d %s", owned.Code, owned.Body.String())
 	}
@@ -239,7 +243,7 @@ func TestElementApplyWithoutLogin(t *testing.T) {
 	t.Cleanup(ts.Close)
 	root := t.TempDir()
 	t.Setenv("GROK_HOME", "")
-	_, err := agent.ApplyElements(t.Context(), ts.URL, root, "Skills", "Grok", "", "", "", 1, []string{"skills/ru-text"})
+	_, err := agent.ApplyElements(t.Context(), ts.URL, root, "Skills", "", "", "", 1, []string{"skills/ru-text"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -300,7 +304,7 @@ func TestPushDropsOnlyMachineMCPServers(t *testing.T) {
 		`"local":{"command":"node","args":["/Users/alex/mcp.js"]},` +
 		`"github":{"command":"npx","env":{"GITHUB_TOKEN":"${GITHUB_TOKEN}"}},` +
 		`"linear":{"type":"http","url":"https://mcp.linear.app/mcp","headers":{"Authorization":"Bearer ${LINEAR_KEY}"}}}}`
-	pushed := postAuth(t, e, "/agent/push", "", pushBody("Grok", false, pushFile{"mcp.json", mcp}), author)
+	pushed := postAuth(t, e, "/agent/push", "", pushBody("agents", false, pushFile{"mcp.json", mcp}), author)
 	if pushed.Code != http.StatusCreated {
 		t.Fatalf("push %d %s", pushed.Code, pushed.Body.String())
 	}
@@ -315,12 +319,12 @@ func TestPushDropsOnlyMachineMCPServers(t *testing.T) {
 	}
 
 	bearer := "Bearer lin_api_REALVALUE123"
-	leaked := postAuth(t, e, "/agent/push", "", pushBody("Grok", false, pushFile{"mcp.json",
+	leaked := postAuth(t, e, "/agent/push", "", pushBody("agents", false, pushFile{"mcp.json",
 		`{"mcpServers":{"linear":{"url":"https://mcp.linear.app/mcp","headers":{"Authorization":"` + bearer + `"}}}}`}), author)
 	if leaked.Code == http.StatusCreated || !strings.Contains(leaked.Body.String(), "mcp.json") || strings.Contains(leaked.Body.String(), "lin_api_REALVALUE123") {
 		t.Fatalf("bearer %d %s", leaked.Code, leaked.Body.String())
 	}
-	basic := postAuth(t, e, "/agent/push", "", pushBody("Grok", false, pushFile{"mcp.json",
+	basic := postAuth(t, e, "/agent/push", "", pushBody("agents", false, pushFile{"mcp.json",
 		`{"mcpServers":{"api":{"url":"https://api.example.com/mcp","headers":{"Authorization":"Basic dXNlcjpwYXNzd29yZA=="}}}}`}), author)
 	if basic.Code == http.StatusCreated || strings.Contains(basic.Body.String(), "dXNlcjpwYXNzd29yZA") {
 		t.Fatalf("basic %d %s", basic.Code, basic.Body.String())

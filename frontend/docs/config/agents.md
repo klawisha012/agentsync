@@ -113,9 +113,9 @@ Cline, Warp, Zed, Droid и ещё несколько ИИ-агентов чит�
 ## Публикация и откат `~/.agents`
 
 ```sh
-agentsync record agents
-agentsync push agents
+agentsync record
+agentsync push
 agentsync revert agents
 ```
 
-`~/.agents` — такая же карточка, как ИИ-агент, с именем `agents`. Снимок не берёт `~/.agents/.env`. Применение публикации `agents` точно заменяет `~/.agents`: подробно в [Применение](./apply.md#публикация-agents).
+Публикуется и хранится на сервере именно каталог `~/.agents` (карточка `agents`). Снимок не берёт `~/.agents/.env`. Применение публикации `agents` точно заменяет `~/.agents`: подробно в [Применение](./apply.md#публикация-agents).

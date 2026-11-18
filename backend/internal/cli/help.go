@@ -38,65 +38,47 @@ func commands() []spec {
 		},
 		{
 			name:    "push",
-			summary: "Публикует переносимую настройку одного ИИ-агента",
-			usage:   "agentsync push <ии-агент>",
-			about: "На сервер уходят только переносимые файлы. Учётные данные в\u00a0запрос не входят.\n" +
-				"Нужен вход в\u00a0аккаунт. Подтверждение почты для публикации не нужно.\n" +
-				"~/.agents публикуется под именем agents, ~/.agents/.env в\u00a0снимок не входит.\n" +
-				"Пароль в\u00a0команду не входит.",
+			summary: "Публикует переносимую настройку ~/.agents",
+			usage:   "agentsync push",
+			about: "На сервер уходят только переносимые файлы ~/.agents под именем agents.\n" +
+				"Файл ~/.agents/.env, учётные данные, машинные MCP и\u00a0машинные хуки в\u00a0публикацию не\u00a0входят.\n" +
+				"Чтобы сначала собрать настройки установленных ИИ-агентов в\u00a0~/.agents, запустите agentsync export.\n" +
+				"Нужен вход в\u00a0аккаунт. Подтверждение почты для публикации не\u00a0нужно.\n" +
+				"Пароль в\u00a0команду не\u00a0входит.",
 			envs:     []envLine{root, server, token, cookie},
-			examples: []string{"agentsync push Grok", "agentsync push agents"},
-			minArgs:  1,
-			missing:  "Назовите ИИ-агента.",
-		},
-		{
-			name:    "all",
-			summary: "Публикует всех найденных ИИ-агентов",
-			usage:   "agentsync all",
-			about: "Команда ищет домашние папки в\u00a0каталоге с\u00a0ИИ-агентами.\n" +
-				"Папка подходит, если в\u00a0ней сразу лежат навыки, правила, конфиг или AGENTS.md.\n" +
-				"Каждая такая папка публикуется отдельно, тем\u00a0же способом, что agentsync push.\n" +
-				"Имя берётся из имени папки. Точка в\u00a0начале имени не входит в\u00a0имя ИИ-агента.\n" +
-				"Пустая папка и\u00a0каталог .agentsync не публикуются.\n" +
-				"Если одна публикация не проходит, команда продолжает остальные.\n" +
-				"Нужен вход в\u00a0аккаунт. Пароль в\u00a0команду не входит.",
-			envs:     []envLine{root, server, token, cookie},
-			examples: []string{"agentsync all"},
+			examples: []string{"agentsync push"},
 		},
 		{
 			name:    "record",
-			summary: "Записывает снимок в\u00a0хранилище",
-			usage:   "agentsync record <ии-агент>",
+			summary: "Записывает снимок ~/.agents в\u00a0хранилище",
+			usage:   "agentsync record",
 			about: "Снимок неизменяемый. Команда печатает ответ сервера и\u00a0оставляет копию в\u00a0~/.agentsync/store.\n" +
-				"Публикацию эта команда не создаёт.",
+				"Публикацию эта команда не\u00a0создаёт.",
 			envs:     []envLine{root, server, token, cookie},
-			examples: []string{"agentsync record Grok"},
-			minArgs:  1,
-			missing:  "Назовите ИИ-агента.",
+			examples: []string{"agentsync record"},
 		},
 		{
 			name:    "store",
-			summary: "Читает снимки из хранилища",
-			usage:   "agentsync store <ии-агент> [номер]",
-			about:   "Без номера команда печатает список снимков. С\u00a0номером печатает один снимок и\u00a0сохраняет его копию локально.",
+			summary: "Читает снимки ~/.agents из\u00a0хранилища",
+			usage:   "agentsync store [номер]",
+			about:   "Без номера команда печатает список снимков ~/.agents. С\u00a0номером печатает один снимок и\u00a0сохраняет его копию локально.",
 			envs:    []envLine{root, server, token, cookie},
 			examples: []string{
-				"agentsync store Grok",
-				"agentsync store Grok 2",
+				"agentsync store",
+				"agentsync store 2",
 			},
-			minArgs: 1,
-			missing: "Назовите ИИ-агента.",
 		},
 		{
 			name:    "revert",
 			summary: "Возвращает последний снимок на этой машине",
-			usage:   "agentsync revert <ии-агент>",
-			about: "Команда берёт последний снимок цепочки этого аккаунта и\u00a0этого ИИ-агента. После отката снимок из цепочки уходит.\n" +
-				"Публикации на сервере не меняются.",
+			usage:   "agentsync revert <ии-агент|agents>",
+			about: "Команда берёт последний локальный снимок этого аккаунта для agents или указанного ИИ-агента.\n" +
+				"После отката снимок из\u00a0локальной цепочки уходит.\n" +
+				"Публикации на сервере не\u00a0меняются.",
 			envs:     []envLine{root, account},
-			examples: []string{"agentsync revert Grok"},
+			examples: []string{"agentsync revert agents", "agentsync revert claude"},
 			minArgs:  1,
-			missing:  "Назовите ИИ-агента.",
+			missing:  "Назовите ИИ-агента или agents.",
 		},
 		{
 			name:    "export",
@@ -120,7 +102,7 @@ func commands() []spec {
 			usage:   "agentsync <ии-агент> on",
 			about: "Каждый внешний навык из\u00a0~/.agents/skills появляется в\u00a0глобальном каталоге навыков ИИ-агента ссылкой.\n" +
 				"Субагенты (~/.agents/agents), пользовательские команды (~/.agents/commands) и\u00a0файл инструкций ~/.agents/AGENTS.md\n" +
-				"появляются там, где их читает ИИ-агент: у\u00a0Claude Code файл инструкций называется CLAUDE.md, у\u00a0Gemini CLI GEMINI.md.\n" +
+				"появляются там, где их читает ИИ-агента: у\u00a0Claude Code файл инструкций называется CLAUDE.md, у\u00a0Gemini CLI GEMINI.md.\n" +
 				"MCP-серверы из\u00a0~/.agents/mcp.json вписываются в\u00a0файл настроек ИИ-агента в\u00a0его формате: Claude Code ~/.claude.json,\n" +
 				"Codex ~/.codex/config.toml, Gemini CLI ~/.gemini/settings.json. Чужие записи с\u00a0другими именами остаются.\n" +
 				"Одноимённая чужая запись заменяется, команда off её возвращает. Codex не\u00a0раскрывает ${NAME}:\n" +
@@ -130,7 +112,7 @@ func commands() []spec {
 				"Хуки из\u00a0~/.agents/hooks.json (события Claude Code) вписываются в\u00a0settings.json Claude Code как есть,\n" +
 				"а\u00a0для Gemini CLI переводятся в\u00a0его события. Хук события, которого у\u00a0ИИ-агента нет, пропускается.\n" +
 				"Хук с\u00a0абсолютным путём остаётся на машине: в\u00a0снимок он не входит, применение его не убирает.\n" +
-				"Вид, который ИИ-агент не\u00a0понимает, пропускается, и\u00a0вывод его называет.\n" +
+				"Вид, который ИИ-агента не\u00a0понимает, пропускается, и\u00a0вывод его называет.\n" +
 				"Правка в\u00a0agents сразу видна ИИ-агенту. Повторная команда убирает ссылку на элемент, которого в\u00a0agents больше нет.\n" +
 				"Если имя занято собственной папкой или файлом ИИ-агента, команда сначала создаёт его снимок, затем ставит ссылку.\n" +
 				"Аккаунт, подтверждение машины и\u00a0сервер не нужны.",
@@ -154,30 +136,25 @@ func commands() []spec {
 		},
 		{
 			name:    "apply",
-			summary: "Применяет публикацию к\u00a0ИИ-агенту",
-			usage:   "agentsync apply <автор> <ии-агент> [--version <номер> <путь>…]",
-			about: "Элементы agents из\u00a0публикации (навыки, субагенты, команды, файл инструкций, MCP) ложатся в\u00a0~/.agents:\n" +
-				"одноимённые заменяются целиком, остальные остаются. Собственные файлы ИИ-агента ложатся в\u00a0его папку по\u00a0тому же правилу.\n" +
-				"Затем ИИ-агент подключается к\u00a0agents, как после agentsync <ии-агент> on.\n" +
-				"Публикация agents (agents) точно заменяет agents, подключённые ИИ-агенты подключаются заново.\n" +
-				"Перед заменой agents и\u00a0переносимая настройка ИИ-агента записываются в\u00a0снимки.\n" +
-				"Откат ИИ-агента: agentsync revert <ии-агент>. Откат agents: agentsync revert agents.\n" +
-				"Учётные данные, машинный MCP и\u00a0машинные хуки остаются на месте.\n" +
-				"Своя публикация требует cookie сессии этого аккаунта. Чужую можно применить без входа на сайт.\n" +
+			summary: "Применяет публикацию agents к\u00a0~/.agents",
+			usage:   "agentsync apply <автор> [--version <номер> <путь>…]",
+			about: "Без --version публикация agents автора точно заменяет ~/.agents, подключённые ИИ-агенты подключаются заново.\n" +
+				"Перед заменой ~/.agents записывается в\u00a0снимок: откат\u00a0— agentsync revert agents.\n" +
+				"Файл ~/.agents/.env, машинный MCP и\u00a0машинные хуки остаются на\u00a0месте.\n" +
+				"Своя публикация требует cookie сессии этого аккаунта. Чужую можно применить без входа на\u00a0сайт.\n" +
 				"С\u00a0--version и\u00a0путями команда берёт названную версию и\u00a0кладёт в\u00a0~/.agents только названные пути.\n" +
 				"Путь\u00a0— файл или папка версии, как на\u00a0странице версии. Папка с\u00a0SKILL.md ложится в\u00a0~/.agents/skills/<имя>.\n" +
 				"Субагенты, команды, файл инструкций и\u00a0записи MCP, плагинов и\u00a0хуков ложатся на\u00a0свои места в\u00a0agents.\n" +
 				"Одноимённый элемент заменяется целиком, остальные остаются. Файл, который ничего не\u00a0даёт agents, пропускается, вывод его называет.\n" +
-				"Перед заменой agents записывается в\u00a0снимок. Собственные файлы ИИ-агента не\u00a0меняются.\n" +
 				"Открытую версию команда берёт без входа. Скрытую\u00a0— с\u00a0сессией владельца или токеном его машины.\n" +
-				"Пароль в\u00a0команду не входит.",
+				"Пароль в\u00a0команду не\u00a0входит.",
 			envs: []envLine{root, server, token, cookie},
 			examples: []string{
-				"agentsync apply Author Grok",
-				"agentsync apply Author claude --version 4 skills/ru-text agents/reviewer.md CLAUDE.md",
+				"agentsync apply Author",
+				"agentsync apply Author --version 4 skills/ru-text agents/reviewer.md AGENTS.md",
 			},
-			minArgs: 2,
-			missing: "Назовите автора и\u00a0ИИ-агента.",
+			minArgs: 1,
+			missing: "Назовите автора.",
 		},
 		{
 			name:     "version",
@@ -230,7 +207,7 @@ func commandByName(name string) (spec, bool) {
 
 func rootHelp() string {
 	var b strings.Builder
-	b.WriteString("Локальный агент AgentSync переносит переносимую настройку ИИ-агента.\n\n")
+	b.WriteString("Локальный агент AgentSync переносит переносимую настройку ~/.agents.\n\n")
 	b.WriteString("Использование:\n")
 	b.WriteString("  agentsync <команда> [аргументы]\n\n")
 	b.WriteString("Команды:\n")
@@ -252,11 +229,11 @@ func rootHelp() string {
 	b.WriteString(formatExamples([]string{
 		"agentsync login",
 		"agentsync export",
-		"agentsync push Grok",
-		"agentsync all",
-		"agentsync store Grok 2",
-		"agentsync apply Author Grok",
-		"agentsync apply Author claude --version 4 skills/ru-text",
+		"agentsync claude on",
+		"agentsync push",
+		"agentsync store 2",
+		"agentsync apply Author",
+		"agentsync apply Author --version 4 skills/ru-text",
 		"agentsync version",
 		"agentsync update",
 		"agentsync help apply",

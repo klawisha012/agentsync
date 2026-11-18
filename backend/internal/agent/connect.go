@@ -554,6 +554,13 @@ func snapshotAgent(root, account string, cat skillCatalog) (string, string, erro
 	return dir, home, nil
 }
 
+func agentDirName(dir string) string {
+	if strings.HasPrefix(dir, ".") && len(dir) > 1 {
+		return dir[1:]
+	}
+	return dir
+}
+
 func shareCanon(canon, snapshot, home, display string, plan connectPlan, occupied map[string]bool, written []string) (catalogUndo, error) {
 	var undo catalogUndo
 	failed := func() error {

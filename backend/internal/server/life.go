@@ -11,6 +11,11 @@ import (
 )
 
 func (s *store) applyPublication(author, agentName, sessionID, token string, version int) (publicationView, int, string) {
+	resolved, ok := resolveCanonAgent(agentName)
+	if !ok {
+		return publicationView{}, http.StatusNotFound, "Публикация не найдена."
+	}
+	agentName = resolved
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	page := s.byName[foldKey.String(author)]

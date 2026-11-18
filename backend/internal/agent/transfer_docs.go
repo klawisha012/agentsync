@@ -1,9 +1,6 @@
 package agent
 
 import (
-	"errors"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -16,63 +13,6 @@ type docMove struct {
 	file string // the agent's file
 	rel  string // the agents file, relative to ~/.agents
 	body string
-}
-
-// ownDocs lists the agent's own subagent and command files in the agents format. A file agents
-// has a file of the same name for stays, and a file that is not the agent's format goes into the report.
-func ownDocs(root string, receiver Receiver, dir string, report *TransferReport) ([]docMove, error) {
-	_, ledger, err := loadFileLedger(receiver.Slug)
-	if err != nil {
-		return nil, err
-	}
-	d := dialects[receiver.Slug]
-	var moves []docMove
-	for _, item := range []struct {
-		kind  docKind
-		place string
-	}{{subagentDoc, receiver.Agents}, {commandDoc, receiver.Commands}} {
-		if receiver.Way(item.kind.key) != WayTranslate {
-			continue
-		}
-		place := filepath.Join(filepath.Dir(dir), filepath.FromSlash(item.place))
-		entries, err := os.ReadDir(place)
-		if errors.Is(err, os.ErrNotExist) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		for _, entry := range entries {
-			file := filepath.Join(place, entry.Name())
-			// A link is agents itself; a folder and a written file are not the agent's own files.
-			if entry.Type()&os.ModeSymlink != 0 || entry.IsDir() || containsPath(ledger.Own, file) {
-				continue
-			}
-			stem, ok := docStem(item.kind, d, entry.Name())
-			if !ok {
-				continue
-			}
-			raw, err := os.ReadFile(file)
-			if err != nil {
-				return nil, err
-			}
-			if msg := SecretExplanation(file, string(raw)); msg != "" {
-				return nil, errors.New(msg)
-			}
-			rel := item.kind.key + "/" + stem + ".md"
-			if _, err := os.Lstat(filepath.Join(canonDir(root), filepath.FromSlash(rel))); err == nil {
-				report.Kept = append(report.Kept, item.kind.one+" "+stem+" (имя занято в agents)")
-				continue
-			}
-			body, ok := fromNativeDoc(item.kind, d, string(raw))
-			if !ok {
-				report.Kept = append(report.Kept, item.kind.one+" "+stem)
-				continue
-			}
-			moves = append(moves, docMove{kind: item.kind, file: file, rel: rel, body: body})
-		}
-	}
-	return moves, nil
 }
 
 // containsPath compares paths the way the file system does: without letter case on Windows.

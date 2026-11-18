@@ -179,19 +179,22 @@ func (s *store) loadLikes(ctx context.Context, byID map[string]*account) error {
 		if err := rows.Scan(&accountID, &agentKey, &likerID, &created); err != nil {
 			return err
 		}
+		if !isCanonAgentName(agentKey) {
+			continue
+		}
 		page, liker := byID[accountID], byID[likerID]
 		if page == nil || liker == nil {
 			continue
 		}
-		if page.agentLikes[agentKey] == nil {
-			page.agentLikes[agentKey] = map[string]struct{}{}
+		if page.agentLikes[canonAgent] == nil {
+			page.agentLikes[canonAgent] = map[string]struct{}{}
 		}
-		page.agentLikes[agentKey][liker.nameKey] = struct{}{}
+		page.agentLikes[canonAgent][liker.nameKey] = struct{}{}
 		if created.Valid {
-			if page.likedAt[agentKey] == nil {
-				page.likedAt[agentKey] = map[string]time.Time{}
+			if page.likedAt[canonAgent] == nil {
+				page.likedAt[canonAgent] = map[string]time.Time{}
 			}
-			page.likedAt[agentKey][liker.nameKey] = created.Time
+			page.likedAt[canonAgent][liker.nameKey] = created.Time
 		}
 	}
 	return rows.Err()
@@ -232,6 +235,10 @@ func (s *store) loadPublications(ctx context.Context, byID map[string]*account) 
 		if err := rows.Scan(&item.id, &accountID, &item.agent, &item.version, &item.packed, &item.created, &item.withdrawn); err != nil {
 			return err
 		}
+		if !isCanonAgentName(item.agent) {
+			continue
+		}
+		item.agent = canonAgent
 		files, err := unpackFiles(item.packed)
 		if err != nil {
 			return err
@@ -476,6 +483,10 @@ func (s *store) loadSnapshots(ctx context.Context, byID map[string]*account) err
 		if err := rows.Scan(&item.id, &accountID, &item.agent, &item.number, &item.packed, &item.created); err != nil {
 			return err
 		}
+		if !isCanonAgentName(item.agent) {
+			continue
+		}
+		item.agent = canonAgent
 		files, err := unpackFiles(item.packed)
 		if err != nil {
 			return err
@@ -501,11 +512,14 @@ func (s *store) loadSnapshots(ctx context.Context, byID map[string]*account) err
 		if err := marks.Scan(&accountID, &agent, &snapshotID); err != nil {
 			return err
 		}
+		if !isCanonAgentName(agent) {
+			continue
+		}
 		page := byID[accountID]
 		if page == nil {
 			continue
 		}
-		page.marks[agent] = snapshotID
+		page.marks[canonAgent] = snapshotID
 	}
 	return marks.Err()
 }

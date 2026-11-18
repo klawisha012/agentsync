@@ -19,7 +19,7 @@ func TestRecordWritesLocalCacheWithoutPrivateFiles(t *testing.T) {
 		}
 		got = r.URL.Path
 		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(`{"id":"s1","account":"Keeper","agent":"Grok","number":1,"current":true,"files":[{"path":"rules/ok.md","body":"hello"}]}`))
+		_, _ = w.Write([]byte(`{"id":"s1","account":"Keeper","agent":"agents","number":1,"current":true,"files":[{"path":"rules/ok.md","body":"hello"}]}`))
 	}))
 	defer srv.Close()
 
@@ -27,33 +27,33 @@ func TestRecordWritesLocalCacheWithoutPrivateFiles(t *testing.T) {
 	if err := Install(root); err != nil {
 		t.Fatal(err)
 	}
-	home := filepath.Join(root, "Grok", "rules")
+	home := filepath.Join(root, ".agents", "rules")
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(home, "ok.md"), []byte("hello"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "Grok", "credentials.json"), []byte("secret"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, ".agents", "credentials.json"), []byte("secret"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	raw, _, err := Record(context.Background(), srv.URL, root, "Grok", "machine", "session=1")
+	raw, err := Record(context.Background(), srv.URL, root, "machine", "session=1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got != "/agent/record" || !strings.Contains(string(raw), `"number":1`) {
 		t.Fatalf("record %s %s", got, raw)
 	}
-	cached := filepath.Join(root, ".agentsync", "store", "keeper", "grok", "0001", "rules", "ok.md")
+	cached := filepath.Join(root, ".agentsync", "store", "keeper", "agents", "0001", "rules", "ok.md")
 	body, err := os.ReadFile(cached)
 	if err != nil || string(body) != "hello" {
 		t.Fatalf("cache %v %s", err, body)
 	}
-	if _, err := os.Stat(filepath.Join(root, ".agentsync", "store", "keeper", "grok", "0001", "credentials.json")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, ".agentsync", "store", "keeper", "agents", "0001", "credentials.json")); !os.IsNotExist(err) {
 		t.Fatal("cache kept credentials")
 	}
-	mark, err := os.ReadFile(filepath.Join(root, ".agentsync", "store", "keeper", "grok", "current"))
+	mark, err := os.ReadFile(filepath.Join(root, ".agentsync", "store", "keeper", "agents", "current"))
 	if err != nil || strings.TrimSpace(string(mark)) != "1" {
 		t.Fatalf("mark %v %s", err, mark)
 	}
@@ -61,11 +61,11 @@ func TestRecordWritesLocalCacheWithoutPrivateFiles(t *testing.T) {
 
 func TestReadStoreCopiesNamedSnapshot(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/agent/store/Grok/2" {
+		if r.URL.Path != "/agent/store/agents/2" {
 			http.NotFound(w, r)
 			return
 		}
-		_, _ = w.Write([]byte(`{"id":"s2","account":"Keeper","agent":"Grok","number":2,"current":true,"files":[{"path":"rules/next.md","body":"again"}]}`))
+		_, _ = w.Write([]byte(`{"id":"s2","account":"Keeper","agent":"agents","number":2,"current":true,"files":[{"path":"rules/next.md","body":"again"}]}`))
 	}))
 	defer srv.Close()
 
@@ -73,14 +73,14 @@ func TestReadStoreCopiesNamedSnapshot(t *testing.T) {
 	if err := Install(root); err != nil {
 		t.Fatal(err)
 	}
-	raw, err := ReadStore(context.Background(), srv.URL, root, "Grok", "2", "machine", "")
+	raw, err := ReadStore(context.Background(), srv.URL, root, "2", "machine", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(raw), "rules/next.md") {
 		t.Fatalf("body %s", raw)
 	}
-	body, err := os.ReadFile(filepath.Join(root, ".agentsync", "store", "keeper", "grok", "0002", "rules", "next.md"))
+	body, err := os.ReadFile(filepath.Join(root, ".agentsync", "store", "keeper", "agents", "0002", "rules", "next.md"))
 	if err != nil || string(body) != "again" {
 		t.Fatalf("cache %v %s", err, body)
 	}

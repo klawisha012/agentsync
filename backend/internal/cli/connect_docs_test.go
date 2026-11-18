@@ -1,9 +1,6 @@
 package cli
 
 import (
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -99,29 +96,6 @@ func TestOffRemovesTranslatedSubagentsAndKeepsOwnFiles(t *testing.T) {
 	entries, err := os.ReadDir(filepath.Join(root, ".claude", "agents"))
 	if err != nil || len(entries) != 1 || entries[0].Name() != "mine.md" {
 		t.Fatalf("off left %v %v", namesOf(entries), err)
-	}
-}
-
-func TestPushCarriesTheAgentsFileOfATranslatedSubagent(t *testing.T) {
-	var sent string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		raw, _ := io.ReadAll(r.Body)
-		sent = string(raw)
-		w.WriteHeader(http.StatusCreated)
-	}))
-	t.Cleanup(srv.Close)
-	root := connectRoot(t)
-	writeRel(t, filepath.Join(root, ".agents"), "agents/reviewer.md", reviewerAgent)
-	if code, _, stderr := runCLI(t, "codex", "on"); code != 0 {
-		t.Fatal(stderr)
-	}
-	t.Setenv("AGENTSYNC_SERVER", srv.URL)
-	t.Setenv("AGENTSYNC_TOKEN", "machine")
-	if code, _, stderr := runCLI(t, "push", "codex"); code != 0 {
-		t.Fatalf("push %s", stderr)
-	}
-	if !strings.Contains(sent, `"path":"agents/reviewer.md"`) || !strings.Contains(sent, "tools: [read, grep]") || strings.Contains(sent, "reviewer.toml") {
-		t.Fatalf("card %s", sent)
 	}
 }
 

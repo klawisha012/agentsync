@@ -54,13 +54,11 @@ type publicationView struct {
 }
 
 func (s *store) push(sessionID, agentToken, agent string, missing bool, files []storedFile) (publicationView, int, string) {
-	agent = strings.TrimSpace(agent)
-	if agent == "" {
-		return publicationView{}, http.StatusBadRequest, "Назовите ИИ-агента."
+	resolved, ok := resolveCanonAgent(agent)
+	if !ok {
+		return publicationView{}, http.StatusBadRequest, "Публикуется только agents (~/.agents)."
 	}
-	if msg := safeAgentName(agent); msg != "" {
-		return publicationView{}, http.StatusBadRequest, msg
-	}
+	agent = resolved
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	viewer := s.accountBySession(sessionID)
@@ -68,7 +66,7 @@ func (s *store) push(sessionID, agentToken, agent string, missing bool, files []
 		return publicationView{}, http.StatusUnauthorized, "Войдите в аккаунт."
 	}
 	if missing {
-		return publicationView{}, http.StatusBadRequest, "На компьютере нет этого ИИ-агента."
+		return publicationView{}, http.StatusBadRequest, "На компьютере нет ~/.agents."
 	}
 	kept, explain := classify(files)
 	if explain != "" {
@@ -114,6 +112,11 @@ type versionHead struct {
 }
 
 func (s *store) versions(name, agentName, sessionID string) ([]versionHead, int, string) {
+	resolved, ok := resolveCanonAgent(agentName)
+	if !ok {
+		return nil, http.StatusNotFound, "Публикация не найдена."
+	}
+	agentName = resolved
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	page := s.byName[foldKey.String(name)]
@@ -150,6 +153,11 @@ func (a *app) listVersions(c echo.Context) error {
 }
 
 func (s *store) version(name, agentName, sessionID, token string, number int) (publicationView, int, string) {
+	resolved, ok := resolveCanonAgent(agentName)
+	if !ok {
+		return publicationView{}, http.StatusNotFound, "Версия не найдена."
+	}
+	agentName = resolved
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	page := s.byName[foldKey.String(name)]
@@ -204,7 +212,7 @@ func (s *store) publication(id, sessionID string) (publicationView, bool) {
 	for _, page := range s.byName {
 		var found *publication
 		for _, item := range page.publications {
-			if item.id == id && !item.withdrawn {
+			if item.id == id && !item.withdrawn && isCanonAgentName(item.agent) {
 				found = item
 				break
 			}
@@ -329,7 +337,7 @@ func (a *app) pushAgent(c echo.Context) error {
 		Files   []storedFile `json:"files"`
 	}
 	if err := c.Bind(&req); err != nil {
-		return writeExplanation(c, http.StatusBadRequest, "Назовите ИИ-агента.")
+		return writeExplanation(c, http.StatusBadRequest, "Не удалось прочитать публикацию.")
 	}
 	token := strings.TrimSpace(strings.TrimPrefix(c.Request().Header.Get("Authorization"), "Bearer "))
 	view, code, msg := a.accounts.push(cookie.Value, token, req.Agent, req.Missing, req.Files)

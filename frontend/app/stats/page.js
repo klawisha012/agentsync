@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api";
-import AgentLogo from "../agent-logo";
 import Avatar from "../avatar";
 import { publicationWord } from "../distribution";
 
@@ -13,9 +12,6 @@ const PERIODS = [
   { value: "90", label: "За 3 месяца" },
   { value: "all", label: "За всё время" },
 ];
-
-const palette = ["#34d399", "#f472b6", "#facc15", "#a3e635", "#60a5fa"];
-const brandColors = { claude: "var(--claude)", grok: "var(--grok)", agents: "var(--agents)" };
 
 export default function StatsPage() {
   const [report, setReport] = useState(null);
@@ -43,10 +39,6 @@ export default function StatsPage() {
   }, [period]);
 
   const selected = PERIODS.find((item) => item.value === period) || PERIODS[PERIODS.length - 1];
-  const shares = (report?.shares || []).map((row, index) => ({
-    ...row,
-    color: brandColors[String(row.name).toLowerCase()] || palette[index % palette.length],
-  }));
   const ready = report !== null;
   const sections = [
     {
@@ -76,14 +68,9 @@ export default function StatsPage() {
       icon: "files",
       tiles: [
         {
-          label: "публикаций",
+          label: "публикаций agents",
           value: ready ? String(report.publications) : "—",
           note: ready ? publicationWord(report.publications) : "",
-        },
-        {
-          label: "популярный агент",
-          value: ready && report.topAgent ? report.topAgent.name : "—",
-          note: ready && report.topAgent ? `${report.topAgent.count} ${publicationWord(report.topAgent.count)}` : "нет данных",
         },
       ],
     },
@@ -155,54 +142,6 @@ export default function StatsPage() {
                 <p className="hint">{report.accounts === 0 ? "Нет аккаунтов." : "Нет просмотров за этот промежуток."}</p>
               ) : null}
             </div>
-          </section>
-          <section className="side-card stats-card" aria-busy={report === null}>
-            <header className="stats-section-heading">
-              <h2 className="stats-section-title">Распределение агентов</h2>
-              <span>{selected.label}</span>
-            </header>
-            {failed ? <p className="hint">Не удалось открыть сводку.</p> : null}
-            {report === null && !failed ? <p className="hint">Открываем сводку…</p> : null}
-            {ready && !failed && report.sharesTotal === 0 ? <p className="hint">Нет публикаций.</p> : null}
-            {ready && !failed && report.sharesTotal > 0 ? (
-              <table className="stats-dist">
-                <thead>
-                  <tr>
-                    <th scope="col">Агент</th>
-                    <th scope="col">Публикации</th>
-                    <th scope="col">Доля</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {shares.map((row) => (
-                    <tr key={row.name}>
-                      <th scope="row">
-                        <span className="stats-dist-name">
-                          <AgentLogo name={row.name} tone={String(row.name).toLowerCase()} />
-                          {row.name}
-                        </span>
-                      </th>
-                      <td>{row.count}</td>
-                      <td>
-                        <span className="stats-dist-share">
-                          <span className="stats-dist-bar" aria-hidden="true">
-                            <i style={{ width: `${row.pct}%`, background: row.color }} />
-                          </span>
-                          <b style={{ color: row.color }}>{row.pct}%</b>
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <th scope="row">Всего</th>
-                    <td>{report.sharesTotal}</td>
-                    <td>100%</td>
-                  </tr>
-                </tfoot>
-              </table>
-            ) : null}
           </section>
         </aside>
       </div>

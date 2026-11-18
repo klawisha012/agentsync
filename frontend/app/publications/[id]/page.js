@@ -63,7 +63,7 @@ export default function PublicationPage() {
   const current = files.find((file) => file.path === selected)
     || (selected === "" ? files.find((file) => !String(file.path).includes("/")) : null)
     || null;
-  const command = `${commandText(page.author, page.agent)}\nagentsync revert ${page.agent}`;
+  const command = `${commandText(page.author)}\nagentsync revert agents`;
 
   async function copy(text, key) {
     try {
@@ -94,7 +94,7 @@ export default function PublicationPage() {
           <span>/</span>
           <Link href={`/${page.author}`}>@{page.author}</Link>
           <span>/</span>
-          <b>{page.agent} (~/.{String(page.agent).toLowerCase()})</b>
+          <b>agents (~/.agents)</b>
           <span>/</span>
           <em className="version-chip">v{page.version}</em>
           <em className="badge ok">immutable</em>
@@ -173,14 +173,14 @@ export default function PublicationPage() {
             {copied === "cmd" ? "Скопировано" : "Скопировать команду"}
           </button>
         </div>
-        <p className="hint">Откат с этой машины: {shellCommand(["agentsync", "revert", page.agent])}</p>
+        <p className="hint">Откат с этой машины: {shellCommand(["agentsync", "revert", "agents"])}</p>
       </section>
     </article>
   );
 }
 
-function commandText(author, agent) {
-  return shellCommand(["agentsync", "apply", author, agent]);
+function commandText(author) {
+  return shellCommand(["agentsync", "apply", author]);
 }
 
 function ruFiles(n) {

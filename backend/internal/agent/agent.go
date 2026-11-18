@@ -38,47 +38,42 @@ func Install(dir string) error {
 	return os.WriteFile(filepath.Join(base, installedFile), []byte("confirm-machine\n"), 0o644)
 }
 
-// Push publishes a snapshot of the AI agent or agents. The snapshot first moves the agent's own
-// hooks and MCP servers into agents; the report names them.
-func Push(ctx context.Context, server, root, agentName, token, cookie string) (TransferReport, error) {
+// Push publishes a snapshot of ~/.agents.
+func Push(ctx context.Context, server, root, token, cookie string) error {
 	unlock, err := lockRoot(root)
 	if err != nil {
-		return TransferReport{}, err
+		return err
 	}
 	defer unlock()
-	if err := checkCanon(root, agentName); err != nil {
-		return TransferReport{}, err
+	if err := checkCanon(root, canonCard); err != nil {
+		return err
 	}
-	home := agentHome(root, agentName)
+	home := canonDir(root)
 	if _, err := os.Stat(home); errors.Is(err, os.ErrNotExist) {
-		return TransferReport{}, errors.New("на компьютере нет этого ИИ-агента")
-	}
-	report, err := transferOwn(root, EnvOrHome("AGENTSYNC_ACCOUNT", "account"), agentName)
-	if err != nil {
-		return report, err
+		return errors.New("на компьютере нет ~/.agents")
 	}
 	files, err := readSnapshot(root, home)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return report, errors.New("на компьютере нет этого ИИ-агента")
+			return errors.New("на компьютере нет ~/.agents")
 		}
-		return report, err
+		return err
 	}
-	_, err = postAgent(ctx, server, "/agent/push", agentName, token, cookie, withMark(root, portableOnly(files), agentName, home), false)
-	return report, err
+	_, err = postAgent(ctx, server, "/agent/push", canonCard, token, cookie, portableOnly(files), false)
+	return err
 }
 
-func Apply(ctx context.Context, server, root, author, agentName, account, token, cookie string) error {
+func Apply(ctx context.Context, server, root, author, account, token, cookie string) error {
 	unlock, err := lockRoot(root)
 	if err != nil {
 		return err
 	}
 	defer unlock()
-	payload, err := fetchPublication(ctx, server, author, agentName, token, cookie, 0)
+	payload, err := fetchPublication(ctx, server, author, canonCard, token, cookie, 0)
 	if err != nil {
 		return err
 	}
-	if err := remember(ctx, server, root, payload.Agent, token, cookie); err != nil {
+	if err := remember(ctx, server, root, token, cookie); err != nil {
 		return err
 	}
 	return applyOwned(root, account, payload)
@@ -91,7 +86,7 @@ func ApplyBody(ctx context.Context, server, root, account, token, cookie string,
 	}
 	defer unlock()
 	var payload publicationPayload
-	if err := json.Unmarshal(raw, &payload); err != nil || payload.Author == "" || payload.Agent == "" {
+	if err := json.Unmarshal(raw, &payload); err != nil || payload.Author == "" {
 		var explained struct {
 			Explanation string `json:"explanation"`
 		}
@@ -100,7 +95,13 @@ func ApplyBody(ctx context.Context, server, root, account, token, cookie string,
 		}
 		return errors.New("команда не содержит публикацию")
 	}
-	if err := remember(ctx, server, root, payload.Agent, token, cookie); err != nil {
+	if payload.Agent == "" {
+		payload.Agent = canonCard
+	}
+	if !isCanonCard(payload.Agent) {
+		return errors.New("Публикуется и\u00a0применяется только agents.")
+	}
+	if err := remember(ctx, server, root, token, cookie); err != nil {
 		return err
 	}
 	return applyOwned(root, account, payload)
@@ -111,27 +112,20 @@ func applyOwned(root, account string, payload publicationPayload) error {
 	if owner == "" {
 		owner = payload.Author
 	}
-	if isCanonCard(payload.Agent) {
-		return applyCanon(root, owner, payload.Files, false)
-	}
-	return applyAgent(root, owner, payload, false)
+	return applyCanon(root, owner, payload.Files, false)
 }
 
-func ApplyBroken(ctx context.Context, server, root, author, agentName, token, cookie string) error {
+func ApplyBroken(ctx context.Context, server, root, author, token, cookie string) error {
 	unlock, err := lockRoot(root)
 	if err != nil {
 		return err
 	}
 	defer unlock()
-	payload, err := fetchPublication(ctx, server, author, agentName, token, cookie, 0)
+	payload, err := fetchPublication(ctx, server, author, canonCard, token, cookie, 0)
 	if err != nil {
 		return err
 	}
-	if isCanonCard(agentName) {
-		return applyCanon(root, author, payload.Files, true)
-	}
-	payload.Agent = agentName
-	return applyAgent(root, author, payload, true)
+	return applyCanon(root, author, payload.Files, true)
 }
 
 func Revert(root, account, agentName string) error {

@@ -31,23 +31,21 @@ func TestPushCarriesSubagentsAndCommandsWithoutMarketplaceClones(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	root := t.TempDir()
-	writeAgentFile(t, root, ".claude/agents/go-developer.md", "subagent")
-	writeAgentFile(t, root, ".claude/commands/review.md", "command")
-	writeAgentFile(t, root, ".claude/settings.json", `{"enabledPlugins":{"ponytail@ponytail":true}}`)
-	writeAgentFile(t, root, ".claude/plugins/marketplaces/ponytail/README.md", "clone")
-	writeAgentFile(t, root, ".claude/plugins/plugin-catalog-cache.json", "{}")
-	writeAgentFile(t, root, ".claude/plugins/known_marketplaces.json", "{}")
-	// Skills Claude Code syncs from claude.ai: program files, and their docs hold example passwords.
-	writeAgentFile(t, root, ".claude/skills/synced/bucket/pdf/REFERENCE.md", "qpdf --password=secret123 --decrypt in.pdf out.pdf")
-	writeAgentFile(t, root, ".claude/skills/synced/bucket/manifest.json", "{}")
-	writeAgentFile(t, root, ".claude/skills/mine/SKILL.md", "own skill")
+	writeRel(t, root, ".agents/agents/go-developer.md", "subagent")
+	writeRel(t, root, ".agents/commands/review.md", "command")
+	writeRel(t, root, ".agents/plugins.json", `{"enabledPlugins":{"ponytail@ponytail":true}}`)
+	writeRel(t, root, ".agents/plugins/marketplaces/ponytail/README.md", "clone")
+	writeRel(t, root, ".agents/plugins/plugin-catalog-cache.json", "{}")
+	writeRel(t, root, ".agents/skills/synced/bucket/pdf/REFERENCE.md", "qpdf --password=secret123 --decrypt in.pdf out.pdf")
+	writeRel(t, root, ".agents/skills/synced/bucket/manifest.json", "{}")
+	writeRel(t, root, ".agents/skills/mine/SKILL.md", "own skill")
 	t.Setenv("AGENTSYNC_ROOT", root)
 	t.Setenv("AGENTSYNC_SERVER", srv.URL)
 	t.Setenv("AGENTSYNC_TOKEN", "machine")
 	t.Setenv("AGENTSYNC_STATE", t.TempDir())
 
 	var out, errOut bytes.Buffer
-	if code := Run([]string{"push", "claude"}, nil, &out, &errOut); code != 0 {
+	if code := Run([]string{"push"}, nil, &out, &errOut); code != 0 {
 		t.Fatalf("push %d %s %s", code, out.String(), errOut.String())
 	}
 	has := func(path string) bool {
@@ -58,12 +56,12 @@ func TestPushCarriesSubagentsAndCommandsWithoutMarketplaceClones(t *testing.T) {
 		}
 		return false
 	}
-	for _, want := range []string{"agents/go-developer.md", "commands/review.md", "settings.json", "skills/mine/SKILL.md"} {
+	for _, want := range []string{"agents/go-developer.md", "commands/review.md", "plugins.json", "skills/mine/SKILL.md"} {
 		if !has(want) {
 			t.Fatalf("snapshot lacks %s: %v", want, sent)
 		}
 	}
-	for _, skip := range []string{"plugins/marketplaces/ponytail/README.md", "plugins/plugin-catalog-cache.json", "plugins/known_marketplaces.json", "skills/synced/bucket/pdf/REFERENCE.md", "skills/synced/bucket/manifest.json"} {
+	for _, skip := range []string{"plugins/marketplaces/ponytail/README.md", "plugins/plugin-catalog-cache.json", "skills/synced/bucket/pdf/REFERENCE.md", "skills/synced/bucket/manifest.json"} {
 		if has(skip) {
 			t.Fatalf("snapshot carries %s: %v", skip, sent)
 		}
@@ -85,14 +83,14 @@ func TestPushSendsMCPWithoutMachineServers(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	root := t.TempDir()
-	writeAgentFile(t, root, ".grok/mcp.json", machineAndSharedMCP)
+	writeRel(t, root, ".agents/mcp.json", machineAndSharedMCP)
 	t.Setenv("AGENTSYNC_ROOT", root)
 	t.Setenv("AGENTSYNC_SERVER", srv.URL)
 	t.Setenv("AGENTSYNC_TOKEN", "machine")
 	t.Setenv("AGENTSYNC_STATE", t.TempDir())
 
 	var out, errOut bytes.Buffer
-	if code := Run([]string{"push", "grok"}, nil, &out, &errOut); code != 0 {
+	if code := Run([]string{"push"}, nil, &out, &errOut); code != 0 {
 		t.Fatalf("push %d %s %s", code, out.String(), errOut.String())
 	}
 	if !strings.Contains(sent, "context7") || !strings.Contains(sent, "LINEAR_KEY") {
@@ -103,15 +101,25 @@ func TestPushSendsMCPWithoutMachineServers(t *testing.T) {
 	}
 }
 
+func TestPushRejectsNonCanonAgent(t *testing.T) {
+	root := t.TempDir()
+	t.Setenv("AGENTSYNC_ROOT", root)
+	t.Setenv("AGENTSYNC_STATE", t.TempDir())
+	var out, errOut bytes.Buffer
+	if code := Run([]string{"push", "claude"}, nil, &out, &errOut); code != 1 || !strings.Contains(errOut.String(), "agentsync export") {
+		t.Fatalf("code=%d stderr=%s", code, errOut.String())
+	}
+}
+
 func TestApplyKeepsMachineMCPServer(t *testing.T) {
 	root := t.TempDir()
-	writeAgentFile(t, root, ".vibe/mcp.json", machineAndSharedMCP)
+	writeRel(t, root, ".agents/mcp.json", machineAndSharedMCP)
 	t.Setenv("AGENTSYNC_ROOT", root)
 	t.Setenv("AGENTSYNC_ACCOUNT", "zwarder")
 	t.Setenv("AGENTSYNC_STATE", t.TempDir())
 
 	incoming, _ := json.Marshal(map[string]any{
-		"author": "alice", "agent": "mistral-vibe",
+		"author": "alice", "agent": "agents",
 		"files": []map[string]string{{"path": "mcp.json", "body": `{"mcpServers":{"docs":{"command":"npx","args":["docs"]}}}`}},
 	})
 	var out, errOut bytes.Buffer
@@ -121,7 +129,7 @@ func TestApplyKeepsMachineMCPServer(t *testing.T) {
 	var got struct {
 		Servers map[string]json.RawMessage `json:"mcpServers"`
 	}
-	if err := json.Unmarshal([]byte(readFile(t, filepath.Join(root, ".vibe", "mcp.json"))), &got); err != nil {
+	if err := json.Unmarshal([]byte(readFile(t, filepath.Join(root, ".agents", "mcp.json"))), &got); err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := got.Servers["docs"]; !ok {

@@ -9,11 +9,11 @@ import (
 func TestPrivacyOpensProfileActions(t *testing.T) {
 	e := newServer(t)
 	owner := mustAccount(t, e, "owner@example.com", "secret-pass", "Owner")
-	pushed := postAuth(t, e, "/agent/push", "", pushBody("Grok", false, pushFile{"rules/ok.md", "one"}), owner)
+	pushed := postAuth(t, e, "/agent/push", "", pushBody("agents", false, pushFile{"rules/ok.md", "one"}), owner)
 	if pushed.Code != http.StatusCreated {
 		t.Fatalf("push %d %s", pushed.Code, pushed.Body.String())
 	}
-	hidden := getJSON(t, e, "/accounts/Owner/versions/Grok", nil)
+	hidden := getJSON(t, e, "/accounts/Owner/versions/agents", nil)
 	if hidden.Code != http.StatusNotFound {
 		t.Fatalf("hidden versions %d %s", hidden.Code, hidden.Body.String())
 	}
@@ -23,7 +23,7 @@ func TestPrivacyOpensProfileActions(t *testing.T) {
 	if saved.Code != http.StatusOK {
 		t.Fatalf("privacy %d %s", saved.Code, saved.Body.String())
 	}
-	shown := getJSON(t, e, "/accounts/Owner/versions/Grok", nil)
+	shown := getJSON(t, e, "/accounts/Owner/versions/agents", nil)
 	if shown.Code != http.StatusOK {
 		t.Fatalf("shown versions %d %s", shown.Code, shown.Body.String())
 	}

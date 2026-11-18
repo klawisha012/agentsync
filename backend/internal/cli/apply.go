@@ -8,15 +8,20 @@ import (
 
 type applyCall struct {
 	author  string
-	source  string
 	version int
 	paths   []string
 }
 
+func isCanonArg(value string) bool {
+	v := strings.ToLower(strings.TrimSpace(value))
+	return v == "agents" || v == ".agents"
+}
+
 func parseApplyArgs(args []string) (applyCall, error) {
 	var call applyCall
-	var positional []string
 	seenVersion := false
+	versionIdx := -1
+	var rest []string
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		switch {
@@ -34,28 +39,38 @@ func parseApplyArgs(args []string) (applyCall, error) {
 			}
 			call.version = number
 			seenVersion = true
+			versionIdx = len(rest)
 			i = next
 		case strings.HasPrefix(arg, "-"):
-			return applyCall{}, fmt.Errorf("Неизвестный аргумент «%s».", arg)
+			return applyCall{}, usageError{text: fmt.Sprintf("Неизвестный аргумент «%s».", arg)}
 		default:
-			if len(positional) < 2 {
-				positional = append(positional, arg)
+			if call.author == "" {
+				call.author = arg
 				continue
 			}
-			call.paths = append(call.paths, arg)
+			rest = append(rest, arg)
 		}
 	}
-	if len(positional) < 2 {
-		return applyCall{}, fmt.Errorf("Назовите автора и ИИ-агента.")
+	if call.author == "" {
+		return applyCall{}, usageError{text: "Назовите автора."}
 	}
-	if seenVersion && len(call.paths) == 0 {
-		return applyCall{}, fmt.Errorf("Назовите элемент.")
-	}
-	if !seenVersion && len(call.paths) > 0 {
+	if !seenVersion {
+		if len(rest) == 0 || (len(rest) == 1 && isCanonArg(rest[0])) {
+			return call, nil
+		}
+		if len(rest) == 1 && !strings.Contains(rest[0], "/") {
+			return applyCall{}, fmt.Errorf("Публикуется и\u00a0применяется только agents: запустите agentsync apply %s.", call.author)
+		}
 		return applyCall{}, fmt.Errorf("Назовите номер версии.")
 	}
-	call.author = positional[0]
-	call.source = positional[1]
+	// Accept optional "agents" right after <author> when --version follows with element paths.
+	if versionIdx == 1 && len(rest) >= 2 && isCanonArg(rest[0]) {
+		rest = rest[1:]
+	}
+	if len(rest) == 0 {
+		return applyCall{}, fmt.Errorf("Назовите элемент.")
+	}
+	call.paths = rest
 	return call, nil
 }
 

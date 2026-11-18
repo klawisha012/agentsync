@@ -17,7 +17,7 @@ import (
 // anywhere becomes skills/<name>; subagent, command and instructions files and MCP, plugin and
 // hook records go to their agents places. Same-name elements are replaced whole, the rest stays.
 // The AI agent's own files are not written: skipped names them. Connected AI agents reconnect.
-func ApplyElements(ctx context.Context, server, root, author, agentName, account, token, cookie string, version int, paths []string) ([]string, error) {
+func ApplyElements(ctx context.Context, server, root, author, account, token, cookie string, version int, paths []string) ([]string, error) {
 	unlock, err := lockRoot(root)
 	if err != nil {
 		return nil, err
@@ -29,7 +29,7 @@ func ApplyElements(ctx context.Context, server, root, author, agentName, account
 	if len(paths) == 0 {
 		return nil, errors.New("Назовите элемент.")
 	}
-	payload, err := fetchVersion(ctx, server, author, agentName, token, cookie, version)
+	payload, err := fetchVersion(ctx, server, author, canonCard, token, cookie, version)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +40,7 @@ func ApplyElements(ctx context.Context, server, root, author, agentName, account
 	for i := range payload.Files {
 		payload.Files[i].Path, _ = CleanRel(payload.Files[i].Path)
 	}
-	split, skipped, err := chosenElements(root, payload, paths)
+	split, skipped, err := chosenElements(payload, paths)
 	if err != nil {
 		return skipped, err
 	}
@@ -53,7 +53,7 @@ func ApplyElements(ctx context.Context, server, root, author, agentName, account
 		return skipped, err
 	}
 	var undo applyUndo
-	if err := writeCard(root, "", split, &undo, false); err != nil {
+	if err := writeCard(root, split, &undo, false); err != nil {
 		undoErr := undo.rollback()
 		// The snapshot holds the previous canon until it is back in place.
 		if undoErr == nil {
@@ -69,7 +69,7 @@ func ApplyElements(ctx context.Context, server, root, author, agentName, account
 
 // chosenElements takes the named paths of a card apart into agents elements and records.
 // A path is a file or a folder of the card; a file that gives agents nothing is skipped.
-func chosenElements(root string, payload publicationPayload, paths []string) (cardSplit, []string, error) {
+func chosenElements(payload publicationPayload, paths []string) (cardSplit, []string, error) {
 	split := cardSplit{canon: map[string][]File{}, records: map[recordKind]map[string]json.RawMessage{}}
 	for _, kind := range recordKinds {
 		split.records[kind] = map[string]json.RawMessage{}
@@ -118,28 +118,20 @@ func chosenElements(root string, payload publicationPayload, paths []string) (ca
 			split.canon[element] = append(split.canon[element], File{Path: element + strings.TrimPrefix(file.Path, folder.path), Body: file.Body})
 		}
 	}
-	var mark []File
-	if i := slices.IndexFunc(payload.Files, func(f File) bool { return f.Path == MarkFile }); i >= 0 {
-		mark = payload.Files[i : i+1]
-	}
-	places, connectable := canonPlaces, true
-	if !isCanonCard(payload.Agent) {
-		places, connectable = agentPlaces(root, agentHome(root, payload.Agent), payload.Agent)
-	}
 	var skipped []string
 	for _, file := range files {
-		if file.Path == MarkFile || slices.ContainsFunc(skills, func(f skillFolder) bool { return strings.HasPrefix(file.Path, f.path+"/") }) {
+		if slices.ContainsFunc(skills, func(f skillFolder) bool { return strings.HasPrefix(file.Path, f.path+"/") }) {
 			continue
 		}
 		var part cardSplit
-		if isCanonCard(payload.Agent) && file.Path == canonRecordFile[hookRecords] {
+		if file.Path == canonRecordFile[hookRecords] {
 			records, err := canonHookRecords(file.Body)
 			if err != nil {
 				return split, nil, err
 			}
 			part.records = map[recordKind]map[string]json.RawMessage{hookRecords: records}
 		} else {
-			part = splitCard(append(slices.Clone(mark), file), places, connectable)
+			part = splitCanonFile(file)
 		}
 		given := false
 		for element, list := range part.canon {
@@ -163,9 +155,6 @@ func chosenElements(root string, payload publicationPayload, paths []string) (ca
 	}
 	return split, skipped, nil
 }
-
-// canonPlaces are the places of the agents card itself: its paths are already agents paths.
-var canonPlaces = cardPlaces{skills: "skills", agents: "agents", commands: "commands", instructions: "AGENTS.md", hasMCP: true, mcp: "mcp.json", plugins: "plugins.json"}
 
 // canonHookRecords lists the records of a hooks.json in the agents format by their canon names.
 func canonHookRecords(body string) (map[string]json.RawMessage, error) {

@@ -18,17 +18,6 @@ type statsLeader struct {
 	AvatarUpdated *time.Time `json:"avatarUpdated,omitempty"`
 }
 
-type statsAgent struct {
-	Name  string `json:"name"`
-	Count int    `json:"count"`
-}
-
-type statsShare struct {
-	Name  string `json:"name"`
-	Count int    `json:"count"`
-	Pct   int    `json:"pct"`
-}
-
 type statsReport struct {
 	Period       string        `json:"period"`
 	ViewsTotal   int           `json:"viewsTotal"`
@@ -38,15 +27,12 @@ type statsReport struct {
 	LikesAverage int           `json:"likesAverage"`
 	LikeRate     float64       `json:"likeRate"`
 	Publications int           `json:"publications"`
-	TopAgent     *statsAgent   `json:"topAgent"`
 	Accounts     int           `json:"accounts"`
 	Verified     int           `json:"verified"`
 	Fresh        int           `json:"fresh"`
 	TopWeek      int           `json:"topWeek"`
 	LastActivity *time.Time    `json:"lastActivity"`
 	Leaders      []statsLeader `json:"leaders"`
-	SharesTotal  int           `json:"sharesTotal"`
-	Shares       []statsShare  `json:"shares"`
 }
 
 func periodCutoff(period string, now time.Time) (time.Time, bool, bool) {
@@ -88,45 +74,32 @@ func (a *account) likesIn(start time.Time, bounded bool) int {
 	if !bounded {
 		return a.publicationLikes()
 	}
-	seen := map[string]struct{}{}
+	if !a.hasPublication(canonAgent) || a.likedAt == nil {
+		return 0
+	}
 	total := 0
-	for _, pub := range a.publications {
-		if pub.withdrawn {
-			continue
-		}
-		key := foldKey.String(pub.agent)
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		for _, at := range a.likedAt[key] {
-			if inWindow(at, start, true) {
-				total++
-			}
+	for _, at := range a.likedAt[canonAgent] {
+		if inWindow(at, start, true) {
+			total++
 		}
 	}
 	return total
 }
 
 func (a *account) publicationsIn(start time.Time, bounded bool) []*publication {
-	latest := map[string]*publication{}
+	var latest *publication
 	for _, pub := range a.publications {
-		if pub.withdrawn {
+		if pub.withdrawn || !isCanonAgentName(pub.agent) {
 			continue
 		}
-		key := foldKey.String(pub.agent)
-		prev := latest[key]
-		if prev == nil || pub.version > prev.version {
-			latest[key] = pub
+		if latest == nil || pub.version > latest.version {
+			latest = pub
 		}
 	}
-	kept := make([]*publication, 0, len(latest))
-	for _, pub := range latest {
-		if inWindow(pub.created, start, bounded) {
-			kept = append(kept, pub)
-		}
+	if latest == nil || !inWindow(latest.created, start, bounded) {
+		return nil
 	}
-	return kept
+	return []*publication{latest}
 }
 
 func roundedAverage(total, count int) int {
@@ -152,10 +125,8 @@ func (s *store) stats(period string, now time.Time) (statsReport, int, string) {
 	report := statsReport{
 		Period:  period,
 		Leaders: []statsLeader{},
-		Shares:  []statsShare{},
 	}
 	var last *time.Time
-	counts := map[string]int{}
 	for _, item := range s.byName {
 		card := item.card()
 		card.PublishedAt = item.publishedAt
@@ -179,10 +150,7 @@ func (s *store) stats(period string, now time.Time) (statsReport, int, string) {
 			Name: item.name, Views: views, Verified: item.verified,
 			HasAvatar: item.hasAvatar, AvatarUpdated: avatarStamp(item.avatarUpdated),
 		})
-		for _, pub := range item.publicationsIn(start, bounded) {
-			report.Publications++
-			counts[pub.agent]++
-		}
+		report.Publications += len(item.publicationsIn(start, bounded))
 	}
 	markTopWeek(cards, now)
 	for _, card := range cards {
@@ -220,37 +188,7 @@ func (s *store) stats(period string, now time.Time) (statsReport, int, string) {
 		leaders = leaders[:5]
 	}
 	report.Leaders = leaders
-
-	bestName, bestCount := "", 0
-	for name, count := range counts {
-		if count > bestCount || (count == bestCount && (bestName == "" || foldedCompare(name, bestName) < 0)) {
-			bestName, bestCount = name, count
-		}
-	}
-	if bestCount > 0 {
-		report.TopAgent = &statsAgent{Name: bestName, Count: bestCount}
-	}
-	report.SharesTotal = report.Publications
-	report.Shares = shareRows(counts, report.SharesTotal)
 	return report, http.StatusOK, ""
-}
-
-func shareRows(counts map[string]int, total int) []statsShare {
-	rows := make([]statsShare, 0, len(counts))
-	for name, count := range counts {
-		pct := 0
-		if total > 0 {
-			pct = int(math.Round(float64(count) / float64(total) * 100))
-		}
-		rows = append(rows, statsShare{Name: name, Count: count, Pct: pct})
-	}
-	slices.SortFunc(rows, func(a, b statsShare) int {
-		if a.Count != b.Count {
-			return b.Count - a.Count
-		}
-		return foldedCompare(a.Name, b.Name)
-	})
-	return rows
 }
 
 func foldedCompare(a, b string) int {

@@ -7,37 +7,29 @@ import AgentLogo from "../agent-logo";
 import Icon from "../profile-icon";
 import { shellCommand } from "../shell-arg";
 
-const tones = {
-  grok: "grok",
-  agents: "agents",
-  claude: "claude",
-};
-
 export default function AgentBoard({ page, owner, onChange, onExplain }) {
-  const [copied, setCopied] = useState("");
-  const [notes, setNotes] = useState({});
+  const [copied, setCopied] = useState(false);
+  const [note, setNote] = useState("");
   const agents = page.agents || [];
-
-  function note(agentName, text) {
-    setNotes((current) => ({ ...current, [agentName]: text }));
-  }
+  const publishedSlot = agents.find((item) => String(item.name || "").trim().toLowerCase() === "agents" && item.version != null) || null;
+  const slot = publishedSlot || (owner ? { name: "agents", version: null, files: 0, publishedAt: null, likes: 0, liked: false } : null);
 
   async function withdraw(agent) {
-    if (!agent.publicationId) {
-      note(agent.name, "Публикация не найдена.");
+    if (!agent?.publicationId) {
+      setNote("Публикация не найдена.");
       return;
     }
     const res = await api(`/publications/${agent.publicationId}/withdraw`, { method: "POST", body: "{}" });
     if (!res.ok) {
-      note(agent.name, res.body?.explanation || "Не удалось снять публикацию.");
+      setNote(res.body?.explanation || "Не удалось снять публикацию.");
       return;
     }
-    note(agent.name, "");
+    setNote("");
     await onChange();
   }
 
-  async function like(agent) {
-    const res = await api(`/accounts/${encodeURIComponent(page.name)}/agents/${encodeURIComponent(agent.name)}/like`, {
+  async function like() {
+    const res = await api(`/accounts/${encodeURIComponent(page.name)}/agents/agents/like`, {
       method: "POST",
       body: "{}",
     });
@@ -49,136 +41,119 @@ export default function AgentBoard({ page, owner, onChange, onExplain }) {
     await onChange();
   }
 
-  async function copyText(key, text) {
+  async function copyText(text) {
     try {
       await navigator.clipboard.writeText(text);
-      setCopied(key);
+      setCopied(true);
     } catch {
       onExplain("Не удалось скопировать команду.");
     }
   }
 
-  const published = agents.filter((agent) => agent.version != null).length;
+  const command = owner
+    ? shellCommand(["agentsync", "push"])
+    : shellCommand(["agentsync", "apply", page.name]);
+  const canCopy = owner || (page.shareCopy && slot?.version != null);
+  const canView = owner || (page.shareView && slot?.version != null);
+  const canVersions = owner || page.shareVersions;
 
   return (
     <section className="agents">
       <div className="section-title">
         <div className="section-title-main">
-          <h2>{owner ? "Управление опубликованными агентами" : "Опубликованные агенты"}</h2>
-          <span className="count-pill">{publishedLabel(published)}</span>
+          <h2>{owner ? "Управление публикацией agents" : "Публикация agents"}</h2>
+          <span className="count-pill">{slot?.version != null ? `v${slot.version}` : "не опубликовано"}</span>
         </div>
         {owner ? <p className="hint section-aside">Публикация командой agentsync push</p> : null}
       </div>
-      <div className="house-grid">
-        {agents.map((agent) => {
-          const command = owner
-            ? shellCommand(["agentsync", "push", agent.name])
-            : shellCommand(["agentsync", "apply", page.name, agent.name]);
-          const tone = tones[String(agent.name || "").trim().toLowerCase()] || "plain";
-          const canon = String(agent.name || "").trim().toLowerCase() === "agents";
-          const canCopy = owner || (page.shareCopy && agent.version != null);
-          const canView = owner || (page.shareView && agent.version != null);
-          const canVersions = owner || page.shareVersions;
-          return (
-            <article className="house-card" key={agent.name}>
-              <div>
-                <div className="house-head">
-                  <span>
-                    <AgentLogo name={agent.name} tone={tone} />
-                    <strong>{canon ? "agents" : agent.name}</strong>
-                  </span>
-                  {agent.version != null ? <em className={`version-chip tone-${tone}`}>v{agent.version}</em> : null}
-                </div>
-                <p className="path-line">
-                  <Icon name="folder" />
-                  {canon ? "~/.agents" : `~/${agent.name}`}
-                </p>
-                <p className="house-copy">
-                  {canon
-                    ? "Общая настройка всех подключённых ИИ-агентов без .env и машинного MCP."
-                    : "Переносимая настройка без учётных данных и машинного MCP."}
-                </p>
-                <dl className="house-stats">
-                  <div>
-                    <dt>Файлов</dt>
-                    <dd>{agent.version == null ? "нет" : `${agent.files} переносимых`}</dd>
-                  </div>
-                  <div>
-                    <dt>Обновлено</dt>
-                    <dd className={agent.publishedAt ? "fresh" : ""}>{agent.publishedAt ? ago(agent.publishedAt) : "нет"}</dd>
-                  </div>
-                  {agent.version != null ? (
-                    <div>
-                      <dt>Лайки</dt>
-                      <dd>
-                        {owner ? (
-                          <span className="like-count" title="Свою публикацию лайкнуть нельзя">{formatCount(agent.likes || 0)}</span>
-                        ) : (
-                          <button className={agent.liked ? "like-count on" : "like-count"} type="button" aria-pressed={Boolean(agent.liked)} onClick={() => like(agent)}>
-                            {agent.liked ? "Снять лайк" : "Лайк"}
-                            <b>{formatCount(agent.likes || 0)}</b>
-                          </button>
-                        )}
-                      </dd>
-                    </div>
-                  ) : null}
-                </dl>
+      {!slot ? (
+        <p className="hint">Публикация agents пока не открыта.</p>
+      ) : (
+        <div className="house-grid">
+          <article className="house-card">
+            <div>
+              <div className="house-head">
+                <span>
+                  <AgentLogo name="agents" tone="agents" />
+                  <strong>agents</strong>
+                </span>
+                {slot.version != null ? <em className="version-chip tone-agents">v{slot.version}</em> : null}
               </div>
-              {notes[agent.name] ? <p className="explanation">{notes[agent.name]}</p> : null}
-              {owner || canCopy || canView || canVersions ? (
-                <div className="house-foot">
-                  <div className="house-actions">
-                    {canCopy ? (
-                      <button type="button" aria-label={`Скопировать команду ${command}`} onClick={() => copyText(`push:${agent.name}`, command)}>
-                        <Icon name={copied === `push:${agent.name}` ? "check" : "copy"} />
-                        {copied === `push:${agent.name}` ? "Скопировано" : "Скопировать"}
-                      </button>
-                    ) : null}
-                    {canView && agent.version != null ? (
-                      <Link href={`/${page.name}/store/${encodeURIComponent(agent.name)}/${agent.version}`}>
-                        <Icon name="eye" />
-                        Осмотр
-                      </Link>
-                    ) : null}
-                    {owner && agent.version == null ? (
-                      <button type="button" onClick={() => note(agent.name, "Нет публикаций.")}>
-                        <Icon name="eye" />
-                        Осмотр
-                      </button>
-                    ) : null}
-                    {canVersions ? (
-                      <Link href={`/${page.name}/store/${encodeURIComponent(agent.name)}`}>
-                        <Icon name="history" />
-                        Версии
-                      </Link>
-                    ) : null}
+              <p className="path-line">
+                <Icon name="folder" />
+                ~/.agents
+              </p>
+              <p className="house-copy">
+                Общая настройка всех подключённых ИИ-агентов без .env и машинного MCP.
+              </p>
+              <dl className="house-stats">
+                <div>
+                  <dt>Файлов</dt>
+                  <dd>{slot.version == null ? "нет" : `${slot.files} переносимых`}</dd>
+                </div>
+                <div>
+                  <dt>Обновлено</dt>
+                  <dd className={slot.publishedAt ? "fresh" : ""}>{slot.publishedAt ? ago(slot.publishedAt) : "нет"}</dd>
+                </div>
+                {slot.version != null ? (
+                  <div>
+                    <dt>Лайки</dt>
+                    <dd>
+                      {owner ? (
+                        <span className="like-count" title="Свою публикацию лайкнуть нельзя">{formatCount(slot.likes || 0)}</span>
+                      ) : (
+                        <button className={slot.liked ? "like-count on" : "like-count"} type="button" aria-pressed={Boolean(slot.liked)} onClick={like}>
+                          {slot.liked ? "Снять лайк" : "Лайк"}
+                          <b>{formatCount(slot.likes || 0)}</b>
+                        </button>
+                      )}
+                    </dd>
                   </div>
-                  {owner ? (
-                    <button className="withdraw" type="button" onClick={() => withdraw(agent)}>
-                      <Icon name="unpublish" />
-                      Снять публикацию
+                ) : null}
+              </dl>
+            </div>
+            {note ? <p className="explanation">{note}</p> : null}
+            {owner || canCopy || canView || canVersions ? (
+              <div className="house-foot">
+                <div className="house-actions">
+                  {canCopy ? (
+                    <button type="button" aria-label={`Скопировать команду ${command}`} onClick={() => copyText(command)}>
+                      <Icon name={copied ? "check" : "copy"} />
+                      {copied ? "Скопировано" : "Скопировать"}
                     </button>
                   ) : null}
+                  {canView && slot.version != null ? (
+                    <Link href={`/${page.name}/store/agents/${slot.version}`}>
+                      <Icon name="eye" />
+                      Осмотр
+                    </Link>
+                  ) : null}
+                  {owner && slot.version == null ? (
+                    <button type="button" onClick={() => setNote("Нет публикаций.")}>
+                      <Icon name="eye" />
+                      Осмотр
+                    </button>
+                  ) : null}
+                  {canVersions ? (
+                    <Link href={`/${page.name}/store/agents`}>
+                      <Icon name="history" />
+                      Версии
+                    </Link>
+                  ) : null}
                 </div>
-              ) : null}
-            </article>
-          );
-        })}
-      </div>
+                {owner && slot.version != null ? (
+                  <button className="withdraw" type="button" onClick={() => withdraw(slot)}>
+                    <Icon name="unpublish" />
+                    Снять публикацию
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </article>
+        </div>
+      )}
     </section>
   );
-}
-
-function publishedLabel(count) {
-  const n10 = count % 10;
-  const n100 = count % 100;
-  let word = "агентов";
-  if (n10 === 1 && n100 !== 11) {
-    word = "агент";
-  } else if (n10 >= 2 && n10 <= 4 && (n100 < 12 || n100 > 14)) {
-    word = "агента";
-  }
-  return `${count}\u00a0${word} с\u00a0публикацией`;
 }
 
 function formatCount(value) {

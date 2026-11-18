@@ -131,12 +131,12 @@ func TestAccountListsOnlyPublishedAgents(t *testing.T) {
 		t.Fatalf("empty page listed %v", names)
 	}
 
-	pushed := postAuth(t, e, "/agent/push", "", pushBody("Grok", false, pushFile{"rules/ok.md", "one"}), owner)
+	pushed := postAuth(t, e, "/agent/push", "", pushBody("agents", false, pushFile{"rules/ok.md", "one"}), owner)
 	if pushed.Code != http.StatusCreated {
 		t.Fatalf("push %d %s", pushed.Code, pushed.Body.String())
 	}
 	page := getJSON(t, e, "/accounts/Owner", nil)
-	if names := agentNames(t, page.Body.Bytes()); len(names) != 1 || names[0] != "Grok" {
+	if names := agentNames(t, page.Body.Bytes()); len(names) != 1 || names[0] != "agents" {
 		t.Fatalf("published page %v %s", names, page.Body.String())
 	}
 	cards := decodeCards(t, getJSON(t, e, "/accounts", nil).Body.Bytes())
@@ -146,7 +146,7 @@ func TestAccountListsOnlyPublishedAgents(t *testing.T) {
 			ownerCard = card
 		}
 	}
-	if names := agentNamesOf(ownerCard); len(names) != 1 || names[0] != "Grok" {
+	if names := agentNamesOf(ownerCard); len(names) != 1 || names[0] != "agents" {
 		t.Fatalf("list card %+v", ownerCard.Agents)
 	}
 

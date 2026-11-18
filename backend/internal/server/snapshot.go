@@ -43,13 +43,11 @@ type snapshotList struct {
 }
 
 func (s *store) record(ctx context.Context, sessionID, agentToken, agent string, missing bool, files []storedFile) (snapshotView, int, string) {
-	agent = strings.TrimSpace(agent)
-	if agent == "" {
-		return snapshotView{}, http.StatusBadRequest, "Назовите ИИ-агента."
+	resolved, ok := resolveCanonAgent(agent)
+	if !ok {
+		return snapshotView{}, http.StatusBadRequest, "В хранилище хранится только agents (~/.agents)."
 	}
-	if msg := safeAgentName(agent); msg != "" {
-		return snapshotView{}, http.StatusBadRequest, msg
-	}
+	agent = resolved
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	viewer, code, msg := s.owner(sessionID, agentToken, false)
@@ -57,7 +55,7 @@ func (s *store) record(ctx context.Context, sessionID, agentToken, agent string,
 		return snapshotView{}, code, msg
 	}
 	if missing {
-		return snapshotView{}, http.StatusBadRequest, "На компьютере нет этого ИИ-агента."
+		return snapshotView{}, http.StatusBadRequest, "На компьютере нет ~/.agents."
 	}
 	kept, explain := classify(files)
 	if explain != "" {
@@ -91,10 +89,11 @@ func (s *store) record(ctx context.Context, sessionID, agentToken, agent string,
 }
 
 func (s *store) listSnapshots(sessionID, agentToken, agent string) (snapshotList, int, string) {
-	agent = strings.TrimSpace(agent)
-	if agent == "" {
-		return snapshotList{}, http.StatusBadRequest, "Назовите ИИ-агента."
+	resolved, ok := resolveCanonAgent(agent)
+	if !ok {
+		return snapshotList{}, http.StatusBadRequest, "В хранилище хранится только agents (~/.agents)."
 	}
+	agent = resolved
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	viewer, code, msg := s.owner(sessionID, agentToken, false)
@@ -116,10 +115,14 @@ func (s *store) listSnapshots(sessionID, agentToken, agent string) (snapshotList
 }
 
 func (s *store) snapshot(sessionID, agentToken, agent string, number int) (snapshotView, int, string) {
-	agent = strings.TrimSpace(agent)
-	if agent == "" || number < 1 {
-		return snapshotView{}, http.StatusBadRequest, "Назовите ИИ-агента."
+	resolved, ok := resolveCanonAgent(agent)
+	if !ok {
+		return snapshotView{}, http.StatusBadRequest, "В хранилище хранится только agents (~/.agents)."
 	}
+	if number < 1 {
+		return snapshotView{}, http.StatusBadRequest, "Укажите номер снимка."
+	}
+	agent = resolved
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	viewer, code, msg := s.owner(sessionID, agentToken, false)
@@ -169,7 +172,7 @@ func (a *app) recordSnapshot(c echo.Context) error {
 		Files   []storedFile `json:"files"`
 	}
 	if err := c.Bind(&req); err != nil {
-		return writeExplanation(c, http.StatusBadRequest, "Назовите ИИ-агента.")
+		return writeExplanation(c, http.StatusBadRequest, "Не удалось прочитать снимок.")
 	}
 	token := bearer(c)
 	view, code, msg := a.accounts.record(c.Request().Context(), sessionID, token, req.Agent, req.Missing, req.Files)
@@ -198,7 +201,7 @@ func (a *app) showSnapshot(c echo.Context) error {
 	}
 	number, err := strconv.Atoi(c.Param("number"))
 	if err != nil {
-		return writeExplanation(c, http.StatusBadRequest, "Назовите ИИ-агента.")
+		return writeExplanation(c, http.StatusBadRequest, "Укажите номер снимка.")
 	}
 	view, code, msg := a.accounts.snapshot(sessionID, bearer(c), c.Param("agent"), number)
 	if msg != "" {

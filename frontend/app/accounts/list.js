@@ -107,9 +107,9 @@ export default function AccountList() {
 
 function AccountCard({ account }) {
   const agents = account.agents || [];
-  const published = agents.filter((agent) => agent.version != null);
+  const slot = agents.find((agent) => agent.version != null) || null;
   return (
-    <article className={published.length === 0 ? "account-card quiet" : "account-card"}>
+    <article className={!slot ? "account-card quiet" : "account-card"}>
       <div className="card-top">
         <div className="card-id">
           <Avatar className="initials" name={account.name} updated={account.avatarUpdated} letter={initials(account.name)} />
@@ -120,27 +120,24 @@ function AccountCard({ account }) {
               {account.fresh ? <em className="badge">новый</em> : null}
               {account.topWeek ? <em className="badge top">топ недели</em> : null}
             </div>
-            <p className="card-meta">{metaLine(account, agents, published.length)}</p>
+            <p className="card-meta">{metaLine(account, slot)}</p>
           </div>
         </div>
         <div className="metric-chips">
           <span className="metric-chip"><EyeIcon />{formatCount(account.views)}</span>
-          <span className="metric-chip" title="Сумма лайков публикаций"><HeartIcon />{formatCount(account.likes)}</span>
+          <span className="metric-chip" title="Лайки публикации agents"><HeartIcon />{formatCount(account.likes)}</span>
         </div>
       </div>
     </article>
   );
 }
 
-function metaLine(account, agents, published) {
-  if (published === 0) {
-    return "В агентах нет опубликованных настроек";
+function metaLine(account, slot) {
+  if (!slot) {
+    return "Публикации agents пока нет";
   }
   const when = account.publishedAt ? `Обновлено: ${ago(account.publishedAt)}` : "Обновлено";
-  const active = published === 1
-    ? `1 активный агент (${agents.find((agent) => agent.version != null).name})`
-    : ruCount(published, "активный агент", "активных агента", "активных агентов");
-  return `${when} · ${active}`;
+  return `${when} · agents v${slot.version}`;
 }
 
 function ago(value) {

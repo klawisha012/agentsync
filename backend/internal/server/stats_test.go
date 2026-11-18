@@ -45,14 +45,14 @@ func TestStatsPeriods(t *testing.T) {
 
 	alice := mustAccount(t, e, "alice@example.com", "secret-pass", "Alice")
 	bob := mustAccount(t, e, "bob@example.com", "secret-pass", "Bob")
-	pushed := postAuth(t, e, "/agent/push", "", pushBody("Grok", false, pushFile{"rules/ok.md", "one"}), alice)
+	pushed := postAuth(t, e, "/agent/push", "", pushBody("agents", false, pushFile{"rules/ok.md", "one"}), alice)
 	if pushed.Code != http.StatusCreated {
 		t.Fatalf("push %d %s", pushed.Code, pushed.Body.String())
 	}
 	if got := getJSON(t, e, "/accounts/Alice", bob); viewsOf(t, got) != 1 {
 		t.Fatalf("view %s", got.Body.String())
 	}
-	liked := postJSON(t, e, "/accounts/Alice/agents/Grok/like", map[string]string{}, bob)
+	liked := postJSON(t, e, "/accounts/Alice/agents/agents/like", map[string]string{}, bob)
 	if liked.Code != http.StatusOK {
 		t.Fatalf("like %d %s", liked.Code, liked.Body.String())
 	}
@@ -69,14 +69,11 @@ func TestStatsPeriods(t *testing.T) {
 		if body.Period != period || body.Accounts != 2 || body.ViewsTotal != 1 || body.LikesTotal != 1 {
 			t.Fatalf("%s totals %+v", period, body)
 		}
-		if body.Publications != 1 || body.SharesTotal != 1 || len(body.Shares) != 1 || body.Shares[0].Name != "Grok" || body.Shares[0].Pct != 100 {
+		if body.Publications != 1 || body.LikeRate != 100 {
 			t.Fatalf("%s publications %+v", period, body)
 		}
 		if body.ViewsLeader == nil || body.ViewsLeader.Name != "Alice" || body.ViewsLeader.Views != 1 {
 			t.Fatalf("%s leader %+v", period, body.ViewsLeader)
-		}
-		if body.TopAgent == nil || body.TopAgent.Name != "Grok" || body.LikeRate != 100 {
-			t.Fatalf("%s agent %+v rate %v", period, body.TopAgent, body.LikeRate)
 		}
 		if body.Fresh != 1 || body.TopWeek != 1 || body.LastActivity == nil {
 			t.Fatalf("%s catalog %+v", period, body)
@@ -97,34 +94,38 @@ func TestStatsWindowSplitsDatedActivity(t *testing.T) {
 			"new": recent,
 		},
 		publications: []*publication{
-			{agent: "Grok", version: 1, created: old},
-			{agent: "Grok", version: 2, created: recent},
-			{agent: "Agents", version: 1, created: old},
+			{agent: "agents", version: 1, created: old},
+			{agent: "agents", version: 2, created: recent},
+			{agent: "Grok", version: 1, created: recent},
 			{agent: "Claude", version: 1, created: old, withdrawn: true},
 		},
 	}
-	quiet := &account{name: "Bob", viewers: map[string]struct{}{}, viewedAt: map[string]time.Time{}}
+	quiet := &account{
+		name:     "Bob",
+		viewers:  map[string]struct{}{},
+		viewedAt: map[string]time.Time{},
+		publications: []*publication{
+			{agent: "Agents", version: 1, created: old},
+		},
+	}
 	store := &store{byName: map[string]*account{"alice": page, "bob": quiet}}
 
 	week, code, msg := store.stats("7", now)
 	if code != http.StatusOK || msg != "" {
 		t.Fatalf("week %d %s", code, msg)
 	}
-	if week.ViewsTotal != 1 || week.Publications != 1 || week.SharesTotal != 1 {
+	if week.ViewsTotal != 1 || week.Publications != 1 {
 		t.Fatalf("week totals %+v", week)
 	}
 	if week.ViewsLeader == nil || week.ViewsLeader.Name != "Alice" || week.ViewsLeader.Views != 1 || len(week.Leaders) != 1 {
 		t.Fatalf("week leader %+v list %+v", week.ViewsLeader, week.Leaders)
-	}
-	if week.TopAgent == nil || week.TopAgent.Name != "Grok" || week.TopAgent.Count != 1 {
-		t.Fatalf("week agent %+v", week.TopAgent)
 	}
 
 	all, code, msg := store.stats("all", now)
 	if code != http.StatusOK || msg != "" {
 		t.Fatalf("all %d %s", code, msg)
 	}
-	if all.ViewsTotal != 2 || all.Publications != 2 || all.SharesTotal != 2 || len(all.Shares) != 2 {
+	if all.ViewsTotal != 2 || all.Publications != 2 {
 		t.Fatalf("all totals %+v", all)
 	}
 	if len(all.Leaders) != 2 || all.Leaders[0].Name != "Alice" {

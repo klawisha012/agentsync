@@ -275,7 +275,7 @@ func applyExportPlan(root string, plan exportPlan) error {
 	if err != nil {
 		return errors.Join(err, undo.rollback())
 	}
-	return nil
+	return undo.finish(canon)
 }
 
 func writeCanonMoves(canon string, moves []ownMove, undo *applyUndo) error {

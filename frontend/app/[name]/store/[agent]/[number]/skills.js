@@ -3,11 +3,11 @@
 import { useState } from "react";
 import { shellCommand } from "../../../../shell-arg";
 
-export default function SkillCommand({ author, agent, version, skills, picked }) {
+export default function SkillCommand({ author, version, skills, picked }) {
   const [copied, setCopied] = useState(false);
   const [note, setNote] = useState("");
   const clashes = duplicateSkillNames(skills, picked);
-  const command = clashes.length > 0 ? "" : applyCommand(author, agent, version, chosenPaths(skills, picked));
+  const command = clashes.length > 0 ? "" : applyCommand(author, version, chosenPaths(skills, picked));
 
   async function copyCommand() {
     try {
@@ -110,9 +110,9 @@ function chosenPaths(skills, picked) {
   return [...picked].filter((path) => folders.includes(path) || !inside(path)).sort();
 }
 
-function applyCommand(author, source, version, paths) {
+function applyCommand(author, version, paths) {
   if (paths.length === 0) {
     return "";
   }
-  return shellCommand(["agentsync", "apply", author, source, "--version", String(version), ...paths]);
+  return shellCommand(["agentsync", "apply", author, "--version", String(version), ...paths]);
 }

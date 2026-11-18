@@ -10,12 +10,12 @@ import (
 	"github.com/klawisha012/agentsync/internal/agent"
 )
 
-func TestPipeApplySnapshotsGrokHome(t *testing.T) {
+func TestPipeApplySnapshotsCanonHome(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("AGENTSYNC_ROOT", dir)
 	t.Setenv("AGENTSYNC_ACCOUNT", "zwarder")
 	t.Setenv("AGENTSYNC_STATE", t.TempDir())
-	home := filepath.Join(dir, ".grok")
+	home := filepath.Join(dir, ".agents")
 	write := func(rel, body string) {
 		t.Helper()
 		target := filepath.Join(home, filepath.FromSlash(rel))
@@ -27,8 +27,8 @@ func TestPipeApplySnapshotsGrokHome(t *testing.T) {
 		}
 	}
 	write("AGENTS.md", "old")
-	write("credentials.json", "secret")
-	payload := bytes.NewBufferString(`{"author":"zwarder","agent":"Grok","files":[{"path":"AGENTS.md","body":"new"}]}`)
+	write(".env", "SECRET=1")
+	payload := bytes.NewBufferString(`{"author":"zwarder","agent":"agents","files":[{"path":"AGENTS.md","body":"new"}]}`)
 	var out, err bytes.Buffer
 	if code := Run(nil, payload, &out, &err); code != 0 {
 		t.Fatalf("apply %d %s", code, err.String())
@@ -36,24 +36,21 @@ func TestPipeApplySnapshotsGrokHome(t *testing.T) {
 	if body := readFile(t, filepath.Join(home, "AGENTS.md")); body != "new" {
 		t.Fatalf("home %q", body)
 	}
-	if body := readFile(t, filepath.Join(home, "credentials.json")); body != "secret" {
-		t.Fatal("credentials changed")
+	if body := readFile(t, filepath.Join(home, ".env")); body != "SECRET=1" {
+		t.Fatal(".env changed")
 	}
-	if _, statErr := os.Stat(filepath.Join(dir, "Grok")); !os.IsNotExist(statErr) {
-		t.Fatal("apply wrote ~/Grok instead of ~/.grok")
-	}
-	snaps := agent.Chain(dir, "zwarder", "Grok")
+	snaps := agent.Chain(dir, "zwarder", "agents")
 	if len(snaps) != 1 || !hasBody(snaps[0].Files, "AGENTS.md", "old") {
 		t.Fatalf("snapshot %+v", snaps)
 	}
-	if revertErr := agent.Revert(dir, "zwarder", "Grok"); revertErr != nil {
+	if revertErr := agent.Revert(dir, "zwarder", "agents"); revertErr != nil {
 		t.Fatal(revertErr)
 	}
 	if body := readFile(t, filepath.Join(home, "AGENTS.md")); body != "old" {
 		t.Fatalf("revert %q", body)
 	}
-	if body := readFile(t, filepath.Join(home, "credentials.json")); body != "secret" {
-		t.Fatal("revert touched credentials")
+	if body := readFile(t, filepath.Join(home, ".env")); body != "SECRET=1" {
+		t.Fatal("revert touched .env")
 	}
 }
 
@@ -87,13 +84,13 @@ func TestRunHelp(t *testing.T) {
 		{name: "help flag", args: []string{"--help"}, code: 0, stdout: "agentsync help apply", stderr: ""},
 		{name: "short help flag", args: []string{"-h"}, code: 0, stdout: "AGENTSYNC_SERVER", stderr: ""},
 		{name: "help command", args: []string{"help"}, code: 0, stdout: "agentsync push", stderr: ""},
-		{name: "command help", args: []string{"help", "apply"}, code: 0, stdout: "agentsync apply <автор> <ии-агент>", stderr: ""},
+		{name: "command help", args: []string{"help", "apply"}, code: 0, stdout: "agentsync apply <автор>", stderr: ""},
 		{name: "skills removed", args: []string{"skills", "Author", "Grok"}, code: 2, stdout: "", stderr: "Неизвестная команда «skills»."},
-		{name: "flag after command", args: []string{"push", "--help"}, code: 0, stdout: "agentsync push <ии-агент>", stderr: ""},
+		{name: "all removed", args: []string{"all"}, code: 2, stdout: "", stderr: "Неизвестная команда «all»."},
+		{name: "flag after command", args: []string{"push", "--help"}, code: 0, stdout: "agentsync push", stderr: ""},
 		{name: "unknown command", args: []string{"nope"}, code: 2, stdout: "", stderr: "Неизвестная команда «nope»."},
 		{name: "unknown topic", args: []string{"help", "nope"}, code: 2, stdout: "", stderr: "agentsync help"},
-		{name: "missing agent", args: []string{"push"}, code: 2, stdout: "", stderr: "Назовите ИИ-агента."},
-		{name: "missing apply args", args: []string{"apply", "Author"}, code: 2, stdout: "", stderr: "agentsync apply"},
+		{name: "missing apply args", args: []string{"apply"}, code: 2, stdout: "", stderr: "Назовите автора."},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -127,9 +127,11 @@ func (s *store) recordView(page, viewer *account, visitorID string) {
 }
 
 func (a *account) hasPublication(agent string) bool {
-	key := foldKey.String(agent)
+	if !isCanonAgentName(agent) {
+		return false
+	}
 	for _, pub := range a.publications {
-		if !pub.withdrawn && foldKey.String(pub.agent) == key {
+		if !pub.withdrawn && isCanonAgentName(pub.agent) {
 			return true
 		}
 	}
@@ -137,38 +139,33 @@ func (a *account) hasPublication(agent string) bool {
 }
 
 func (a *account) publicationLikes() int {
-	seen := map[string]struct{}{}
-	total := 0
-	for _, pub := range a.publications {
-		if pub.withdrawn {
-			continue
-		}
-		key := foldKey.String(pub.agent)
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		total += len(a.agentLikes[key])
+	if !a.hasPublication(canonAgent) || a.agentLikes == nil {
+		return 0
 	}
-	return total
+	return len(a.agentLikes[canonAgent])
 }
 
 func (a *account) agentLikeCount(agent string) int {
 	if !a.hasPublication(agent) || a.agentLikes == nil {
 		return 0
 	}
-	return len(a.agentLikes[foldKey.String(agent)])
+	return len(a.agentLikes[canonAgent])
 }
 
 func (a *account) agentLiked(agent string, viewer *account) bool {
 	if viewer == nil || a.agentLikes == nil || !a.hasPublication(agent) {
 		return false
 	}
-	_, ok := a.agentLikes[foldKey.String(agent)][viewer.nameKey]
+	_, ok := a.agentLikes[canonAgent][viewer.nameKey]
 	return ok
 }
 
 func (s *store) toggleLike(name, agent, sessionID string) (int, bool, int, int, string) {
+	resolved, ok := resolveCanonAgent(agent)
+	if !ok {
+		return 0, false, 0, http.StatusNotFound, "Публикация не найдена."
+	}
+	agent = resolved
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	viewer := s.accountBySession(sessionID)
@@ -185,7 +182,7 @@ func (s *store) toggleLike(name, agent, sessionID string) (int, bool, int, int, 
 	if viewer == page {
 		return page.agentLikeCount(agent), false, page.publicationLikes(), http.StatusForbidden, "Свою публикацию лайкнуть нельзя."
 	}
-	key := foldKey.String(agent)
+	key := canonAgent
 	if page.agentLikes == nil {
 		page.agentLikes = map[string]map[string]struct{}{}
 	}

@@ -44,7 +44,7 @@ func TestCanonCardPushApplyBreakRevert(t *testing.T) {
 	write(src, "skills/note/SKILL.md", "note")
 	write(src, "AGENTS.md", "rules")
 	write(src, ".env", "SECRET=from-author")
-	if _, err := agent.Push(t.Context(), ts.URL, src, "agents", "", cookie); err != nil {
+	if err := agent.Push(t.Context(), ts.URL, src, "", cookie); err != nil {
 		t.Fatal(err)
 	}
 	page := getJSON(t, e, "/accounts/Canon", nil)
@@ -55,14 +55,14 @@ func TestCanonCardPushApplyBreakRevert(t *testing.T) {
 	dst := t.TempDir()
 	write(dst, "skills/old/SKILL.md", "old")
 	write(dst, ".env", "MINE=1")
-	if err := agent.ApplyBroken(t.Context(), ts.URL, dst, "Canon", "agents", "", cookie); err == nil {
+	if err := agent.ApplyBroken(t.Context(), ts.URL, dst, "Canon", "", cookie); err == nil {
 		t.Fatal("broken apply succeeded")
 	}
 	if read(dst, "skills/old/SKILL.md") != "old" || read(dst, "skills/note/SKILL.md") != "" || len(agent.Chain(dst, "Canon", "agents")) != 0 {
 		t.Fatal("broken apply changed the canon or left a snapshot")
 	}
 
-	if err := agent.Apply(t.Context(), ts.URL, dst, "Canon", "agents", "", "", cookie); err != nil {
+	if err := agent.Apply(t.Context(), ts.URL, dst, "Canon", "", "", cookie); err != nil {
 		t.Fatal(err)
 	}
 	if read(dst, "skills/note/SKILL.md") != "note" || read(dst, "AGENTS.md") != "rules" || read(dst, "skills/old/SKILL.md") != "" {

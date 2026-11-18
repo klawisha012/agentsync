@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/klawisha012/agentsync/internal/agent"
@@ -92,6 +93,42 @@ func hasHelpFlag(args []string) bool {
 	return false
 }
 
+func checkCanonOnlyArgs(args []string, refusal string) error {
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			return usageError{text: "Неизвестный аргумент «" + arg + "»."}
+		}
+	}
+	if len(args) == 0 || (len(args) == 1 && isCanonArg(args[0])) {
+		return nil
+	}
+	if len(args) > 1 {
+		return usageError{text: "Неизвестный аргумент «" + args[1] + "»."}
+	}
+	return errors.New(refusal)
+}
+
+func parseStoreNumber(args []string) (string, error) {
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			return "", usageError{text: "Неизвестный аргумент «" + arg + "»."}
+		}
+	}
+	if len(args) > 0 && isCanonArg(args[0]) {
+		args = args[1:]
+	}
+	if len(args) == 0 {
+		return "", nil
+	}
+	if len(args) > 1 {
+		return "", usageError{text: "Неизвестный аргумент «" + args[1] + "»."}
+	}
+	if n, err := strconv.Atoi(args[0]); err != nil || n < 1 {
+		return "", errors.New("В\u00a0хранилище хранится только ~/.agents: укажите номер снимка (например, agentsync store 2).")
+	}
+	return args[0], nil
+}
+
 func (item spec) execute(args []string, stdout io.Writer) error {
 	switch item.name {
 	case "on", "off":
@@ -107,12 +144,22 @@ func (item spec) execute(args []string, stdout io.Writer) error {
 	case "update":
 		return updateCommand(args, stdout)
 	}
+	switch item.name {
+	case "push":
+		if err := checkCanonOnlyArgs(args, "Публикуется только ~/.agents. Перенесите настройки командой agentsync export, затем запустите agentsync push."); err != nil {
+			return err
+		}
+	case "record":
+		if err := checkCanonOnlyArgs(args, "В\u00a0хранилище записывается только ~/.agents: запустите agentsync record."); err != nil {
+			return err
+		}
+	}
 	root, server, token, account, cookie, err := clientSession()
 	if err != nil {
 		return err
 	}
 	ctx := context.Background()
-	if (item.name == "push" || item.name == "all" || item.name == "record") && token == "" && cookie == "" {
+	if (item.name == "push" || item.name == "record") && token == "" && cookie == "" {
 		return errors.New("Войдите в\u00a0аккаунт: agentsync login")
 	}
 	switch item.name {
@@ -123,54 +170,20 @@ func (item spec) execute(args []string, stdout io.Writer) error {
 		}
 		return login(ctx, server, email, stdout)
 	case "push":
-		report, err := agent.Push(
-			ctx,
-			server,
-			root,
-			args[0],
-			token,
-			cookie,
-		)
-		for _, line := range report.Lines() {
-			fmt.Fprintln(stdout, line)
-		}
-		return err
-	case "all":
-		if len(args) > 0 {
-			return usageError{text: "Неизвестный аргумент «" + args[0] + "»."}
-		}
-		return pushAll(ctx, server, root, token, cookie, stdout)
+		return agent.Push(ctx, server, root, token, cookie)
 	case "record":
-		raw, report, err := agent.Record(
-			ctx,
-			server,
-			root,
-			args[0],
-			token,
-			cookie,
-		)
-		for _, line := range report.Lines() {
-			fmt.Fprintln(stdout, line)
-		}
+		raw, err := agent.Record(ctx, server, root, token, cookie)
 		if err != nil {
 			return err
 		}
 		fmt.Fprintln(stdout, string(raw))
 		return nil
 	case "store":
-		number := ""
-		if len(args) >= 2 {
-			number = args[1]
+		number, err := parseStoreNumber(args)
+		if err != nil {
+			return err
 		}
-		raw, err := agent.ReadStore(
-			ctx,
-			server,
-			root,
-			args[0],
-			number,
-			token,
-			cookie,
-		)
+		raw, err := agent.ReadStore(ctx, server, root, number, token, cookie)
 		if err != nil {
 			return err
 		}
@@ -184,22 +197,13 @@ func (item spec) execute(args []string, stdout io.Writer) error {
 			return err
 		}
 		if len(call.paths) > 0 {
-			skipped, err := agent.ApplyElements(ctx, server, root, call.author, call.source, account, token, cookie, call.version, call.paths)
+			skipped, err := agent.ApplyElements(ctx, server, root, call.author, account, token, cookie, call.version, call.paths)
 			if len(skipped) > 0 {
 				fmt.Fprintln(stdout, "Не элементы agents, пропущены: "+strings.Join(skipped, ", "))
 			}
 			return err
 		}
-		return agent.Apply(
-			ctx,
-			server,
-			root,
-			call.author,
-			call.source,
-			account,
-			token,
-			cookie,
-		)
+		return agent.Apply(ctx, server, root, call.author, account, token, cookie)
 	default:
 		return fmt.Errorf("неизвестная команда")
 	}

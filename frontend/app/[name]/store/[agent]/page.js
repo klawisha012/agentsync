@@ -43,7 +43,7 @@ export default function SnapshotListPage() {
           <h2>Версии</h2>
           <span className="count-pill">{shots.length}</span>
         </div>
-        <p className="hint section-aside">Публикации этого ИИ-агента</p>
+        <p className="hint section-aside">История публикаций ~/.agents</p>
       </div>
       {shots.length === 0 ? (
         <p className="hint">Версий пока нет. Они появляются командой agentsync push.</p>

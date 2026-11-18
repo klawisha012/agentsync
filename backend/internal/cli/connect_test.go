@@ -266,7 +266,7 @@ func writeRel(t *testing.T, root, rel, body string) {
 	}
 }
 
-func TestPushOfAConnectedAgentCarriesCanonCopies(t *testing.T) {
+func TestPushSkipsExternalDirectoryLinks(t *testing.T) {
 	var sent string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		raw, _ := io.ReadAll(r.Body)
@@ -277,25 +277,18 @@ func TestPushOfAConnectedAgentCarriesCanonCopies(t *testing.T) {
 	root := connectRoot(t)
 	writeRel(t, filepath.Join(root, ".agents"), "skills/note/SKILL.md", "from-canon")
 	writeRel(t, filepath.Join(root, ".agents"), "AGENTS.md", "rules")
-	writeRel(t, filepath.Join(root, ".cursor"), "rules/own.md", "own")
 	outside := t.TempDir()
 	writeRel(t, outside, "SKILL.md", "elsewhere")
-	if err := os.Symlink(outside, filepath.Join(root, ".cursor", "skills-outside")); err != nil {
+	if err := os.Symlink(outside, filepath.Join(root, ".agents", "skills", "outside")); err != nil {
 		t.Fatal(err)
-	}
-	if err := os.Symlink(filepath.Join(root, ".agents", "AGENTS.md"), filepath.Join(root, ".cursor", "AGENTS.md")); err != nil {
-		t.Fatal(err)
-	}
-	if code, _, stderr := runCLI(t, "cursor", "on"); code != 0 {
-		t.Fatal(stderr)
 	}
 	t.Setenv("AGENTSYNC_SERVER", srv.URL)
 	t.Setenv("AGENTSYNC_TOKEN", "machine")
 
-	if code, _, stderr := runCLI(t, "push", "cursor"); code != 0 {
+	if code, _, stderr := runCLI(t, "push"); code != 0 {
 		t.Fatalf("push %s", stderr)
 	}
-	for _, want := range []string{`"skills/note/SKILL.md"`, "from-canon", `"AGENTS.md"`, `"rules/own.md"`} {
+	for _, want := range []string{`"skills/note/SKILL.md"`, "from-canon", `"AGENTS.md"`} {
 		if !strings.Contains(sent, want) {
 			t.Fatalf("snapshot lacks %s: %s", want, sent)
 		}
@@ -358,18 +351,18 @@ func TestPushReadsALinkedSettingsFile(t *testing.T) {
 	t.Cleanup(srv.Close)
 	root := connectRoot(t)
 	dotfiles := t.TempDir()
-	writeRel(t, dotfiles, "settings.json", `{"theme":"dark"}`)
-	writeRel(t, filepath.Join(root, ".cursor"), "rules/own.md", "own")
-	if err := os.Symlink(filepath.Join(dotfiles, "settings.json"), filepath.Join(root, ".cursor", "settings.json")); err != nil {
+	writeRel(t, dotfiles, "AGENTS.md", "from-dotfiles")
+	writeRel(t, filepath.Join(root, ".agents"), "rules/own.md", "own")
+	if err := os.Symlink(filepath.Join(dotfiles, "AGENTS.md"), filepath.Join(root, ".agents", "AGENTS.md")); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("AGENTSYNC_SERVER", srv.URL)
 	t.Setenv("AGENTSYNC_TOKEN", "machine")
-	if code, _, stderr := runCLI(t, "push", "cursor"); code != 0 {
+	if code, _, stderr := runCLI(t, "push"); code != 0 {
 		t.Fatalf("push %s", stderr)
 	}
-	if !strings.Contains(sent, `"settings.json"`) || !strings.Contains(sent, "dark") {
-		t.Fatalf("linked settings lost: %s", sent)
+	if !strings.Contains(sent, `"AGENTS.md"`) || !strings.Contains(sent, "from-dotfiles") {
+		t.Fatalf("linked file lost: %s", sent)
 	}
 }
 

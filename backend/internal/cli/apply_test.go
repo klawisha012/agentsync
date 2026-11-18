@@ -22,38 +22,47 @@ func TestParseApplyArgs(t *testing.T) {
 	}{
 		{
 			name: "whole publication",
-			args: []string{"Author", "Grok"},
+			args: []string{"Author"},
+		},
+		{
+			name: "whole publication with explicit agents",
+			args: []string{"Author", "agents"},
 		},
 		{
 			name:    "paths after version",
-			args:    []string{"Author", "Grok", "--version", "4", "skills/ru-text", "agents/reviewer.md", "AGENTS.md"},
+			args:    []string{"Author", "--version", "4", "skills/ru-text", "agents/reviewer.md", "AGENTS.md"},
 			version: 4,
 			paths:   "skills/ru-text,agents/reviewer.md,AGENTS.md",
 		},
 		{
 			name:    "equals form before paths",
-			args:    []string{"Author", "Grok", "skills/ru-text", "--version=2"},
+			args:    []string{"Author", "skills/ru-text", "--version=2"},
 			version: 2,
 			paths:   "skills/ru-text",
 		},
 		{
+			name: "other agent rejected",
+			args: []string{"Author", "Grok"},
+			err:  "только agents",
+		},
+		{
 			name: "paths without version",
-			args: []string{"Author", "Grok", "skills/ru-text"},
+			args: []string{"Author", "skills/ru-text"},
 			err:  "номер версии",
 		},
 		{
 			name: "version without paths",
-			args: []string{"Author", "Grok", "--version", "4"},
+			args: []string{"Author", "--version", "4"},
 			err:  "элемент",
 		},
 		{
 			name: "bad version",
-			args: []string{"Author", "Grok", "--version", "0", "skills/ru-text"},
+			args: []string{"Author", "--version", "0", "skills/ru-text"},
 			err:  "номер версии",
 		},
 		{
 			name: "unknown flag",
-			args: []string{"Author", "Grok", "--global"},
+			args: []string{"Author", "--global"},
 			err:  "--global",
 		},
 	}
@@ -69,7 +78,7 @@ func TestParseApplyArgs(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got.author != "Author" || got.source != "Grok" || got.version != tt.version || strings.Join(got.paths, ",") != tt.paths {
+			if got.author != "Author" || got.version != tt.version || strings.Join(got.paths, ",") != tt.paths {
 				t.Fatalf("call %+v", got)
 			}
 		})
@@ -92,18 +101,17 @@ func serveVersion(t *testing.T, want, body string) {
 func TestApplyPathsPutsChosenElementsIntoAgents(t *testing.T) {
 	root := seedClaudeAndCanon(t)
 	canon := filepath.Join(root, ".agents")
-	serveVersion(t, "/accounts/Author/versions/claude/4", `{"author":"Author","agent":"claude","version":4,"files":[
+	serveVersion(t, "/accounts/Author/versions/agents/4", `{"author":"Author","agent":"agents","version":4,"files":[
 		{"path":"skills/grill/SKILL.md","body":"new"},
 		{"path":"skills/grill/ref.md","body":"ref"},
 		{"path":"skills/other/SKILL.md","body":"other"},
 		{"path":"plugins/p/skills/deep/SKILL.md","body":"deep"},
 		{"path":"agents/go.md","body":"go"},
-		{"path":"CLAUDE.md","body":"new rules"},
-		{"path":"settings.json","body":"theirs"},
-		{"path":"agentsync.json","body":"{\"mcp\":[]}"}]}`)
+		{"path":"AGENTS.md","body":"new rules"},
+		{"path":"settings.json","body":"theirs"}]}`)
 
-	code, stdout, stderr := runCLI(t, "apply", "Author", "claude", "--version", "4",
-		"skills/grill", "plugins/p/skills/deep", "agents/go.md", "CLAUDE.md", "settings.json")
+	code, stdout, stderr := runCLI(t, "apply", "Author", "--version", "4",
+		"skills/grill", "plugins/p/skills/deep", "agents/go.md", "AGENTS.md", "settings.json")
 	if code != 0 {
 		t.Fatalf("apply %d %s", code, stderr)
 	}
@@ -136,11 +144,11 @@ func TestApplyPathsPutsChosenElementsIntoAgents(t *testing.T) {
 		t.Fatalf("agents snapshot %+v", snaps)
 	}
 
-	code, _, stderr = runCLI(t, "apply", "Author", "claude", "--version", "4", "nope")
+	code, _, stderr = runCLI(t, "apply", "Author", "--version", "4", "nope")
 	if code != 1 || !strings.Contains(stderr, "«nope»") {
 		t.Fatalf("missing path %d %s", code, stderr)
 	}
-	code, _, stderr = runCLI(t, "apply", "Author", "claude", "--version", "4", "settings.json")
+	code, _, stderr = runCLI(t, "apply", "Author", "--version", "4", "settings.json")
 	if code != 1 || !strings.Contains(stderr, "нет элементов agents") {
 		t.Fatalf("own only %d %s", code, stderr)
 	}
@@ -154,7 +162,7 @@ func TestApplyPathsMergesAgentsCardHooks(t *testing.T) {
 		{"path":"hooks.json","body":"{\"version\":1,\"hooks\":{\"session_start\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"theirs\"}]}]}}"},
 		{"path":"README.md","body":"readme"}]}`)
 
-	code, stdout, stderr := runCLI(t, "apply", "Author", "agents", "--version", "2", "hooks.json", "README.md")
+	code, stdout, stderr := runCLI(t, "apply", "Author", "--version", "2", "hooks.json", "README.md")
 	if code != 0 {
 		t.Fatalf("apply %d %s", code, stderr)
 	}
@@ -170,11 +178,10 @@ func TestApplyPathsMergesAgentsCardHooks(t *testing.T) {
 func TestApplyPathsCleansStoredPaths(t *testing.T) {
 	root := seedClaudeAndCanon(t)
 	canon := filepath.Join(root, ".agents")
-	serveVersion(t, "/accounts/Author/versions/claude/4", `{"author":"Author","agent":"claude","version":4,"files":[
-		{"path":"agents/../agents/go.md","body":"go"},
-		{"path":"agentsync.json","body":"{\"mcp\":[]}"}]}`)
+	serveVersion(t, "/accounts/Author/versions/agents/4", `{"author":"Author","agent":"agents","version":4,"files":[
+		{"path":"agents/../agents/go.md","body":"go"}]}`)
 
-	code, _, stderr := runCLI(t, "apply", "Author", "claude", "--version", "4", "agents")
+	code, _, stderr := runCLI(t, "apply", "Author", "--version", "4", "agents")
 	if code != 0 {
 		t.Fatalf("apply %d %s", code, stderr)
 	}

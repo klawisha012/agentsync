@@ -71,7 +71,7 @@ func TestPageAndPublicationSurviveRestart(t *testing.T) {
 		"id": testMachineID("pc-owner"), "host": "desk", "listener": "127.0.0.1:49152",
 	}, ownerCookie)
 	token := decodeMachine(t, machine.Body.Bytes()).AgentToken
-	pushed := postAuth(t, first, "/agent/push", token, pushBody("Grok", false, pushFile{"rules/ok.md", "hello"}), ownerCookie)
+	pushed := postAuth(t, first, "/agent/push", token, pushBody("agents", false, pushFile{"rules/ok.md", "hello"}), ownerCookie)
 	if pushed.Code != http.StatusCreated {
 		t.Fatalf("push %d %s", pushed.Code, pushed.Body.String())
 	}
@@ -86,7 +86,7 @@ func TestPageAndPublicationSurviveRestart(t *testing.T) {
 		"email": "liker@example.com", "password": "secret-pass", "name": "Liker",
 	}, nil)
 	likerCookie := readSessionCookie(t, liker)
-	liked := postJSON(t, first, "/accounts/Owner/agents/Grok/like", map[string]string{}, likerCookie)
+	liked := postJSON(t, first, "/accounts/Owner/agents/agents/like", map[string]string{}, likerCookie)
 	if liked.Code != http.StatusOK {
 		t.Fatalf("like %d %s", liked.Code, liked.Body.String())
 	}

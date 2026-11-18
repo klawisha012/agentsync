@@ -21,7 +21,7 @@ func TestPreviewMatchesPortableFiles(t *testing.T) {
 	}, cookie)
 	token := decodeMachine(t, machine.Body.Bytes()).AgentToken
 	secret := "sk-live-PREVIEWSECRET"
-	pushed := postAuth(t, e, "/agent/push", token, pushBody("Grok", false,
+	pushed := postAuth(t, e, "/agent/push", token, pushBody("agents", false,
 		pushFile{"rules/ok.md", "hello"},
 		pushFile{"credentials.json", `{"token":"` + secret + `"}`},
 		pushFile{"hooks/machine.json", "bash /Users/alex/run.sh"},

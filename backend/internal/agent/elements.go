@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	pathpkg "path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -332,34 +331,4 @@ func removeWrittenFiles(slug string) error {
 		}
 	}
 	return os.Remove(file)
-}
-
-// canonFiles puts the agents file back, in an upload of home, in place of each file connect
-// translated, so applying the card gives agents its own file and not a translation.
-func canonFiles(root string, files []File, agentName, home string) []File {
-	receiver, found := FindReceiver(agentName)
-	if !found {
-		return files
-	}
-	_, ledger, err := loadFileLedger(receiver.Slug)
-	if err != nil {
-		return files
-	}
-	for dest, origin := range ledger.Origins {
-		rel, err := filepath.Rel(home, dest)
-		if err != nil || !filepath.IsLocal(rel) {
-			continue
-		}
-		raw, err := os.ReadFile(filepath.Join(canonDir(root), filepath.FromSlash(origin)))
-		if err != nil {
-			continue
-		}
-		rel = filepath.ToSlash(rel)
-		for i := range files {
-			if files[i].Path == rel {
-				files[i] = File{Path: pathpkg.Join(pathpkg.Dir(rel), pathpkg.Base(origin)), Body: string(raw)}
-			}
-		}
-	}
-	return files
 }

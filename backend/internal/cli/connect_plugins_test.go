@@ -63,22 +63,3 @@ func TestOnSkipsPluginsForCodex(t *testing.T) {
 		t.Fatalf("code %d stdout %s stderr %s", code, stdout, stderr)
 	}
 }
-
-func TestPipeApplyClaudeCardMovesMarkedPluginsToTheCanon(t *testing.T) {
-	root := connectRoot(t)
-	code, stderr := pipeApply(t, `{"author":"zwarder","agent":"claude","files":[
-		{"path":"settings.json","body":"{\"theme\":\"light\",\"enabledPlugins\":{\"commit@anthropic\":true,\"mine@x\":true}}"},
-		{"path":"agentsync.json","body":"{\"mcp\":[],\"plugins\":[\"commit@anthropic\"],\"marketplaces\":[]}"}]}`)
-	if code != 0 {
-		t.Fatalf("apply %d %s", code, stderr)
-	}
-	canon := readFile(t, filepath.Join(root, ".agents", "plugins.json"))
-	if !strings.Contains(canon, "commit@anthropic") || strings.Contains(canon, "mine@x") {
-		t.Fatalf("canon plugins %s", canon)
-	}
-	top := claudeSettings(t, root)
-	plugins, _ := top["enabledPlugins"].(map[string]any)
-	if top["theme"] != "light" || plugins["mine@x"] != true || plugins["commit@anthropic"] != true {
-		t.Fatalf("home settings %v", top)
-	}
-}

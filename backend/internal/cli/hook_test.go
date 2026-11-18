@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -156,41 +154,5 @@ func TestHookRunsACommandWhoseQuotesCmdKept(t *testing.T) {
 	}
 	if _, err := os.Stat(seen); err != nil {
 		t.Fatal("the script did not run")
-	}
-}
-
-func TestCopilotCardWithoutOneCommandDoesNotBringItBack(t *testing.T) {
-	var sent []byte
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sent, _ = io.ReadAll(r.Body)
-		w.WriteHeader(http.StatusCreated)
-	}))
-	t.Cleanup(srv.Close)
-	root := connectRoot(t)
-	writeRel(t, filepath.Join(root, ".agents"), "hooks.json", `{"version":1,"hooks":{"stop":[{"input":"none","hooks":[{"type":"command","command":"keep"},{"type":"command","command":"gone"}]}]}}`)
-	if code, _, stderr := runCLI(t, "copilot", "on"); code != 0 {
-		t.Fatal(stderr)
-	}
-	file := filepath.Join(root, ".copilot", "hooks", "agentsync.json")
-	writeRel(t, root, ".copilot/hooks/agentsync.json", strings.Replace(readFile(t, file), `"gone"`, `"keep"`, 1))
-	t.Setenv("AGENTSYNC_SERVER", srv.URL)
-	t.Setenv("AGENTSYNC_TOKEN", "machine")
-	if code, _, stderr := runCLI(t, "push", "copilot"); code != 0 {
-		t.Fatalf("push %s", stderr)
-	}
-	var card struct {
-		Files []map[string]string `json:"files"`
-	}
-	if err := json.Unmarshal(sent, &card); err != nil {
-		t.Fatal(err)
-	}
-	payload, _ := json.Marshal(map[string]any{"author": "zwarder", "agent": "copilot", "files": card.Files})
-	fresh := connectRoot(t)
-	t.Setenv("AGENTSYNC_TOKEN", "")
-	if code, stderr := pipeApply(t, string(payload)); code != 0 {
-		t.Fatalf("apply %d %s", code, stderr)
-	}
-	if body := readFile(t, filepath.Join(fresh, ".agents", "hooks.json")); strings.Contains(body, "gone") {
-		t.Fatalf("a removed command came back %s", body)
 	}
 }

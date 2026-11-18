@@ -247,13 +247,13 @@ func TestAutoUpdateReplacesInstallCopy(t *testing.T) {
 	t.Setenv("AGENTSYNC_SERVER", srv.URL)
 
 	var out, err bytes.Buffer
-	if code := Run([]string{"push"}, nil, &out, &err); code != 2 {
-		t.Fatalf("push %d %s", code, err.String())
+	if code := Run([]string{"apply"}, nil, &out, &err); code != 2 {
+		t.Fatalf("apply %d %s", code, err.String())
 	}
 	if !bytes.Contains(err.Bytes(), []byte("AgentSync обновлён до 1.2.3.")) {
 		t.Fatalf("stderr %q", err.String())
 	}
-	if !bytes.Contains(err.Bytes(), []byte("Назовите ИИ-агента.")) {
+	if !bytes.Contains(err.Bytes(), []byte("Назовите автора.")) {
 		t.Fatalf("command stderr %q", err.String())
 	}
 	if got := readFile(t, exe); got != string(next) {
@@ -261,7 +261,7 @@ func TestAutoUpdateReplacesInstallCopy(t *testing.T) {
 	}
 	seen := hits.Load()
 	err.Reset()
-	if code := Run([]string{"push"}, nil, &out, &err); code != 2 {
+	if code := Run([]string{"apply"}, nil, &out, &err); code != 2 {
 		t.Fatalf("second %d", code)
 	}
 	if hits.Load() != seen {
@@ -318,8 +318,8 @@ func TestAutoUpdateDisabled(t *testing.T) {
 	t.Setenv("AGENTSYNC_AUTO_UPDATE", "0")
 
 	var out, err bytes.Buffer
-	if code := Run([]string{"push"}, nil, &out, &err); code != 2 {
-		t.Fatalf("push %d", code)
+	if code := Run([]string{"apply"}, nil, &out, &err); code != 2 {
+		t.Fatalf("apply %d", code)
 	}
 	if hits.Load() != 0 {
 		t.Fatalf("hits %d", hits.Load())

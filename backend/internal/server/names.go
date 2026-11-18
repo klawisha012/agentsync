@@ -1,25 +1,19 @@
 package server
 
-import (
-	"strings"
-	"unicode"
-)
+import "strings"
 
-func safeAgentName(name string) string {
-	runes := []rune(name)
-	if len(runes) == 0 || len(runes) > 64 || name == "." || name == ".." || strings.Contains(name, "..") {
-		return "Имя ИИ-агента не подходит."
+const canonAgent = "agents"
+
+func isCanonAgentName(name string) bool {
+	return sameAgent(strings.TrimSpace(name), canonAgent) || sameAgent(strings.TrimSpace(name), ".agents")
+}
+
+func resolveCanonAgent(raw string) (string, bool) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" || isCanonAgentName(trimmed) {
+		return canonAgent, true
 	}
-	if runes[0] == '.' || runes[len(runes)-1] == '.' || runes[0] == ' ' || runes[len(runes)-1] == ' ' {
-		return "Имя ИИ-агента не подходит."
-	}
-	for _, r := range runes {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == ' ' || r == '.' || r == '-' || r == '_' {
-			continue
-		}
-		return "Имя ИИ-агента не подходит."
-	}
-	return ""
+	return "", false
 }
 
 func machineID(id string) string {
