@@ -551,15 +551,7 @@ func readTree(root string) ([]File, error) {
 		if err != nil {
 			return err
 		}
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
-		}
-		rel = filepath.ToSlash(rel)
 		if entry.IsDir() {
-			if path != root && PrivatePath(rel) {
-				return filepath.SkipDir
-			}
 			return nil
 		}
 		// Skip directory symlinks, Windows junctions (ModeIrregular), and unreadable non-regular entries.
@@ -568,6 +560,11 @@ func readTree(root string) ([]File, error) {
 				return nil
 			}
 		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
 		if strings.Contains(rel, "..") {
 			return nil
 		}

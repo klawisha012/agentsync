@@ -110,13 +110,12 @@ func TestArchivesStayOnMachine(t *testing.T) {
 	}
 }
 
-func TestReadTreeSkipsPrivateDirsAndDirLinks(t *testing.T) {
+func TestReadTreeSkipsDirLinks(t *testing.T) {
 	root := t.TempDir()
 	target := t.TempDir()
 	for path, body := range map[string]string{
-		filepath.Join(root, "skills", "demo", "SKILL.md"):             "ok",
-		filepath.Join(root, "skills", "demo", "node_modules", "a.js"): "skip",
-		filepath.Join(target, "nested.txt"):                           "skip",
+		filepath.Join(root, "skills", "demo", "SKILL.md"): "ok",
+		filepath.Join(target, "nested.txt"):               "skip",
 	} {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			t.Fatal(err)
