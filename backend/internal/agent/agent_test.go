@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -105,5 +107,38 @@ func TestArchivesStayOnMachine(t *testing.T) {
 	})
 	if len(kept) != 1 || kept[0].Path != "skills/pdf/SKILL.md" {
 		t.Fatalf("kept %v", kept)
+	}
+}
+
+func TestReadTreeSkipsPrivateDirsAndDirLinks(t *testing.T) {
+	root := t.TempDir()
+	target := t.TempDir()
+	for path, body := range map[string]string{
+		filepath.Join(root, "skills", "demo", "SKILL.md"):             "ok",
+		filepath.Join(root, "skills", "demo", "node_modules", "a.js"): "skip",
+		filepath.Join(target, "nested.txt"):                           "skip",
+	} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	link := filepath.Join(root, "skills", "demo", "linked")
+	if runtime.GOOS == "windows" {
+		if out, err := exec.Command("cmd", "/c", "mklink", "/J", link, target).CombinedOutput(); err != nil {
+			t.Fatalf("mklink /J: %v: %s", err, out)
+		}
+	} else if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+
+	files, err := readTree(root)
+	if err != nil {
+		t.Fatalf("readTree: %v", err)
+	}
+	if len(files) != 1 || files[0].Path != "skills/demo/SKILL.md" {
+		t.Fatalf("files %+v", files)
 	}
 }

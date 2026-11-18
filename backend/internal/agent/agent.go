@@ -551,20 +551,23 @@ func readTree(root string) ([]File, error) {
 		if err != nil {
 			return err
 		}
-		if entry.IsDir() {
-			return nil
-		}
-		// A link to a directory is skipped: clearing a home must not reach into the canon. readSnapshot follows it.
-		if entry.Type()&os.ModeSymlink != 0 {
-			if info, err := os.Stat(path); err != nil || info.IsDir() {
-				return nil
-			}
-		}
 		rel, err := filepath.Rel(root, path)
 		if err != nil {
 			return err
 		}
 		rel = filepath.ToSlash(rel)
+		if entry.IsDir() {
+			if path != root && PrivatePath(rel) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		// Skip directory symlinks, Windows junctions (ModeIrregular), and unreadable non-regular entries.
+		if !entry.Type().IsRegular() {
+			if info, err := os.Stat(path); err != nil || info.IsDir() || !info.Mode().IsRegular() {
+				return nil
+			}
+		}
 		if strings.Contains(rel, "..") {
 			return nil
 		}
