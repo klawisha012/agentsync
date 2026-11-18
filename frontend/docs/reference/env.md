@@ -4,7 +4,7 @@
 
 | Переменная | Значение | По умолчанию |
 |---|---|---|
-| `AGENTSYNC_SERVER` | адрес API | `https://zwarder.ru/api` |
+| `AGENTSYNC_SERVER` | адрес API | `https://agentsync.zwarder.ru/api` |
 | `AGENTSYNC_ROOT` | каталог с ИИ-агентами и `.agents` | домашний каталог |
 | `AGENTSYNC_STATE` | каталог состояния: сессия, имя аккаунта, учёт записей `on`; абсолютный путь | `~/.agentsync` |
 | `AGENTSYNC_TOKEN` | токен локального агента (машины) | файл `token` в каталоге состояния |

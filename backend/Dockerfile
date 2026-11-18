@@ -10,14 +10,14 @@ RUN set -eu; \
     if [ -z "$v" ]; then v=dev; fi; \
     mkdir -p /cli-bin; \
     printf '%s\n' "$v" > /cli-bin/version; \
-    ldflags="-X github.com/klawisha012/agentsync/internal/cli.Version=${v}"; \
-    CGO_ENABLED=0 go build -ldflags "$ldflags" -o /server ./cmd/api; \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "$ldflags" -o /cli-bin/agentsync-linux-amd64 ./cmd/agentsync; \
-    CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags "$ldflags" -o /cli-bin/agentsync-linux-arm64 ./cmd/agentsync; \
-    CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags "$ldflags" -o /cli-bin/agentsync-windows-amd64.exe ./cmd/agentsync; \
-    CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -ldflags "$ldflags" -o /cli-bin/agentsync-windows-arm64.exe ./cmd/agentsync; \
-    CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags "$ldflags" -o /cli-bin/agentsync-darwin-amd64 ./cmd/agentsync; \
-    CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags "$ldflags" -o /cli-bin/agentsync-darwin-arm64 ./cmd/agentsync
+    ldflags="-s -w -X github.com/klawisha012/agentsync/internal/cli.Version=${v}"; \
+    CGO_ENABLED=0 go build -trimpath -ldflags "$ldflags" -o /server ./cmd/api; \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "$ldflags" -o /cli-bin/agentsync-linux-amd64 ./cmd/agentsync; \
+    CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags "$ldflags" -o /cli-bin/agentsync-linux-arm64 ./cmd/agentsync; \
+    CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "$ldflags" -o /cli-bin/agentsync-windows-amd64.exe ./cmd/agentsync; \
+    CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -trimpath -ldflags "$ldflags" -o /cli-bin/agentsync-windows-arm64.exe ./cmd/agentsync; \
+    CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -trimpath -ldflags "$ldflags" -o /cli-bin/agentsync-darwin-amd64 ./cmd/agentsync; \
+    CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags "$ldflags" -o /cli-bin/agentsync-darwin-arm64 ./cmd/agentsync
 
 FROM alpine:3.22
 RUN apk add --no-cache ca-certificates

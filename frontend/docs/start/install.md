@@ -9,7 +9,7 @@ CLI `agentsync` — отдельная программа для термина�
 ## Linux и macOS
 
 ```sh
-curl -fsSL https://zwarder.ru/api/install.sh | sh
+curl -fsSL https://agentsync.zwarder.ru/api/cli/install.sh | sh
 ```
 
 ## Windows
@@ -17,7 +17,7 @@ curl -fsSL https://zwarder.ru/api/install.sh | sh
 В PowerShell:
 
 ```powershell
-iwr https://zwarder.ru/api/install.ps1 -useb | iex
+iwr https://agentsync.zwarder.ru/api/cli/install.ps1 -useb | iex
 ```
 
 ## Проверка
@@ -53,4 +53,4 @@ agentsync update --check
 
 ## Другой сервер
 
-По умолчанию CLI работает с `https://zwarder.ru/api`. Переменная `AGENTSYNC_SERVER` задаёт другой адрес API, например для своего сервера. Все переменные: [Переменные окружения](../reference/env.md).
+По умолчанию CLI работает с `https://agentsync.zwarder.ru/api`. Переменная `AGENTSYNC_SERVER` задаёт другой адрес API, например для своего сервера. Все переменные: [Переменные окружения](../reference/env.md).

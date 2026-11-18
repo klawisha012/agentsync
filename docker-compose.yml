@@ -18,7 +18,7 @@ services:
         CLI_VERSION: ${CLI_VERSION:-dev}
     environment:
       PORT: "8080"
-      WEB_ORIGIN: https://zwarder.ru
+      WEB_ORIGIN: ${WEB_ORIGIN:-https://agentsync.zwarder.ru}
       DATABASE_URL: postgres://${POSTGRES_USER:-agentsync}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-agentsync}?sslmode=disable
     depends_on:
       db:

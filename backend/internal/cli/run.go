@@ -254,7 +254,7 @@ func clientSession() (string, string, string, string, string, error) {
 	}
 	server := strings.TrimSpace(os.Getenv("AGENTSYNC_SERVER"))
 	if server == "" {
-		server = "https://zwarder.ru/api"
+		server = "https://agentsync.zwarder.ru/api"
 	}
 	return root, server, agent.EnvOrHome("AGENTSYNC_TOKEN", "token"), agent.EnvOrHome("AGENTSYNC_ACCOUNT", "account"), agent.SessionCookie(), nil
 }

@@ -179,13 +179,31 @@ func TestExportValidationAndSecrets(t *testing.T) {
 			name:       "help export",
 			args:       []string{"help", "export"},
 			wantCode:   0,
-			wantStdout: "agentsync export [ии-агент…]",
+			wantStdout: "agentsync export [--only виды]",
 		},
 		{
 			name:       "unknown flag",
 			args:       []string{"export", "--unknown"},
 			wantCode:   2,
 			wantStderr: "Неизвестный аргумент «--unknown».",
+		},
+		{
+			name:       "missing only value",
+			args:       []string{"export", "--only"},
+			wantCode:   2,
+			wantStderr: "Укажите значение --only.",
+		},
+		{
+			name:       "empty only item",
+			args:       []string{"export", "--only=skills,"},
+			wantCode:   2,
+			wantStderr: "Укажите значение --only.",
+		},
+		{
+			name:       "unknown only kind",
+			args:       []string{"export", "--only", "bogus"},
+			wantCode:   2,
+			wantStderr: "Неизвестный вид «bogus».",
 		},
 		{
 			name:       "unknown agent",
@@ -244,5 +262,85 @@ func TestExportValidationAndSecrets(t *testing.T) {
 				t.Fatalf("stderr=%q want substring %q", stderr, tt.wantStderr)
 			}
 		})
+	}
+}
+
+func TestExportSelectiveKinds(t *testing.T) {
+	root := connectRoot(t)
+	writeRel(t, root, ".claude/skills/lint-go/SKILL.md", "---\nname: lint-go\n---\nLint Go.\n")
+	writeRel(t, root, ".claude/agents/rev.md", "---\nname: rev\ndescription: Review\n---\nCheck diff.\n")
+	writeRel(t, root, ".claude/commands/ship.md", "---\ndescription: Ship release\n---\nShip $ARGUMENTS\n")
+	writeRel(t, root, ".claude/CLAUDE.md", "Global rules.\n")
+	writeRel(t, root, ".claude.json", `{"mcpServers":{"docs":{"type":"http","url":"https://docs.example/mcp"}}}`)
+	writeRel(t, root, ".claude/settings.json", `{
+		"enabledPlugins":{"ponytail@official":true},
+		"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"check"}]}]}
+	}`)
+	// Secret in Gemini MCP must not block exporting skills only.
+	writeRel(t, root, ".gemini/skills/gem/SKILL.md", "---\nname: gem\n---\nGem.\n")
+	writeRel(t, root, ".gemini/settings.json", `{"mcpServers":{"gh":{"command":"gh","env":{"GITHUB_TOKEN":"ghp_abcdefghijklmnop"}}}}`)
+
+	canon := filepath.Join(root, ".agents")
+
+	// 1. Export only skills across all agents.
+	code, stdout, stderr := runCLI(t, "export", "--only", "skills")
+	if code != 0 {
+		t.Fatalf("export --only skills failed: code=%d stdout=%s stderr=%s", code, stdout, stderr)
+	}
+	if !strings.Contains(stdout, "claude-code: В\u00a0agents перенесены: навыки: lint-go.") ||
+		!strings.Contains(stdout, "gemini-cli: В\u00a0agents перенесены: навыки: gem.") {
+		t.Fatalf("unexpected skills export stdout:\n%s", stdout)
+	}
+	for _, unexpected := range []string{"AGENTS.md", "mcp.json", "plugins.json", "hooks.json", "agents/rev.md", "commands/ship.md"} {
+		if _, err := os.Stat(filepath.Join(canon, filepath.FromSlash(unexpected))); !os.IsNotExist(err) {
+			t.Fatalf("unexpected %s exported when filtering skills", unexpected)
+		}
+	}
+
+	// 2. Export only plugins and hooks for a single named agent using shorthand flags.
+	code, stdout, stderr = runCLI(t, "export", "claude", "--plugins", "--hooks")
+	if code != 0 {
+		t.Fatalf("export claude --plugins --hooks failed: code=%d stdout=%s stderr=%s", code, stdout, stderr)
+	}
+	if strings.Contains(stdout, "claude-code:") || !strings.Contains(stdout, "В\u00a0agents перенесены: хуки (1), плагины: ponytail@official.") {
+		t.Fatalf("single-agent selective stdout:\n%s", stdout)
+	}
+	if _, err := os.Stat(filepath.Join(canon, "plugins.json")); err != nil {
+		t.Fatalf("plugins.json missing: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(canon, "hooks.json")); err != nil {
+		t.Fatalf("hooks.json missing: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(canon, "mcp.json")); !os.IsNotExist(err) {
+		t.Fatalf("mcp.json exported unexpectedly")
+	}
+
+	// 3. Export only subagents (--only=subagents) without commands or instructions.
+	code, stdout, stderr = runCLI(t, "export", "--only=subagents", "claude")
+	if code != 0 {
+		t.Fatalf("export --only=subagents failed: code=%d stdout=%s stderr=%s", code, stdout, stderr)
+	}
+	if !strings.Contains(stdout, "субагенты: rev") {
+		t.Fatalf("missing subagents in stdout:\n%s", stdout)
+	}
+	if _, err := os.Stat(filepath.Join(canon, "agents", "rev.md")); err != nil {
+		t.Fatalf("agents/rev.md missing: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(canon, "commands", "ship.md")); !os.IsNotExist(err) {
+		t.Fatalf("commands/ship.md exported unexpectedly")
+	}
+	if _, err := os.Stat(filepath.Join(canon, "AGENTS.md")); !os.IsNotExist(err) {
+		t.Fatalf("AGENTS.md exported unexpectedly")
+	}
+
+	// 4. Export mcp + commands + instructions via mixed flags.
+	code, stdout, stderr = runCLI(t, "export", "claude", "--only", "mcp,commands", "--instructions")
+	if code != 0 {
+		t.Fatalf("export mcp,commands,instructions failed: code=%d stdout=%s stderr=%s", code, stdout, stderr)
+	}
+	for _, want := range []string{"commands/ship.md", "AGENTS.md", "mcp.json"} {
+		if _, err := os.Stat(filepath.Join(canon, filepath.FromSlash(want))); err != nil {
+			t.Fatalf("%s missing: %v", want, err)
+		}
 	}
 }

@@ -23,7 +23,7 @@ func main() {
 	}
 	server := os.Getenv("AGENTSYNC_SERVER")
 	if server == "" {
-		server = "https://zwarder.ru/api"
+		server = "https://agentsync.zwarder.ru/api"
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

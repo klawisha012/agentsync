@@ -6,7 +6,7 @@ set -eu
 dir="${HOME}/.agentsync"
 mkdir -p "$dir"
 
-origin="${AGENTSYNC_ORIGIN:-https://zwarder.ru/api}"
+origin="${AGENTSYNC_ORIGIN:-https://agentsync.zwarder.ru/api}"
 origin="${origin%/}"
 
 os=$(uname -s)

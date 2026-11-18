@@ -1,4 +1,4 @@
-# AgentSync. Кладёт бинарник agentsync в домашний каталог и добавляет этот каталог в PATH.
+﻿# AgentSync. Кладёт бинарник agentsync в домашний каталог и добавляет этот каталог в PATH.
 # Публикацию не применяет и ИИ-агента не загружает. Пароль в эту инструкцию не входит.
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
@@ -6,7 +6,7 @@ $ProgressPreference = "SilentlyContinue"
 $dir = Join-Path $env:USERPROFILE ".agentsync"
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
 
-$origin = "https://zwarder.ru/api"
+$origin = "https://agentsync.zwarder.ru/api"
 if ($env:AGENTSYNC_ORIGIN) {
   $origin = $env:AGENTSYNC_ORIGIN.TrimEnd("/")
 }

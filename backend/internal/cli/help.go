@@ -83,9 +83,11 @@ func commands() []spec {
 		{
 			name:    "export",
 			summary: "Переносит переносимую настройку ИИ-агентов в\u00a0~/.agents",
-			usage:   "agentsync export [ии-агент…]",
+			usage:   "agentsync export [--only виды] [--skills] [--agents] [--commands] [--instructions] [--mcp] [--plugins] [--hooks] [ии-агент…]",
 			about: "Без аргументов команда обходит найденных на\u00a0машине ИИ-агентов из\u00a0каталога.\n" +
 				"С\u00a0именами берёт только перечисленных ИИ-агентов.\n" +
+				"Флаг --only (через запятую или несколько раз) и\u00a0флаги видов (--skills, --agents, --commands, --instructions, --mcp, --plugins, --hooks)\n" +
+				"ограничивают перенос выбранными видами.\n" +
 				"Навыки, субагенты, пользовательские команды, файл инструкций, MCP-серверы, плагины и\u00a0хуки\n" +
 				"переводятся в\u00a0формат agents и\u00a0кладутся в\u00a0~/.agents. Файлы самих ИИ-агентов остаются на\u00a0месте.\n" +
 				"Машинные MCP и\u00a0машинные хуки остаются у\u00a0ИИ-агента.\n" +
@@ -94,7 +96,7 @@ func commands() []spec {
 				"Чтобы раздать элементы из\u00a0~/.agents ИИ-агенту в\u00a0его формате, запустите agentsync <ии-агент> on.\n" +
 				"Аккаунт и\u00a0сервер не\u00a0нужны.",
 			envs:     []envLine{root, account},
-			examples: []string{"agentsync export", "agentsync export claude codex gemini"},
+			examples: []string{"agentsync export", "agentsync export --only skills,mcp", "agentsync export claude --plugins --hooks"},
 		},
 		{
 			name:    "on",
@@ -219,7 +221,7 @@ func rootHelp() string {
 	b.WriteString("\nПеременные окружения:\n")
 	b.WriteString(formatRows([][2]string{
 		{"AGENTSYNC_ROOT", "Каталог с\u00a0домашними папками ИИ-агентов. По умолчанию домашний каталог"},
-		{"AGENTSYNC_SERVER", "Адрес API. По умолчанию https://zwarder.ru/api"},
+		{"AGENTSYNC_SERVER", "Адрес API. По умолчанию https://agentsync.zwarder.ru/api"},
 		{"AGENTSYNC_TOKEN", "Токен аккаунта. Файл в\u00a0домашнем каталоге: ~/.agentsync/token"},
 		{"AGENTSYNC_ACCOUNT", "Имя аккаунта, чья цепочка лежит на машине"},
 		{"AGENTSYNC_COOKIE", "Cookie сессии. Файл в\u00a0домашнем каталоге: ~/.agentsync/cookie"},

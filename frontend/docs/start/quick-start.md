@@ -5,13 +5,13 @@
 ## 1. Установите CLI
 
 ```sh
-curl -fsSL https://zwarder.ru/api/install.sh | sh
+curl -fsSL https://agentsync.zwarder.ru/api/cli/install.sh | sh
 ```
 
 На Windows в PowerShell:
 
 ```powershell
-iwr https://zwarder.ru/api/install.ps1 -useb | iex
+iwr https://agentsync.zwarder.ru/api/cli/install.ps1 -useb | iex
 ```
 
 Откройте новый терминал и проверьте команду: `agentsync help`. Подробно: [Установка CLI](./install.md).

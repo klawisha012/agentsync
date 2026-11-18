@@ -1,0 +1,24 @@
+services:
+  db:
+    restart: unless-stopped
+  api:
+    restart: unless-stopped
+    networks:
+      default:
+      caddy_default:
+        aliases:
+          - agentsync-api
+  web:
+    restart: unless-stopped
+    networks:
+      default:
+      caddy_default:
+        aliases:
+          - agentsync-web
+  angie:
+    profiles:
+      - standalone
+
+networks:
+  caddy_default:
+    external: true

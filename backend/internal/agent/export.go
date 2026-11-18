@@ -35,14 +35,57 @@ func (p exportPlan) empty() bool {
 	return len(p.skills) == 0 && len(p.docs) == 0 && p.inst == nil && len(p.moves) == 0
 }
 
+var exportKinds = []string{"skills", "agents", "commands", "instructions", "mcp", "plugins", "hooks"}
+
+// ExportKinds lists the supported element kinds for selective export.
+func ExportKinds() []string {
+	return slices.Clone(exportKinds)
+}
+
+// NormalizeExportKind returns the canonical export kind for name or false if unknown.
+func NormalizeExportKind(name string) (string, bool) {
+	key := strings.ToLower(strings.TrimSpace(name))
+	if key == "subagents" {
+		key = "agents"
+	}
+	if slices.Contains(exportKinds, key) {
+		return key, true
+	}
+	return "", false
+}
+
+func normalizeExportKinds(kinds []string) (map[string]bool, error) {
+	if len(kinds) == 0 {
+		return nil, nil
+	}
+	want := make(map[string]bool, len(kinds))
+	for _, raw := range kinds {
+		norm, ok := NormalizeExportKind(raw)
+		if !ok {
+			return nil, fmt.Errorf("Неизвестный вид «%s». Доступны: %s.", strings.TrimSpace(raw), strings.Join(exportKinds, ", "))
+		}
+		want[norm] = true
+	}
+	return want, nil
+}
+
+func wantExportKind(want map[string]bool, kind string) bool {
+	return len(want) == 0 || want[kind]
+}
+
 // Export copies and translates portable elements of the named AI agents (or every installed
 // catalog AI agent when names is empty) into ~/.agents without removing the agents' own files.
-func Export(root, account string, names []string) ([]ExportItem, error) {
+// When kinds is non-empty, only the named element kinds are exported.
+func Export(root, account string, names, kinds []string) ([]ExportItem, error) {
+	want, err := normalizeExportKinds(kinds)
+	if err != nil {
+		return nil, err
+	}
 	if err := checkCanon(root, canonCard); err != nil {
 		return nil, err
 	}
 	var out []ExportItem
-	err := withRootLock(root, func() error {
+	err = withRootLock(root, func() error {
 		targets, labels, err := resolveExportTargets(root, names)
 		if err != nil {
 			return err
@@ -50,7 +93,7 @@ func Export(root, account string, names []string) ([]ExportItem, error) {
 		snapshot := ""
 		wroteAny := false
 		for i, receiver := range targets {
-			plan, planErr := planExportOne(root, receiver)
+			plan, planErr := planExportOne(root, receiver, want)
 			if planErr != nil {
 				if len(names) == 1 {
 					return planErr
@@ -154,33 +197,54 @@ func receiverPresent(root string, r Receiver) bool {
 	return false
 }
 
-func planExportOne(root string, receiver Receiver) (exportPlan, error) {
+func planExportOne(root string, receiver Receiver, want map[string]bool) (exportPlan, error) {
 	var plan exportPlan
 	dir, _ := receiver.GlobalDir(root)
 
-	skills, err := exportSkills(root, dir, &plan.report)
-	if err != nil {
-		return plan, err
+	var (
+		skills  []skillMove
+		docs    []docMove
+		inst    *docMove
+		hooks   []ownMove
+		servers []ownMove
+		plugins []ownMove
+		err     error
+	)
+	if wantExportKind(want, "skills") {
+		skills, err = exportSkills(root, dir, &plan.report)
+		if err != nil {
+			return plan, err
+		}
 	}
-	docs, err := exportDocs(root, receiver, dir, &plan.report)
-	if err != nil {
-		return plan, err
+	if wantExportKind(want, "agents") || wantExportKind(want, "commands") {
+		docs, err = exportDocs(root, receiver, dir, want, &plan.report)
+		if err != nil {
+			return plan, err
+		}
 	}
-	inst, err := exportInstructions(root, receiver, dir, &plan.report)
-	if err != nil {
-		return plan, err
+	if wantExportKind(want, "instructions") {
+		inst, err = exportInstructions(root, receiver, dir, &plan.report)
+		if err != nil {
+			return plan, err
+		}
 	}
-	hooks, err := exportHooks(root, receiver, dir)
-	if err != nil {
-		return plan, err
+	if wantExportKind(want, "hooks") {
+		hooks, err = exportHooks(root, receiver, dir)
+		if err != nil {
+			return plan, err
+		}
 	}
-	servers, err := exportServers(root, receiver, &plan.report)
-	if err != nil {
-		return plan, err
+	if wantExportKind(want, "mcp") {
+		servers, err = exportServers(root, receiver, &plan.report)
+		if err != nil {
+			return plan, err
+		}
 	}
-	plugins, err := exportPlugins(root, receiver, dir, &plan.report)
-	if err != nil {
-		return plan, err
+	if wantExportKind(want, "plugins") {
+		plugins, err = exportPlugins(root, receiver, dir, &plan.report)
+		if err != nil {
+			return plan, err
+		}
 	}
 
 	plan.skills = skills
@@ -410,7 +474,7 @@ func equalFileSlices(a, b []File) bool {
 	return true
 }
 
-func exportDocs(root string, receiver Receiver, dir string, report *TransferReport) ([]docMove, error) {
+func exportDocs(root string, receiver Receiver, dir string, want map[string]bool, report *TransferReport) ([]docMove, error) {
 	if dir == "" {
 		return nil, nil
 	}
@@ -425,7 +489,7 @@ func exportDocs(root string, receiver Receiver, dir string, report *TransferRepo
 		kind  docKind
 		place string
 	}{{subagentDoc, receiver.Agents}, {commandDoc, receiver.Commands}} {
-		if receiver.Way(item.kind.key) != WayTranslate {
+		if !wantExportKind(want, item.kind.key) || receiver.Way(item.kind.key) != WayTranslate {
 			continue
 		}
 		place := filepath.Join(filepath.Dir(dir), filepath.FromSlash(item.place))

@@ -296,7 +296,7 @@ func releaseFileName() (string, bool) {
 func apiOrigin() string {
 	server := strings.TrimSpace(os.Getenv("AGENTSYNC_SERVER"))
 	if server == "" {
-		server = "https://zwarder.ru/api"
+		server = "https://agentsync.zwarder.ru/api"
 	}
 	return strings.TrimRight(server, "/")
 }

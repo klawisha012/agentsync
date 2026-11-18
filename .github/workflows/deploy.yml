@@ -1,0 +1,220 @@
+name: CI, CLI Release & Deploy
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Создать новый GitHub Release для CLI"
+        type: boolean
+        default: false
+      version:
+        description: "Версия CLI (например 2026.11.18.1), пусто = авто"
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Run Go tests
+        working-directory: backend
+        run: go test ./...
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend & docs
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+  cli_release:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      released: ${{ steps.meta.outputs.should_release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve CLI release version
+        id: meta
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          should_release="false"
+          version=""
+
+          if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+            should_release="true"
+            version="${GITHUB_REF_NAME#v}"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.release }}" == "true" ]]; then
+            should_release="true"
+            version="${{ inputs.version }}"
+            version="${version#v}"
+          elif [[ "${GITHUB_REF:-}" == "refs/heads/main" ]]; then
+            rel_count="$(gh release list --limit 1 --json tagName --jq 'length' || echo 0)"
+            if [[ "$rel_count" == "0" ]]; then
+              should_release="true"
+            else
+              before="${{ github.event.before }}"
+              if [[ -n "$before" && "$before" != "0000000000000000000000000000000000000000" ]] && git cat-file -e "${before}^{commit}" 2>/dev/null; then
+                if git diff --name-only "$before" "${GITHUB_SHA}" | grep -qE '^(backend/(cmd/(agentsync|mcp)|internal/(agent|cli|mcp)|go\.(mod|sum))|scripts/|backend/Dockerfile)'; then
+                  should_release="true"
+                fi
+              fi
+            fi
+          fi
+
+          if [[ "$should_release" == "true" ]]; then
+            if [[ -z "$version" ]]; then
+              version="$(date -u +%Y.%m.%d).${GITHUB_RUN_NUMBER}"
+            fi
+            version="$(printf '%s' "$version" | tr -cd 'A-Za-z0-9._+-')"
+          else
+            latest_tag="$(gh release list --limit 1 --json tagName --jq '.[0].tagName // ""' || true)"
+            version="${latest_tag#v}"
+            if [[ -z "$version" ]]; then
+              version="$(date -u +%Y.%m.%d).${GITHUB_RUN_NUMBER}"
+            fi
+          fi
+
+          echo "should_release=$should_release" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "CLI version: $version (release=$should_release)"
+
+      - uses: actions/setup-go@v5
+        if: steps.meta.outputs.should_release == 'true'
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Build CLI binaries
+        if: steps.meta.outputs.should_release == 'true'
+        working-directory: backend
+        env:
+          CLI_VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p ../dist
+          printf '%s\n' "$CLI_VERSION" > ../dist/version
+          ldflags="-s -w -X github.com/klawisha012/agentsync/internal/cli.Version=${CLI_VERSION}"
+          for target in \
+            "linux amd64 agentsync-linux-amd64" \
+            "linux arm64 agentsync-linux-arm64" \
+            "darwin amd64 agentsync-darwin-amd64" \
+            "darwin arm64 agentsync-darwin-arm64" \
+            "windows amd64 agentsync-windows-amd64.exe" \
+            "windows arm64 agentsync-windows-arm64.exe"
+          do
+            read -r goos goarch out <<< "$target"
+            CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" go build -trimpath -ldflags "$ldflags" -o "../dist/${out}" ./cmd/agentsync
+          done
+          (cd ../dist && sha256sum agentsync-* > SHA256SUMS.txt)
+
+      - name: Publish GitHub Release
+        if: steps.meta.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CLI_VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          tag="v${CLI_VERSION}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/* --clobber
+          else
+            gh release create "$tag" dist/* \
+              --target "${GITHUB_SHA}" \
+              --title "AgentSync CLI ${tag}" \
+              --generate-notes
+          fi
+
+  deploy:
+    needs: [test, cli_release]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - name: Prepare SSH key
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Deploy to VPS
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          CLI_VERSION: ${{ needs.cli_release.outputs.version }}
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_deploy "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "TARGET_SHA='${TARGET_SHA}' CLI_VERSION='${CLI_VERSION}' bash -s" <<'EOF'
+          set -euo pipefail
+          cd /opt/agentsync
+          git fetch origin --tags --prune
+          git checkout -f "$TARGET_SHA"
+
+          touch .env
+          grep -v -E '^(CLI_VERSION|WEB_ORIGIN)=' .env > .env.tmp || true
+          {
+            cat .env.tmp
+            echo "WEB_ORIGIN=https://agentsync.zwarder.ru"
+            echo "CLI_VERSION=${CLI_VERSION}"
+          } > .env
+          rm -f .env.tmp
+          chmod 600 .env
+
+          export CLI_VERSION
+          docker compose -f docker-compose.yml -f deploy/compose.caddy.yml up -d --build --remove-orphans db api web
+
+          for i in $(seq 1 30); do
+            if curl -fsS https://agentsync.zwarder.ru/api/health >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+
+          curl -fsS https://agentsync.zwarder.ru/api/health
+          echo ""
+          version_json="$(curl -fsS https://agentsync.zwarder.ru/api/cli/version)"
+          echo "$version_json"
+          printf '%s' "$version_json" | grep -F "\"version\":\"${CLI_VERSION}\"" >/dev/null
+          docker image prune -f >/dev/null || true
+          EOF
