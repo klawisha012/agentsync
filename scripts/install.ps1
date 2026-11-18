@@ -1,7 +1,8 @@
-﻿# AgentSync. Кладёт бинарник agentsync в домашний каталог и добавляет этот каталог в PATH.
+# AgentSync. Кладёт бинарник agentsync в домашний каталог и добавляет этот каталог в PATH.
 # Публикацию не применяет и ИИ-агента не загружает. Пароль в эту инструкцию не входит.
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072
 
 $dir = Join-Path $env:USERPROFILE ".agentsync"
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
@@ -22,17 +23,31 @@ switch ($arch) {
 }
 
 $exe = Join-Path $dir "agentsync.exe"
+$old = "$exe.old"
 $tmp = Join-Path $dir "agentsync.exe.tmp"
 $url = "$origin/cli/agentsync-windows-$goarch.exe"
 try {
   Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing
-  Move-Item -Force -Path $tmp -Destination $exe
 } catch {
   if (Test-Path $tmp) {
     Remove-Item -Force $tmp
   }
   throw "Не удалось скачать agentsync."
 }
+Remove-Item -Force $old -ErrorAction SilentlyContinue
+if (Test-Path $exe) {
+  Move-Item -Force -Path $exe -Destination $old
+}
+try {
+  Move-Item -Force -Path $tmp -Destination $exe
+} catch {
+  if (Test-Path $old) {
+    Move-Item -Force -Path $old -Destination $exe -ErrorAction SilentlyContinue
+  }
+  Remove-Item -Force $tmp -ErrorAction SilentlyContinue
+  throw "Не удалось установить agentsync."
+}
+Remove-Item -Force $old -ErrorAction SilentlyContinue
 
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ([string]::IsNullOrEmpty($userPath)) {

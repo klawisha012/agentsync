@@ -51,7 +51,8 @@ func readScript(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("read install script %s: %w", filepath.Base(path), err)
 	}
-	body := strings.ReplaceAll(string(raw), "\r\n", "\n")
+	body := strings.TrimPrefix(string(raw), "\ufeff")
+	body = strings.ReplaceAll(body, "\r\n", "\n")
 	if strings.TrimSpace(body) == "" {
 		return "", fmt.Errorf("install script %s is empty", filepath.Base(path))
 	}

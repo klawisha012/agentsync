@@ -43,15 +43,30 @@ func TestInstallScripts(t *testing.T) {
 			}
 			want := scriptText(t, filepath.Join(dir, tt.file))
 			matchesFile := body == want
+			noBOM := !strings.HasPrefix(body, "\ufeff")
 			unixNewlines := !strings.Contains(body, "\r")
 			putsOnPath := strings.Contains(body, "PATH") && !strings.Contains(body, "agentsync push")
 			hasMark := strings.Contains(body, tt.mark)
 			hasBinary := strings.Contains(body, "agentsync")
-			served := matchesFile && unixNewlines && putsOnPath && hasMark && hasBinary
+			served := matchesFile && noBOM && unixNewlines && putsOnPath && hasMark && hasBinary
 			if !served {
 				t.Fatalf("body %q", body)
 			}
 		})
+	}
+}
+
+func TestReadScriptStripsBOM(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "install.ps1")
+	if err := os.WriteFile(path, []byte("\ufeff# comment\r\nWrite-Output 'ok'\r\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := readScript(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.HasPrefix(got, "\ufeff") || strings.Contains(got, "\r") {
+		t.Fatalf("got %q", got)
 	}
 }
 

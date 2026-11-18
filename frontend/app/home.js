@@ -24,7 +24,7 @@ const localOnly = [
 ];
 
 export default function Home() {
-  const [origin, setOrigin] = useState("");
+  const [origin, setOrigin] = useState("https://agentsync.zwarder.ru");
   const [tab, setTab] = useState("ps");
   const [copied, setCopied] = useState(false);
   const [explanation, setExplanation] = useState("");
