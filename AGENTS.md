@@ -4,7 +4,6 @@
 - **Triage labels**: five canonical roles matching role names. See `docs/agents/triage-labels.md`.
 - **Domain docs**: `CONTEXT.md` and `docs/adr/` at repo root. See `docs/agents/domain.md`.
 - **UI & Design**: before visual work, read `docs/DESIGN.md`. Colors, typography, spacing, component roles from it; state and behavior from this repo.
-- **Controlled Technical Russian (Ru-STE)**: zero-ambiguity rules for prompts, schemas, errors, and procedures. See `~/.agents/skills/ru-ste/SKILL.md` and `## Language`. The skill lives in the canon `~/.agents` of the developer's machine, not in this repo; `agentsync <ии-агент> on` makes it visible to Codex, Cursor and other AI agents.
 
 ## Graphify (Knowledge graph)
 
@@ -60,43 +59,6 @@ Use Russian for:
 - specs, plans, tasks, checklists, READMEs, ADRs, and other human-facing generated docs.
 
 If the user writes in another language, reply in that language for that exchange. Persisted project artifacts stay Russian unless the user says otherwise.
-
-### Ru-STE (Controlled Technical Russian)
-
-Russian does not automatically mean Ru-STE.
-
-Use Ru-STE only when the text is intended to be executed, interpreted by agents, or processed as a technical specification/instruction.
-
-**When Ru-STE applies:**
-1. Read `~/.agents/skills/ru-ste/SKILL.md`. If the file is missing (fresh clone, CI, another machine), state in the reply that Ru-STE was not applied and continue.
-2. Select **Strict mode** or **STE-adapted mode**.
-3. Apply the selected mode to the generated artifact.
-4. Do not apply Ru-STE rules to normal chat unless the user explicitly requests it.
-
-**Modes:**
-- **Strict mode**: commands, step-by-step procedures, tool schemas, error diagnostics, and agent handoffs.
-- **STE-adapted mode**: technical explanations, verification summaries, and architecture documentation.
-
-**Prompt Authoring:**
-When authoring or rewriting prompts and instructions for agents in Russian, always provide **two variants**:
-1. **Strict** (машинный / zero-ambiguity) — атомарные шаги, активный залог, строгий императив, жесткие лимиты длины, исключение многозначных местоимений (для прямого и детерминированного выполнения LLM).
-2. **STE-adapted** (инженерный / human-readable) — выверенная структура с естественными синтаксическими связками (для чтения человеком и проектной документации).
-
-### Technical clarity in final responses
-
-When the final response describes:
-- executed procedures;
-- verification results;
-- errors and their causes;
-- required user actions;
-- agent handoffs;
-- technical state transitions;
-
-use the principles from `~/.agents/skills/ru-ste/SKILL.md`:
-- **Strict mode** for commands, procedures, and required actions.
-- **STE-adapted mode** for technical explanations and summaries.
-
-Do not use Ru-STE for conversational remarks or when natural language improves clarity.
 
 ## Final Responses
 
